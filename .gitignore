@@ -2,6 +2,7 @@ _build/
 .idea/
 *~
 *.bak
+readme_example_images_code.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
