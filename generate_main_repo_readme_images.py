@@ -469,7 +469,7 @@ def draw_per_augmenter_videos():
 
         def render_title(self):
             #return '<td colspan="%d">\n<small>\n%s\n</small>\n</td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
-            return '<td colspan="%d"><small>%s</small></td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
+            return '<td colspan="%d"><sub>%s</sub></td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
 
         def render_main(self):
             #return '<td colspan="%d">\n\n%s%s%s%s%s\n\n</td>' % (self.colspan, self.markup_images, self.markup_kps, self.markup_bbs, self.markup_hm, self.markup_segmap)
@@ -478,12 +478,12 @@ def draw_per_augmenter_videos():
         def render_comment(self):
             if self.descriptor.comment is not None:
                 #return '<td colspan="%d">\n<small>\n\n%s\n\n</small>\n</td>' % (self.colspan, self.descriptor.comment,)
-                return '<td colspan="%d"><small>%s</small></td>' % (self.colspan, self.descriptor.comment,)
+                return '<td colspan="%d"><sub>%s</sub></td>' % (self.colspan, self.descriptor.comment,)
             else:
                 return '<td colspan="%d">&nbsp;</td>' % (self.colspan,)
 
     class _MarkdownTable(object):
-        ROW_SIZE = 4  # in columns
+        ROW_SIZE = 5  # in columns
 
         def __init__(self):
             self.cells = []
@@ -509,6 +509,8 @@ def draw_per_augmenter_videos():
                             first_row_in_module = True
                         else:
                             break
+                    if cell.colspan > (self.ROW_SIZE - current_row_size):
+                        break
                     row_title.append(cell.render_title())
                     row_main.append(cell.render_main())
                     row_comment.append(cell.render_comment())
@@ -525,7 +527,7 @@ def draw_per_augmenter_videos():
 
                 if first_row_in_module:
                     #markup.append('<tr>\n<td colspan="3">\n\n**%s**\n\n</td>\n</tr>' % (current_module,))
-                    markup.append('<tr><td colspan="3"><strong>%s</strong></td></tr>' % (current_module,))
+                    markup.append('<tr><td colspan="%d"><strong>%s</strong></td></tr>' % (self.ROW_SIZE, current_module,))
                     first_row_in_module = False
                 markup.append("<tr>\n%s\n</tr>\n<tr>\n%s\n</tr>%s" % (
                     "\n".join(row_title),
