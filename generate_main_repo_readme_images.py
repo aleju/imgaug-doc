@@ -24,9 +24,8 @@ IMAGES_DIR = "readme_images"
 
 
 def main():
-    draw_small_overview()
-    draw_single_sequential_images()
-    #draw_per_augmenter_images()
+    #draw_small_overview()
+    #draw_single_sequential_images()
     draw_per_augmenter_videos()
 
 
@@ -412,9 +411,11 @@ def draw_per_augmenter_videos():
             for augmenter, subtitle in zip(self.augmenters, self.subtitles):
                 def _subt(img, toptitle):
                     if self.affects_geometry:
-                        return self._draw_cell(img, subtitle, subtitle_height if any_subtitle else 0, toptitle, 16)
+                        #return self._draw_cell(img, subtitle, subtitle_height if any_subtitle else 0, toptitle, 16)
+                        return self._draw_cell(img, subtitle, subtitle_height, toptitle, 16)
                     else:
-                        return self._draw_cell(img, subtitle, subtitle_height if any_subtitle else 0, "", 0)
+                        #return self._draw_cell(img, subtitle, subtitle_height if any_subtitle else 0, "", 0)
+                        return self._draw_cell(img, subtitle, subtitle_height, "", 16)
                 aug_det = augmenter.to_deterministic()
                 image_aug = aug_det.augment_image(image)
                 kps_aug = aug_det.augment_keypoints([keypoints])[0]
@@ -462,22 +463,28 @@ def draw_per_augmenter_videos():
 
         @property
         def colspan(self):
-            only_images = len(self.markup_kps) == 0 and len(self.markup_bbs) == 0 and len(self.markup_hm) == 0 and len(self.markup_segmap) == 0
-            return 1 if only_images else 3
+            #only_images = len(self.markup_kps) == 0 and len(self.markup_bbs) == 0 and len(self.markup_hm) == 0 and len(self.markup_segmap) == 0
+            only_images = not self.descriptor.affects_geometry
+            return 1 if only_images else 2
 
         def render_title(self):
-            return '<td colspan="%d">\n<small>\n%s\n</small>\n</td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
+            #return '<td colspan="%d">\n<small>\n%s\n</small>\n</td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
+            return '<td colspan="%d"><small>%s</small></td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
 
         def render_main(self):
-            return '<td colspan="%d">\n\n%s%s%s%s%s\n\n</td>' % (self.colspan, self.markup_images, self.markup_kps, self.markup_bbs, self.markup_hm, self.markup_segmap)
+            #return '<td colspan="%d">\n\n%s%s%s%s%s\n\n</td>' % (self.colspan, self.markup_images, self.markup_kps, self.markup_bbs, self.markup_hm, self.markup_segmap)
+            return '<td colspan="%d">%s%s%s%s%s</td>' % (self.colspan, self.markup_images, self.markup_kps, self.markup_bbs, self.markup_hm, self.markup_segmap)
 
         def render_comment(self):
             if self.descriptor.comment is not None:
-                return '<td colspan="%d">\n<small>\n\n%s\n\n</small>\n</td>' % (self.colspan, self.descriptor.comment,)
+                #return '<td colspan="%d">\n<small>\n\n%s\n\n</small>\n</td>' % (self.colspan, self.descriptor.comment,)
+                return '<td colspan="%d"><small>%s</small></td>' % (self.colspan, self.descriptor.comment,)
             else:
                 return '<td colspan="%d">&nbsp;</td>' % (self.colspan,)
 
     class _MarkdownTable(object):
+        ROW_SIZE = 4  # in columns
+
         def __init__(self):
             self.cells = []
 
@@ -492,7 +499,7 @@ def draw_per_augmenter_videos():
                 row_main = []
                 row_comment = []
                 any_comment = False
-                while current_row_size < 3 and len(cells) > 0:
+                while current_row_size < self.ROW_SIZE and len(cells) > 0:
                     cell = cells[0]
                     if current_module is None:
                         current_module = cell.descriptor.module
@@ -505,24 +512,26 @@ def draw_per_augmenter_videos():
                     row_title.append(cell.render_title())
                     row_main.append(cell.render_main())
                     row_comment.append(cell.render_comment())
-                    if cell.descriptor.comment is not None:
+                    if cell.descriptor.comment is not None and len(cell.descriptor.comment) > 0:
                         any_comment = True
                     current_row_size += cell.colspan
                     cells = cells[1:]
 
-                while current_row_size < 3:
+                while current_row_size < self.ROW_SIZE:
                     row_title.append("<td>&nbsp;</td>")
                     row_main.append("<td>&nbsp;</td>")
                     row_comment.append("<td>&nbsp;</td>")
                     current_row_size += 1
 
                 if first_row_in_module:
-                    markup.append('<tr>\n<td colspan="3">\n\n**%s**\n\n</td>\n</tr>' % (current_module,))
+                    #markup.append('<tr>\n<td colspan="3">\n\n**%s**\n\n</td>\n</tr>' % (current_module,))
+                    markup.append('<tr><td colspan="3"><strong>%s</strong></td></tr>' % (current_module,))
                     first_row_in_module = False
-                markup.append("<tr>\n%s\n</tr>\n<tr>\n%s\n</tr>\n<tr>\n%s\n</tr>" % (
+                markup.append("<tr>\n%s\n</tr>\n<tr>\n%s\n</tr>%s" % (
                     "\n".join(row_title),
                     "\n".join(row_main),
-                    "\n".join(row_comment) if any_comment else ""))
+                    "" if not any_comment else "\n<tr>\n%s\n</tr>" % ("\n".join(row_comment),)
+                ))
 
             return "<table>\n\n%s\n\n</table>" % ("\n".join(markup),)
 
@@ -1135,29 +1144,39 @@ def draw_per_augmenter_videos():
                 image if descriptor.module != "weather" else image_landscape,
                 keypoints, bbs, heatmap, segmap, h_subtitle)
 
+        if descriptor.affects_geometry:
+            frames_images = [np.hstack([frame_image, frame_hm, frame_segmap])
+                             for frame_image, frame_hm, frame_segmap in zip(frames_images, frames_hm, frames_segmap)]
+
         aug_name = slugify(descriptor.title)
-        fp_images = os.path.join(IMAGES_DIR, "augmenter_videos/augment_images_with_coordsaug/%s.gif" % (aug_name,))
+        fp_all = os.path.join(IMAGES_DIR, "augmenter_videos/%s.gif" % (aug_name,))
+        #fp_images = os.path.join(IMAGES_DIR, "augmenter_videos/augment_images_with_coordsaug/%s.gif" % (aug_name,))
         #fp_kps = os.path.join(IMAGES_DIR, "augmenter_videos/augment_keypoints/%s.gif" % (aug_name,))
         #fp_bbs = os.path.join(IMAGES_DIR, "augmenter_videos/augment_bounding_boxes/%s.gif" % (aug_name,))
         #fp_kps_bbs = os.path.join(IMAGES_DIR, "augmenter_videos/augment_coordinate_based/%s.gif" % (aug_name,))
-        fp_hm = os.path.join(IMAGES_DIR, "augmenter_videos/augment_heatmaps/%s.gif" % (aug_name,))
-        fp_segmap = os.path.join(IMAGES_DIR, "augmenter_videos/augment_segmentation_maps/%s.gif" % (aug_name,))
+        #fp_hm = os.path.join(IMAGES_DIR, "augmenter_videos/augment_heatmaps/%s.gif" % (aug_name,))
+        #fp_segmap = os.path.join(IMAGES_DIR, "augmenter_videos/augment_segmentation_maps/%s.gif" % (aug_name,))
 
-        _makedirs(fp_images)
-        _makedirs(fp_hm)
-        _makedirs(fp_segmap)
+        #_makedirs(fp_images)
+        #_makedirs(fp_hm)
+        #_makedirs(fp_segmap)
 
-        mimwrite_if_changed(fp_images, frames_images, duration=1.25)
-        if descriptor.affects_geometry:
-            markup_images = '![%s (+Keypoints, +BBs)](%s%s?raw=true "%s (+Keypoints, +BBs")' % (descriptor.title_markup, DOC_BASE, fp_images, descriptor.title_markup)
-        else:
-            markup_images = '![%s](%s%s?raw=true "%s")' % (descriptor.title_markup, DOC_BASE, fp_images, descriptor.title_markup)
+        mimwrite_if_changed(fp_all, frames_images, duration=1.25)
+        #if descriptor.affects_geometry:
+        #    markup_images = '![%s (+Keypoints, +BBs)](%s%s?raw=true "%s (+Keypoints, +BBs")' % (descriptor.title_markup, DOC_BASE, fp_images, descriptor.title_markup)
+        #else:
+        #    markup_images = '![%s](%s%s?raw=true "%s")' % (descriptor.title_markup, DOC_BASE, fp_images, descriptor.title_markup)
+        #markup_images = '![%s](%s%s?raw=true "%s")' % (descriptor.title_markup, DOC_BASE, fp_images, descriptor.title_markup)
+        height = frames_images[0].shape[0]
+        width = frames_images[0].shape[1]
+        markup_images = '<img src="%s%s" height="%d" width="%d" alt="%s">' % (DOC_BASE, fp_all, height, width, descriptor.title_markup)
 
         #markup_kps_bbs = ""
         #markup_kps = ""
         #markup_bbs = ""
         markup_hm = ""
         markup_segmap = ""
+        """
         if descriptor.affects_geometry > 0:
             #imageio.mimsave(fp_kps, frames_kps, duration=1.0)
             #imageio.mimsave(fp_bbs, frames_bbs, duration=1.0)
@@ -1169,6 +1188,7 @@ def draw_per_augmenter_videos():
             #markup_kps_bbs = '![%s (keypoint and BB augmentation)](%s?raw=true "%s (keypoint and BB augmentation)")' % (descriptor.title_markup, fp_kps_bbs, descriptor.title_markup)
             markup_hm = '![%s (heatmap augmentation)](%s%s?raw=true "%s (heatmap augmentation)")' % (descriptor.title_markup, DOC_BASE, fp_hm, descriptor.title_markup)
             markup_segmap = '![%s (segmentation map augmentation)](%s%s?raw=true "%s (segmentation map augmentation)")' % (descriptor.title_markup, DOC_BASE, fp_segmap, descriptor.title_markup)
+        """
 
         #table.append(descriptor, markup_images, markup_kps, markup_bbs, markup_hm, markup_segmap)
         #table.append(descriptor, markup_images, markup_kps_bbs, "", markup_hm, markup_segmap)
