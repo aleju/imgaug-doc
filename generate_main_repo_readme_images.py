@@ -33,7 +33,7 @@ def main():
 def draw_small_overview():
     ia.seed(42)
     image = ia.quokka(size=0.2)
-    heatmap = ia.quokka_heatmap(size=0.4)
+    heatmap = ia.quokka_heatmap(size=0.2)
     segmap = ia.quokka_segmentation_map(size=0.2)
     kps = ia.quokka_keypoints(size=0.2)
     bbs = ia.quokka_bounding_boxes(size=0.2)
@@ -462,7 +462,8 @@ def draw_per_augmenter_videos():
 
         @property
         def colspan(self):
-            return 1 if len(self.markup_kps) == 0 else 3
+            only_images = len(self.markup_kps) == 0 and len(self.markup_bbs) == 0 and len(self.markup_hm) == 0 and len(self.markup_segmap) == 0
+            return 1 if only_images else 3
 
         def render_title(self):
             return '<td colspan="%d">\n<small>\n%s\n</small>\n</td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
@@ -547,21 +548,26 @@ def draw_per_augmenter_videos():
     # ###
     # meta
     # ###
-    # Augmenter (base class for all augmenters)
-    # Sequential
-    # SomeOf
-    # OneOf
-    # Sometimes
-    # WithChannels
     descriptors.extend([
+        # Augmenter (base class for all augmenters)
+        # Sequential
+        # SomeOf
+        # OneOf
+        # Sometimes
+        # WithChannels
         _Descriptor.from_augsubs(
             "meta",
             "Noop",
             [("", iaa.Noop()) for _ in sm.xrange(1)]),
+        # Lambda
+        # AssertLambda
+        # AssertShape
+        _Descriptor.from_augsubs(
+            "meta",
+            "ChannelShuffle",
+            [("p=1.0", iaa.ChannelShuffle(p=1.0)) for _ in sm.xrange(5)]
+        )
     ])
-    # Lambda
-    # AssertLambda
-    # AssertShape
 
     # ###
     # arithmetic
@@ -912,10 +918,11 @@ def draw_per_augmenter_videos():
             "geometric",
             "Affine: Modes",
             [("mode=%s" % (mode,), iaa.Affine(translate_px=-32, mode=mode)) for mode in ["constant", "edge", "symmetric", "reflect", "wrap"]],
-            affects_geometry=True,
-            comment='Augmentation of heatmaps and segmentation maps is currently always done with mode="constant" '
-                    + 'for consistency with keypoint and bounding box augmentation. It may be resonable to use '
-                    + 'mode="constant" for images too when augmenting heatmaps or segmentation maps.'),
+            affects_geometry=True
+            #comment='Augmentation of heatmaps and segmentation maps is currently always done with mode="constant" '
+            #        + 'for consistency with keypoint and bounding box augmentation. It may be resonable to use '
+            #        + 'mode="constant" for images too when augmenting heatmaps or segmentation maps.'
+            ),
         _Descriptor.from_augsubs(
             "geometric",
             "Affine: cval",
@@ -1119,6 +1126,7 @@ def draw_per_augmenter_videos():
             os.makedirs(fp_dir)
 
     # routine to generate gifs and produce markup
+    DOC_BASE = "https://raw.githubusercontent.com/aleju/imgaug-doc/master/"
     table = _MarkdownTable()
 
     for descriptor in descriptors:
@@ -1141,9 +1149,9 @@ def draw_per_augmenter_videos():
 
         mimwrite_if_changed(fp_images, frames_images, duration=1.25)
         if descriptor.affects_geometry:
-            markup_images = '![%s (+Keypoints, +BBs)](doc/%s?raw=true "%s (+Keypoints, +BBs")' % (descriptor.title_markup, fp_images, descriptor.title_markup)
+            markup_images = '![%s (+Keypoints, +BBs)](%s%s?raw=true "%s (+Keypoints, +BBs")' % (descriptor.title_markup, DOC_BASE, fp_images, descriptor.title_markup)
         else:
-            markup_images = '![%s](doc/%s?raw=true "%s")' % (descriptor.title_markup, fp_images, descriptor.title_markup)
+            markup_images = '![%s](%s%s?raw=true "%s")' % (descriptor.title_markup, DOC_BASE, fp_images, descriptor.title_markup)
 
         #markup_kps_bbs = ""
         #markup_kps = ""
@@ -1159,8 +1167,8 @@ def draw_per_augmenter_videos():
             #markup_kps = '![%s (keypoint augmentation)](%s?raw=true "%s (keypoint augmentation)")' % (descriptor.title_markup, fp_kps, descriptor.title_markup)
             #markup_bbs = '![%s (bounding box augmentation)](%s?raw=true "%s (bounding box augmentation)")' % (descriptor.title_markup, fp_bbs, descriptor.title_markup)
             #markup_kps_bbs = '![%s (keypoint and BB augmentation)](%s?raw=true "%s (keypoint and BB augmentation)")' % (descriptor.title_markup, fp_kps_bbs, descriptor.title_markup)
-            markup_hm = '![%s (heatmap augmentation)](doc/%s?raw=true "%s (heatmap augmentation)")' % (descriptor.title_markup, fp_hm, descriptor.title_markup)
-            markup_segmap = '![%s (segmentation map augmentation)](doc/%s?raw=true "%s (segmentation map augmentation)")' % (descriptor.title_markup, fp_segmap, descriptor.title_markup)
+            markup_hm = '![%s (heatmap augmentation)](%s%s?raw=true "%s (heatmap augmentation)")' % (descriptor.title_markup, DOC_BASE, fp_hm, descriptor.title_markup)
+            markup_segmap = '![%s (segmentation map augmentation)](%s%s?raw=true "%s (segmentation map augmentation)")' % (descriptor.title_markup, DOC_BASE, fp_segmap, descriptor.title_markup)
 
         #table.append(descriptor, markup_images, markup_kps, markup_bbs, markup_hm, markup_segmap)
         #table.append(descriptor, markup_images, markup_kps_bbs, "", markup_hm, markup_segmap)
