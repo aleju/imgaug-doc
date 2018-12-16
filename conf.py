@@ -37,6 +37,17 @@ def logical_abspath(p):
 sys.path.insert(0, logical_abspath('../'))
 # --------------
 
+# --------------
+# Currently we add imgaug/ source as a subfolder here, so that we can build the docs from the main directory
+# and keep that main directory in a state where it only contains docs files.
+# This allows us to link the imgaug-doc repository as doc/ from the main repo, but simultaneously also let RTD
+# build the docs from imgaug-doc, including auto-generated API.
+dir_path = os.path.abspath(os.path.dirname(__file__))
+if os.path.exists(os.path.join(dir_path, "imgaug")):
+    # the included directory must contain imgaug/ as a subdirectory, hence we do *not* add <current_dir>/imgaug
+    sys.path.insert(0, dir_path)
+# --------------
+
 
 # unittest.mock is available in python 3.3+ by default
 # in lower versions run 'pip install mock'
