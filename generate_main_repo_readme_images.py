@@ -24,8 +24,8 @@ IMAGES_DIR = "readme_images"
 
 
 def main():
-    #draw_small_overview()
-    #draw_single_sequential_images()
+    draw_small_overview()
+    draw_single_sequential_images()
     draw_per_augmenter_videos()
 
 
