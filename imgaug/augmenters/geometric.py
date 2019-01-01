@@ -61,6 +61,50 @@ class Affine(meta.Augmenter):
     of the input image to generate output pixel values. The parameter `order`
     deals with the method of interpolation used for this.
 
+    dtype support::
+
+        If (backend="skimage")::
+
+            * ``uint8``: yes; fully tested
+            * ``uint16``: yes; tested (1)
+            * ``uint32``: yes; tested (1) (2)
+            * ``uint64``: no (3)
+            * ``int8``: yes; tested (1)
+            * ``int16``: yes; tested (1)
+            * ``int32``: yes; tested (1)  (2)
+            * ``int64``: no (3)
+            * ``float16``: yes; tested (1)
+            * ``float32``: yes; tested (1)
+            * ``float64``: yes; tested (1)
+            * ``float128``: no (3)
+            * ``bool``: yes; tested (1)
+
+            - (1) only tested with `order` set to 0.
+            - (2) scikit-image converts internally to float64, which might affect the accuracy of
+                  large integers. In tests this seemed to not be an issue.
+            - (3) results too inaccurate
+
+        If (backend="cv2")::
+
+            * ``uint8``: yes; fully tested
+            * ``uint16``: yes; tested (1)
+            * ``uint32``: no (2)
+            * ``uint64``: no (3)
+            * ``int8``: yes; tested (1)
+            * ``int16``: yes; tested (1)
+            * ``int32``: yes; tested (1)
+            * ``int64``: no (3)
+            * ``float16``: yes; tested (4)
+            * ``float32``: yes; tested (1)
+            * ``float64``: yes; tested (1)
+            * ``float128``: no (2)
+            * ``bool``: yes; tested (1) (4)
+
+            - (1) only tested with `order` set to 0.
+            - (2) rejected by cv2
+            - (3) changed to ``int32`` by cv2
+            - (4) mapped internally to ``float32``
+
     Parameters
     ----------
     scale : number or tuple of number or list of number or imgaug.parameters.StochasticParameter\
@@ -322,6 +366,7 @@ class Affine(meta.Augmenter):
     the value of the nearest edge is used.
 
     """
+    VALID_DTYPES_CV2 = set(["uint8", "uint16", "int8", "int16", "int32", "float16", "float32", "float64", "bool"])
 
     def __init__(self, scale=1.0, translate_percent=None, translate_px=None, rotate=0.0, shear=0.0, order=1, cval=0,
                  mode="constant", fit_output=False, backend="auto", name=None, deterministic=False, random_state=None):
@@ -381,9 +426,10 @@ class Affine(meta.Augmenter):
                 type(order),))
 
         if cval == ia.ALL:
-            self.cval = iap.Uniform(0, 255) # skimage transform expects float
+            # TODO change this so that it is dynamically created per image (or once per dtype)
+            self.cval = iap.Uniform(0, 255)  # skimage transform expects float
         else:
-            self.cval = iap.handle_continuous_param(cval, "cval", value_range=(0, 255), tuple_to_uniform=True,
+            self.cval = iap.handle_continuous_param(cval, "cval", value_range=None, tuple_to_uniform=True,
                                                     list_to_choice=True)
 
         # constant, edge, symmetric, reflect, wrap
@@ -492,6 +538,9 @@ class Affine(meta.Augmenter):
             matrices = [None] * nb_images
         for i in sm.xrange(nb_images):
             image = images[i]
+
+            min_value, _center_value, max_value = meta.get_value_range_of_dtype(image.dtype)
+
             scale_x, scale_y = scale_samples[0][i], scale_samples[1][i]
             translate_x, translate_y = translate_samples[0][i], translate_samples[1][i]
             if ia.is_single_float(translate_y):
@@ -510,15 +559,15 @@ class Affine(meta.Augmenter):
             if scale_x != 1.0 or scale_y != 1.0 or translate_x_px != 0 or translate_y_px != 0 or rotate != 0 \
                     or shear != 0:
                 cv2_bad_order = order not in [0, 1, 3]
-                cv2_bad_dtype = image.dtype not in [np.uint8, np.float32, np.float64]
+                cv2_bad_dtype = image.dtype.name not in self.VALID_DTYPES_CV2
+                cv2_bad_dtype = False
                 cv2_bad_shape = image.shape[2] > 4
                 cv2_impossible = cv2_bad_order or cv2_bad_dtype or cv2_bad_shape
                 if self.backend == "skimage" or (self.backend == "auto" and cv2_impossible):
                     # cval contains 3 values as cv2 can handle 3, but skimage only 1
                     cval = cval[0]
                     # skimage does not clip automatically
-                    if image.dtype == np.uint8:
-                        cval = np.clip(cval, 0, 255)
+                    cval = max(min(cval, max_value), min_value)
                     image_warped = self._warp_skimage(
                         image,
                         scale_x, scale_y,
@@ -697,6 +746,15 @@ class Affine(meta.Augmenter):
 
     def _warp_skimage(self, image, scale_x, scale_y, translate_x_px, translate_y_px, rotate, shear, cval, mode, order,
                       fit_output, return_matrix=False):
+        meta.gate_dtypes(image,
+                         allowed=["bool", "uint8", "uint16", "uint32", "int8", "int16", "int32",
+                                  "float16", "float32", "float64"],
+                         disallowed=["uint64", "uint128", "uint256", "int64", "int128", "int256",
+                                     "float96", "float128", "float256"],
+                         augmenter=self)
+
+        input_dtype = image.dtype
+
         height, width = image.shape[0], image.shape[1]
         shift_x = width / 2.0 - 0.5
         shift_y = height / 2.0 - 0.5
@@ -724,9 +782,12 @@ class Affine(meta.Augmenter):
             preserve_range=True,
             output_shape=output_shape,
         )
-        # warp changes uint8 to float64, making this necessary
-        if image_warped.dtype != image.dtype:
-            image_warped = image_warped.astype(image.dtype, copy=False)
+
+        # tf.warp changes all dtypes to float64, including uint8
+        if input_dtype == np.bool_:
+            image_warped = image_warped > 0.5
+        else:
+            image_warped = meta.restore_dtypes_(image_warped, input_dtype)
 
         if return_matrix:
             return image_warped, matrix
@@ -734,6 +795,17 @@ class Affine(meta.Augmenter):
 
     def _warp_cv2(self, image, scale_x, scale_y, translate_x_px, translate_y_px, rotate, shear, cval, mode, order,
                   fit_output, return_matrix=False):
+        meta.gate_dtypes(image,
+                         allowed=["bool", "uint8", "uint16", "int8", "int16", "int32",
+                                  "float16", "float32", "float64"],
+                         disallowed=["uint64", "uint128", "uint256", "int64", "int128", "int256",
+                                     "float96", "float128", "float256"],
+                         augmenter=self)
+
+        input_dtype = image.dtype
+        if input_dtype in [np.bool_, np.float16]:
+            image = image.astype(np.float32)
+
         height, width = image.shape[0], image.shape[1]
         shift_x = width / 2.0 - 0.5
         shift_y = height / 2.0 - 0.5
@@ -766,6 +838,11 @@ class Affine(meta.Augmenter):
         if image_warped.ndim == 2:
             image_warped = image_warped[..., np.newaxis]
 
+        if input_dtype == np.bool_:
+            image_warped = image_warped > 0.5
+        elif input_dtype == np.float16:
+            image_warped = meta.restore_dtypes_(image_warped, input_dtype)
+
         if return_matrix:
             return image_warped, matrix
         return image_warped
@@ -796,6 +873,22 @@ class AffineCv2(meta.Augmenter):
     Some transformations involve interpolations between several pixels
     of the input image to generate output pixel values. The parameter `order`
     deals with the method of interpolation used for this.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: ?
+        * ``uint32``: ?
+        * ``uint64``: ?
+        * ``int8``: ?
+        * ``int16``: ?
+        * ``int32``: ?
+        * ``int64``: ?
+        * ``float16``: ?
+        * ``float32``: ?
+        * ``float64``: ?
+        * ``float128``: ?
+        * ``bool``: ?
 
     Parameters
     ----------
@@ -1339,6 +1432,28 @@ class PiecewiseAffine(meta.Augmenter):
     This is mostly a wrapper around scikit-image's PiecewiseAffine.
     See also the Affine augmenter for a similar technique.
 
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested (1)
+        * ``uint32``: yes; tested (1) (2)
+        * ``uint64``: no (3)
+        * ``int8``: yes; tested (1)
+        * ``int16``: yes; tested (1)
+        * ``int32``: yes; tested (1) (2)
+        * ``int64``: no (3)
+        * ``float16``: yes; tested (1)
+        * ``float32``: yes; tested (1)
+        * ``float64``: yes; tested (1)
+        * ``float128``: no (3)
+        * ``bool``: yes; tested (1) (4)
+
+        - (1) Only tested with `order` set to 0.
+        - (2) scikit-image converts internally to ``float64``, which might introduce inaccuracies.
+              Tests showed that these inaccuracies seemed to not be an issue.
+        - (3) results too inaccurate
+        - (4) mapped internally to ``float64``
+
     Parameters
     ----------
     scale : float or tuple of float or imgaug.parameters.StochasticParameter, optional
@@ -1461,9 +1576,10 @@ class PiecewiseAffine(meta.Augmenter):
             raise Exception("Expected order to be imgaug.ALL, int or StochasticParameter, got %s." % (type(order),))
 
         if cval == ia.ALL:
+            # TODO change this so that it is dynamically created per image (or once per dtype)
             self.cval = iap.Uniform(0, 255)
         else:
-            self.cval = iap.handle_continuous_param(cval, "cval", value_range=(0, 255), tuple_to_uniform=True,
+            self.cval = iap.handle_continuous_param(cval, "cval", value_range=None, tuple_to_uniform=True,
                                                     list_to_choice=True)
 
         # constant, edge, symmetric, reflect, wrap
@@ -1483,37 +1599,57 @@ class PiecewiseAffine(meta.Augmenter):
         self.absolute_scale = absolute_scale
 
     def _augment_images(self, images, random_state, parents, hooks):
+        meta.gate_dtypes(images,
+                         allowed=["bool", "uint8", "uint16", "uint32", "int8", "int16", "int32",
+                                  "float16", "float32", "float64"],
+                         disallowed=["uint64", "uint128", "uint256", "int64", "int128", "int256",
+                                     "float96", "float128", "float256"],
+                         augmenter=self)
+
         result = images
         nb_images = len(images)
 
-        seeds = ia.copy_random_state(random_state).randint(0, 10**6, (nb_images+1,))
+        rss = ia.derive_random_states(random_state, nb_images+5)
 
-        seed = seeds[-1]
-        nb_rows_samples = self.nb_rows.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 1))
-        nb_cols_samples = self.nb_cols.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 2))
-        cval_samples = self.cval.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 3))
-        mode_samples = self.mode.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 4))
-        order_samples = self.order.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 5))
+        # make sure to sample "order" here at the 3rd position to match the sampling steps
+        # in _augment_heatmaps()
+        nb_rows_samples = self.nb_rows.draw_samples((nb_images,), random_state=rss[-5])
+        nb_cols_samples = self.nb_cols.draw_samples((nb_images,), random_state=rss[-4])
+        order_samples = self.order.draw_samples((nb_images,), random_state=rss[-3])
+        cval_samples = self.cval.draw_samples((nb_images,), random_state=rss[-2])
+        mode_samples = self.mode.draw_samples((nb_images,), random_state=rss[-1])
 
-        for i in sm.xrange(nb_images):
-            rs_image = ia.new_random_state(seeds[i])
-            h, w = images[i].shape[0:2]
+        for i, image in enumerate(images):
+            rs_image = rss[i]
+            h, w = image.shape[0:2]
+
             transformer = self._get_transformer(h, w, nb_rows_samples[i], nb_cols_samples[i], rs_image)
 
             if transformer is not None:
+                input_dtype = image.dtype
+                if image.dtype == np.bool_:
+                    image = image.astype(np.float64)
+
+                min_value, _center_value, max_value = meta.get_value_range_of_dtype(image.dtype)
+                cval = cval_samples[i]
+                cval = max(min(cval, max_value), min_value)
+
                 image_warped = tf.warp(
-                    images[i],
+                    image,
                     transformer,
                     order=order_samples[i],
                     mode=mode_samples[i],
-                    cval=cval_samples[i],
+                    cval=cval,
                     preserve_range=True,
                     output_shape=images[i].shape
                 )
 
-                # warp changes uint8 to float64, making this necessary
-                if image_warped.dtype != images[i].dtype:
-                    image_warped = image_warped.astype(images[i].dtype, copy=False)
+                if input_dtype == np.bool_:
+                    image_warped = image_warped > 0.5
+                else:
+                    # warp seems to change everything to float64, including uint8,
+                    # making this necessary
+                    image_warped = meta.restore_dtypes_(image_warped, input_dtype)
 
                 result[i] = image_warped
 
@@ -1523,18 +1659,17 @@ class PiecewiseAffine(meta.Augmenter):
         result = heatmaps
         nb_images = len(heatmaps)
 
-        seeds = ia.copy_random_state(random_state).randint(0, 10**6, (nb_images+1,))
+        rss = ia.derive_random_states(random_state, nb_images+3)
 
-        seed = seeds[-1]
-        nb_rows_samples = self.nb_rows.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 1))
-        nb_cols_samples = self.nb_cols.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 2))
-        order_samples = self.order.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 5))
+        nb_rows_samples = self.nb_rows.draw_samples((nb_images,), random_state=rss[-3])
+        nb_cols_samples = self.nb_cols.draw_samples((nb_images,), random_state=rss[-2])
+        order_samples = self.order.draw_samples((nb_images,), random_state=rss[-1])
 
         for i in sm.xrange(nb_images):
             heatmaps_i = heatmaps[i]
             arr_0to1 = heatmaps_i.arr_0to1
 
-            rs_image = ia.new_random_state(seeds[i])
+            rs_image = rss[i]
             h, w = arr_0to1.shape[0:2]
             transformer = self._get_transformer(h, w, nb_rows_samples[i], nb_cols_samples[i], rs_image)
 
@@ -1560,13 +1695,13 @@ class PiecewiseAffine(meta.Augmenter):
         result = []
         nb_images = len(keypoints_on_images)
 
-        seeds = ia.copy_random_state(random_state).randint(0, 10**6, (nb_images+1,))
-        seed = seeds[-1]
-        nb_rows_samples = self.nb_rows.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 1))
-        nb_cols_samples = self.nb_cols.draw_samples((nb_images,), random_state=ia.new_random_state(seed + 2))
+        rss = ia.derive_random_states(random_state, nb_images+2)
+
+        nb_rows_samples = self.nb_rows.draw_samples((nb_images,), random_state=rss[-2])
+        nb_cols_samples = self.nb_cols.draw_samples((nb_images,), random_state=rss[-1])
 
         for i in sm.xrange(nb_images):
-            rs_image = ia.new_random_state(seeds[i])
+            rs_image = rss[i]
             kpsoi = keypoints_on_images[i]
             h, w = kpsoi.shape[0:2]
             transformer = self._get_transformer(h, w, nb_rows_samples[i], nb_cols_samples[i], rs_image)
@@ -1693,6 +1828,37 @@ class PerspectiveTransform(meta.Augmenter):
 
     Code partially from http://www.pyimagesearch.com/2014/08/25/4-point-opencv-getperspective-transform-example/ .
 
+    dtype support::
+
+        if (keep_size=False)::
+
+            * ``uint8``: yes; fully tested
+            * ``uint16``: yes; tested
+            * ``uint32``: no (1)
+            * ``uint64``: no (2)
+            * ``int8``: yes; tested (3)
+            * ``int16``: yes; tested
+            * ``int32``: no (2)
+            * ``int64``: no (2)
+            * ``float16``: yes; tested (4)
+            * ``float32``: yes; tested
+            * ``float64``: yes; tested
+            * ``float128``: no (1)
+            * ``bool``: yes; tested (4)
+
+            - (1) rejected by opencv
+            - (2) leads to opencv error: cv2.error: ``OpenCV(3.4.4) (...)imgwarp.cpp:1805: error:
+                  (-215:Assertion failed) ifunc != 0 in function 'remap'``.
+            - (3) mapped internally to ``int16``.
+            - (4) mapped intenally to ``float32``.
+
+        else::
+
+            minimum of (
+                ``imgaug.augmenters.geometric.PerspectiveTransform(keep_size=False)``,
+                :func:`imgaug.imgaug.imresize_many_images`
+            )
+
     Parameters
     ----------
     scale : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
@@ -1745,6 +1911,13 @@ class PerspectiveTransform(meta.Augmenter):
         self.keep_size = keep_size
 
     def _augment_images(self, images, random_state, parents, hooks):
+        meta.gate_dtypes(images,
+                         allowed=["bool", "uint8", "uint16", "int8", "int16",
+                                  "float16", "float32", "float64"],
+                         disallowed=["uint32", "uint64", "uint128", "uint256", "int32", "int64", "int128", "int256",
+                                     "float96", "float128", "float256"],
+                         augmenter=self)
+
         result = images
         if not self.keep_size:
             result = list(result)
@@ -1755,29 +1928,37 @@ class PerspectiveTransform(meta.Augmenter):
         )
 
         for i, (M, max_height, max_width) in enumerate(zip(matrices, max_heights, max_widths)):
+            image = images[i]
+
             # cv2.warpPerspective only supports <=4 channels
-            nb_channels = images[i].shape[2]
-            dtype = images[i].dtype
-            if dtype not in [np.float32, np.float64, np.uint8]:
-                images[i] = images[i].astype(np.float64)  # e.g. np.int32
+            nb_channels = image.shape[2]
+            input_dtype = image.dtype
+            if input_dtype in [np.int8]:
+                image = image.astype(np.int16)
+            elif input_dtype in [np.bool_, np.float16]:
+                image = image.astype(np.float32)
+
             if nb_channels <= 4:
-                warped = cv2.warpPerspective(images[i], M, (max_width, max_height))
+                warped = cv2.warpPerspective(image, M, (max_width, max_height))
                 if warped.ndim == 2 and images[i].ndim == 3:
                     warped = np.expand_dims(warped, 2)
             else:
                 # warp each channel on its own, re-add channel axis, then stack
                 # the result from a list of [H, W, 1] to (H, W, C).
-                warped = [cv2.warpPerspective(images[i][..., c], M, (max_width, max_height))
+                warped = [cv2.warpPerspective(image[..., c], M, (max_width, max_height))
                           for c in sm.xrange(nb_channels)]
                 warped = [warped_i[..., np.newaxis] for warped_i in warped]
                 warped = np.dstack(warped)
 
             if self.keep_size:
-                h, w = images[i].shape[0:2]
+                h, w = image.shape[0:2]
                 warped = ia.imresize_single_image(warped, (h, w), interpolation="cubic")
 
-            if warped.dtype != dtype:
-                warped = warped.astype(dtype)
+            if input_dtype == np.bool_:
+                warped = warped > 0.5
+            elif warped.dtype != input_dtype:
+                warped = meta.restore_dtypes_(warped, input_dtype)
+
             result[i] = warped
 
         return result
@@ -1970,6 +2151,27 @@ class ElasticTransformation(meta.Augmenter):
 
     for a detailed explanation.
 
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested (1)
+        * ``uint32``: yes; tested (1)
+        * ``uint64``: no (2)
+        * ``int8``: yes; tested (1)
+        * ``int16``: yes; tested (1)
+        * ``int32``: yes; tested (1)
+        * ``int64``: no (2)
+        * ``float16``: yes; tested (1) (3)
+        * ``float32``: yes; tested (1)
+        * ``float64``: yes; tested (1)
+        * ``float128``: no (4)
+        * ``bool``: yes; tested (1)
+
+        - (1) Only tested with `order` set to 0 (nearest neighbour interpolation).
+        - (2) Results too inaccurate.
+        - (3) Mapped internally to ``float32``.
+        - (4) dtype rejected by scipy.
+
     Parameters
     ----------
     alpha : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
@@ -2095,9 +2297,10 @@ class ElasticTransformation(meta.Augmenter):
                                                    list_to_choice=True, allow_floats=False)
 
         if cval == ia.ALL:
+            # TODO change this so that it is dynamically created per image (or once per dtype)
             self.cval = iap.DiscreteUniform(0, 255)
         else:
-            self.cval = iap.handle_discrete_param(cval, "cval", value_range=(0, 255), tuple_to_uniform=True,
+            self.cval = iap.handle_discrete_param(cval, "cval", value_range=None, tuple_to_uniform=True,
                                                   list_to_choice=True, allow_floats=True)
 
         if mode == ia.ALL:
@@ -2123,25 +2326,45 @@ class ElasticTransformation(meta.Augmenter):
         return seeds[0:-1], alphas, sigmas, orders, cvals, modes
 
     def _augment_images(self, images, random_state, parents, hooks):
+        meta.gate_dtypes(images,
+                         allowed=["bool", "uint8", "uint16", "uint32", "int8", "int16", "int32",
+                                  "float16", "float32", "float64"],
+                         disallowed=["uint64", "uint128", "uint256", "int64", "int128", "int256",
+                                     "float96", "float128", "float256"],
+                         augmenter=self)
+
         result = images
         nb_images = len(images)
         seeds, alphas, sigmas, orders, cvals, modes = self._draw_samples(nb_images, random_state)
-        for i in sm.xrange(nb_images):
+        for i, image in enumerate(images):
             image = images[i]
+            min_value, _center_value, max_value = meta.get_value_range_of_dtype(image.dtype)
+            cval = cvals[i]
+            cval = max(min(cval, max_value), min_value)
+
+            input_dtype = image.dtype
+            if image.dtype == np.dtype(np.float16):
+                image = image.astype(np.float32)
+
             (source_indices_x, source_indices_y), (_dx, _dy) = ElasticTransformation.generate_indices(
                 image.shape[0:2],
                 alpha=alphas[i],
                 sigma=sigmas[i],
                 random_state=ia.new_random_state(seeds[i])
             )
-            result[i] = ElasticTransformation.map_coordinates(
-                images[i],
+            image_aug = ElasticTransformation.map_coordinates(
+                image,
                 source_indices_x,
                 source_indices_y,
                 order=orders[i],
-                cval=cvals[i],
+                cval=cval,
                 mode=modes[i]
             )
+
+            if image.dtype != input_dtype:
+                image_aug = meta.restore_dtypes_(image_aug, input_dtype)
+            result[i] = image_aug
+
         return result
 
     def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
@@ -2326,6 +2549,31 @@ class Rot90(meta.Augmenter):
     Augmenter to rotate images clockwise by multiples of 90 degrees.
 
     This could also be achieved using ``Affine``, but Rot90 is significantly more efficient.
+
+    dtype support::
+
+        if (keep_size=False)::
+
+            * ``uint8``: yes; fully tested
+            * ``uint16``: yes; tested
+            * ``uint32``: yes; tested
+            * ``uint64``: yes; tested
+            * ``int8``: yes; tested
+            * ``int16``: yes; tested
+            * ``int32``: yes; tested
+            * ``int64``: yes; tested
+            * ``float16``: yes; tested
+            * ``float32``: yes; tested
+            * ``float64``: yes; tested
+            * ``float128``: yes; tested
+            * ``bool``: yes; tested
+
+        else::
+
+            minimum of (
+                ``imgaug.augmenters.geometric.Rot90(keep_size=False)``,
+                :func:`imgaug.imgaug.imresize_many_images`
+            )
 
     Parameters
     ----------

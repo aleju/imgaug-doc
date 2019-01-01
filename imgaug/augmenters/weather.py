@@ -39,6 +39,25 @@ class FastSnowyLandscape(meta.Augmenter):
     This is based on the method proposed by
     https://medium.freecodecamp.org/image-augmentation-make-it-rain-make-it-snow-how-to-modify-a-photo-with-machine-learning-163c0cb3843f?gi=bca4a13e634c
 
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: no (1)
+        * ``uint32``: no (1)
+        * ``uint64``: no (1)
+        * ``int8``: no (1)
+        * ``int16``: no (1)
+        * ``int32``: no (1)
+        * ``int64``: no (1)
+        * ``float16``: no (1)
+        * ``float32``: no (1)
+        * ``float64``: no (1)
+        * ``float128``: no (1)
+        * ``bool``: no (1)
+
+        - (1) This augmenter is based on a colorspace conversion to HLS. Hence, only RGB uint8
+              inputs are sensible.
+
     Parameters
     ----------
     lightness_threshold : number or tuple of number or list of number\
@@ -159,6 +178,26 @@ def Clouds(name=None, deterministic=False, random_state=None):
     This augmenter seems to be fairly robust w.r.t. the image size. Tested with ``96x128``, ``192x256``
     and ``960x1280``.
 
+    dtype support::
+
+        * ``uint8``: yes; tested
+        * ``uint16``: no (1)
+        * ``uint32``: no (1)
+        * ``uint64``: no (1)
+        * ``int8``: no (1)
+        * ``int16``: no (1)
+        * ``int32``: no (1)
+        * ``int64``: no (1)
+        * ``float16``: no (1)
+        * ``float32``: no (1)
+        * ``float64``: no (1)
+        * ``float128``: no (1)
+        * ``bool``: no (1)
+
+        - (1) Parameters of this augmenter are optimized for the value range of uint8.
+              While other dtypes may be accepted, they will lead to images augmented in
+              ways inappropiate for the respective dtype.
+
     Parameters
     ----------
     name : None or str, optional
@@ -206,6 +245,26 @@ def Fog(name=None, deterministic=False, random_state=None):
     This augmenter seems to be fairly robust w.r.t. the image size. Tested with ``96x128``, ``192x256``
     and ``960x1280``.
 
+    dtype support::
+
+        * ``uint8``: yes; tested
+        * ``uint16``: no (1)
+        * ``uint32``: no (1)
+        * ``uint64``: no (1)
+        * ``int8``: no (1)
+        * ``int16``: no (1)
+        * ``int32``: no (1)
+        * ``int64``: no (1)
+        * ``float16``: no (1)
+        * ``float32``: no (1)
+        * ``float64``: no (1)
+        * ``float128``: no (1)
+        * ``bool``: no (1)
+
+        - (1) Parameters of this augmenter are optimized for the value range of uint8.
+              While other dtypes may be accepted, they will lead to images augmented in
+              ways inappropiate for the respective dtype.
+
     Parameters
     ----------
     name : None or str, optional
@@ -240,6 +299,28 @@ def Fog(name=None, deterministic=False, random_state=None):
 class CloudLayer(meta.Augmenter):
     """
     Augmenter to add a single layer of clouds to an image.
+
+    dtype support::
+
+        * ``uint8``: yes; tested (1)
+        * ``uint16``: no
+        * ``uint32``: no
+        * ``uint64``: no
+        * ``int8``: no
+        * ``int16``: no
+        * ``int32``: no
+        * ``int64``: no
+        * ``float16``: yes; not tested
+        * ``float32``: yes; not tested
+        * ``float64``: yes; not tested
+        * ``float128``: yes; not tested (2)
+        * ``bool``: no
+
+        - (1) indirectly tested via tests for ``Clouds`` and ``Fog``
+        - (2) Note that random values are usually sampled as ``int64`` or ``float64``, which
+              ``float128`` images would exceed. Note also that random values might have to upscaled,
+              which is done via :func:`imgaug.imgaug.imresize_many_images` and has its own limited
+              dtype support (includes however floats up to ``64bit``).
 
     Parameters
     ----------
@@ -361,14 +442,25 @@ class CloudLayer(meta.Augmenter):
                 self.intensity_coarse_scale]
 
     def draw_on_image(self, image, random_state):
+        meta.gate_dtypes(image,
+                         allowed=["uint8",  "float16", "float32", "float64", "float96", "float128", "float256"],
+                         disallowed=["bool",
+                                     "uint16", "uint32", "uint64", "uint128", "uint256",
+                                     "int8", "int16", "int32", "int64", "int128", "int256"])
+
         alpha, intensity = self.generate_maps(image, random_state)
         alpha = alpha[..., np.newaxis]
         intensity = intensity[..., np.newaxis]
-        return np.clip(
-            (1 - alpha) * image.astype(np.float64) + alpha * intensity.astype(np.float64),
-            0,
-            255
-        ).astype(np.uint8)
+        if image.dtype.kind == "f":
+            intensity = intensity.astype(image.dtype)
+            return (1 - alpha) * image + alpha * intensity,
+        else:
+            intensity = np.clip(intensity, 0, 255)
+            return np.clip(
+                (1 - alpha) * image.astype(alpha.dtype) + alpha * intensity.astype(alpha.dtype),
+                0,
+                255
+            ).astype(np.uint8)
 
     def generate_maps(self, image, random_state):
         intensity_mean_sample = self.intensity_mean.draw_sample(random_state)
@@ -390,7 +482,7 @@ class CloudLayer(meta.Augmenter):
         )
         intensity_fine = self._generate_intensity_map_fine(height, width, intensity_mean_sample,
                                                            intensity_freq_exponent, rss_intensity)
-        intensity = np.clip(intensity_coarse + intensity_fine, 0, 255)
+        intensity = intensity_coarse + intensity_fine
 
         alpha = self._generate_alpha_mask(height, width, alpha_min_sample, alpha_multiplier_sample,
                                           alpha_freq_exponent, alpha_size_px_max,
@@ -403,7 +495,7 @@ class CloudLayer(meta.Augmenter):
         height_intensity, width_intensity = (8, 8)  # TODO this might be too simplistic for some image sizes
         intensity = intensity_mean\
             + intensity_local_offset.draw_samples((height_intensity, width_intensity), random_state)
-        intensity = ia.imresize_single_image(np.clip(intensity, 0, 255).astype(np.uint8), (height, width),
+        intensity = ia.imresize_single_image(intensity, (height, width),
                                              interpolation="cubic")
 
         return intensity
@@ -441,6 +533,26 @@ def Snowflakes(density=(0.005, 0.075), density_uniformity=(0.3, 0.9), flake_size
     Augmenter to add falling snowflakes to images.
 
     This is a wrapper around ``SnowflakesLayer``. It executes 1 to 3 layers per image.
+
+    dtype support::
+
+        * ``uint8``: yes; tested
+        * ``uint16``: no (1)
+        * ``uint32``: no (1)
+        * ``uint64``: no (1)
+        * ``int8``: no (1)
+        * ``int16``: no (1)
+        * ``int32``: no (1)
+        * ``int64``: no (1)
+        * ``float16``: no (1)
+        * ``float32``: no (1)
+        * ``float64``: no (1)
+        * ``float128``: no (1)
+        * ``bool``: no (1)
+
+        - (1) Parameters of this augmenter are optimized for the value range of uint8.
+              While other dtypes may be accepted, they will lead to images augmented in
+              ways inappropiate for the respective dtype.
 
     Parameters
     ----------
@@ -562,6 +674,24 @@ def Snowflakes(density=(0.005, 0.075), density_uniformity=(0.3, 0.9), flake_size
 class SnowflakesLayer(meta.Augmenter):
     """
     Augmenter to add a single layer of falling snowflakes to images.
+
+    dtype support::
+
+        * ``uint8``: yes; indirectly tested (1)
+        * ``uint16``: no
+        * ``uint32``: no
+        * ``uint64``: no
+        * ``int8``: no
+        * ``int16``: no
+        * ``int32``: no
+        * ``int64``: no
+        * ``float16``: no
+        * ``float32``: no
+        * ``float64``: no
+        * ``float128``: no
+        * ``bool``: no
+
+        - (1) indirectly tested via tests for ``Snowflakes``
 
     Parameters
     ----------

@@ -158,6 +158,10 @@ class Scale(meta.Augmenter):
     """
     Augmenter that scales/resizes images to specified heights and widths.
 
+    dtype support::
+
+        See :func:`imgaug.imgaug.imresize_many_images`.
+
     Parameters
     ----------
     size : 'keep' or int or float or tuple of int or tuple of float or list of int or list of float or\
@@ -348,8 +352,6 @@ class Scale(meta.Augmenter):
         samples_h, samples_w, samples_ip = self._draw_samples(nb_images, random_state, do_sample_ip=True)
         for i in sm.xrange(nb_images):
             image = images[i]
-            ia.do_assert(image.dtype == np.uint8,
-                         "Scale() can currently only process images of dtype uint8 (got %s)" % (image.dtype,))
             sample_h, sample_w, sample_ip = samples_h[i], samples_w[i], samples_ip[i]
             h, w = self._compute_height_width(image.shape, sample_h, sample_w)
             image_rs = ia.imresize_single_image(image, (h, w), interpolation=sample_ip)
@@ -449,6 +451,31 @@ class CropAndPad(meta.Augmenter):
     percent (relative to input image size).
     Cropping removes pixels at the sides (i.e. extracts a subimage from
     a given full image). Padding adds pixels to the sides (e.g. black pixels).
+
+    dtype support::
+
+        if (keep_size=False)::
+
+            * ``uint8``: yes; fully tested
+            * ``uint16``: yes; tested
+            * ``uint32``: yes; tested
+            * ``uint64``: yes; tested
+            * ``int8``: yes; tested
+            * ``int16``: yes; tested
+            * ``int32``: yes; tested
+            * ``int64``: yes; tested
+            * ``float16``: yes; tested
+            * ``float32``: yes; tested
+            * ``float64``: yes; tested
+            * ``float128``: yes; tested
+            * ``bool``: yes; tested
+
+        if (keep_size=True)::
+
+            minimum of (
+                ``imgaug.augmenters.size.CropAndPad(keep_size=False)``,
+                :func:`imgaug.imgaug.imresize_many_images`
+            )
 
     Parameters
     ----------
@@ -677,7 +704,7 @@ class CropAndPad(meta.Augmenter):
             else:
                 raise Exception("Expected int, tuple of 4 ints/tuples/lists/StochasticParameters or "
                                 + "StochasticParameter, got type %s." % (type(px),))
-        else: # = elif percent is not None:
+        else:  # = elif percent is not None:
             self.mode = "percent"
             if ia.is_single_number(percent):
                 ia.do_assert(-1.0 < percent)
@@ -720,15 +747,14 @@ class CropAndPad(meta.Augmenter):
                                 + "StochasticParameter, got type %s." % (type(percent),))
 
         self.pad_mode = _handle_pad_mode_param(pad_mode)
-        self.pad_cval = iap.handle_discrete_param(pad_cval, "pad_cval", value_range=(0, 255), tuple_to_uniform=True,
+        # TODO enable ALL here, like in e.g. Affine
+        self.pad_cval = iap.handle_discrete_param(pad_cval, "pad_cval", value_range=None, tuple_to_uniform=True,
                                                   list_to_choice=True, allow_floats=True)
 
         self.keep_size = keep_size
         self.sample_independently = sample_independently
 
     def _augment_images(self, images, random_state, parents, hooks):
-        input_dtypes = meta.copy_dtypes_for_restore(images)
-
         result = []
         nb_images = len(images)
         seeds = random_state.randint(0, 10**6, (nb_images,))
@@ -741,20 +767,8 @@ class CropAndPad(meta.Augmenter):
 
             image_cr = images[i][crop_top:height-crop_bottom, crop_left:width-crop_right, :]
 
-            if any([pad_top > 0, pad_right > 0, pad_bottom > 0, pad_left > 0]):
-                if image_cr.ndim == 2:
-                    pad_vals = ((pad_top, pad_bottom), (pad_left, pad_right))
-                else:
-                    pad_vals = ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0))
-
-                if pad_mode == "constant":
-                    image_cr_pa = np.pad(image_cr, pad_vals, mode=pad_mode, constant_values=pad_cval)
-                elif pad_mode == "linear_ramp":
-                    image_cr_pa = np.pad(image_cr, pad_vals, mode=pad_mode, end_values=pad_cval)
-                else:
-                    image_cr_pa = np.pad(image_cr, pad_vals, mode=pad_mode)
-            else:
-                image_cr_pa = image_cr
+            image_cr_pa = ia.pad(image_cr, top=pad_top, right=pad_right, bottom=pad_bottom, left=pad_left,
+                                 mode=pad_mode, cval=pad_cval)
 
             if self.keep_size:
                 image_cr_pa = ia.imresize_single_image(image_cr_pa, (height, width))
@@ -763,12 +777,11 @@ class CropAndPad(meta.Augmenter):
 
         if ia.is_np_array(images):
             if self.keep_size:
-                # this converts the list to an array of original input dtype
-
-                # without this, restore_augmented_images_dtypes_() expects input_dtypes to be a list
-                result = np.array(result)
-
-                meta.restore_augmented_images_dtypes_(result, input_dtypes)
+                result = np.array(result, dtype=images.dtype)
+            else:
+                nb_shapes = len(set([image.shape for image in result]))
+                if nb_shapes == 1:
+                    result = np.array(result, dtype=images.dtype)
 
         return result
 
@@ -920,6 +933,10 @@ def Pad(px=None, percent=None, pad_mode="constant", pad_cval=0, keep_size=True, 
         name=None, deterministic=False, random_state=None):
     """
     Augmenter that pads images, i.e. adds columns/rows to them.
+
+    dtype support::
+
+        See ``imgaug.augmenters.size.CropAndPad``.
 
     Parameters
     ----------
@@ -1119,6 +1136,10 @@ def Crop(px=None, percent=None, keep_size=True, sample_independently=True,
     The number of pixels to cut off may be defined in absolute values or
     percent of the image sizes.
 
+    dtype support::
+
+        See ``imgaug.augmenters.size.CropAndPad``.
+
     Parameters
     ----------
     px : None or int or imgaug.parameters.StochasticParameter or tuple, optional
@@ -1255,6 +1276,8 @@ def Crop(px=None, percent=None, keep_size=True, sample_independently=True,
 
 
 # TODO maybe rename this to PadToMinimumSize?
+# TODO this is very similar to CropAndPad, maybe add a way to generate crop values imagewise via a callback in
+#      in CropAndPad?
 class PadToFixedSize(meta.Augmenter):
     """
     Pad images to minimum width/height.
@@ -1267,6 +1290,10 @@ class PadToFixedSize(meta.Augmenter):
     required width, the augmenter will sometimes add 2px to the left and 0px to the right,
     sometimes add 2px to the right and 0px to the left and sometimes add 1px to both sides.
     Set `position` to ``center`` to prevent that.
+
+    dtype support::
+
+        See :func:`imgaug.imgaug.pad`.
 
     Parameters
     ----------
@@ -1358,7 +1385,8 @@ class PadToFixedSize(meta.Augmenter):
         self.position = _handle_position_parameter(position)
 
         self.pad_mode = _handle_pad_mode_param(pad_mode)
-        self.pad_cval = iap.handle_discrete_param(pad_cval, "pad_cval", value_range=(0, 255), tuple_to_uniform=True,
+        # TODO enable ALL here like in eg Affine
+        self.pad_cval = iap.handle_discrete_param(pad_cval, "pad_cval", value_range=None, tuple_to_uniform=True,
                                                   list_to_choice=True, allow_floats=True)
 
     def _augment_images(self, images, random_state, parents, hooks):
@@ -1471,6 +1499,9 @@ class PadToFixedSize(meta.Augmenter):
 
 
 # TODO maybe rename this to CropToMaximumSize ?
+# TODO this is very similar to CropAndPad, maybe add a way to generate crop values imagewise via a callback in
+#      in CropAndPad?
+# TODO add crop() function in imgaug, similar to pad
 class CropToFixedSize(meta.Augmenter):
     """
     Augmenter that crops down to a fixed maximum width/height.
@@ -1483,6 +1514,22 @@ class CropToFixedSize(meta.Augmenter):
     required width, the augmenter will sometimes remove 2px from the left and 0px from the right,
     sometimes remove 2px from the right and 0px from the left and sometimes remove 1px from both
     sides. Set `position` to ``center`` to prevent that.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
 
     Parameters
     ----------
@@ -1697,6 +1744,10 @@ class KeepSizeByResize(meta.Augmenter):
     This can e.g. be placed after a cropping operation. Some augmenters have a ``keep_size`` parameter that does
     mostly the same if set to True, though this augmenter offers control over the interpolation mode.
 
+    dtype support::
+
+        See :func:`imgaug.imgaug.imresize_many_images`.
+
     Parameters
     ----------
     children : Augmenter or list of imgaug.augmenters.meta.Augmenter or None, optional
@@ -1706,7 +1757,7 @@ class KeepSizeByResize(meta.Augmenter):
                     {cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_AREA, cv2.INTER_CUBIC} or\
                     list of str or list of int or StochasticParameter, optional
         The interpolation mode to use when resizing images.
-        Can take any value that :func:`imgaug.imresize_single_image` accepts, e.g. ``cubic``.
+        Can take any value that :func:`imgaug.imgaug.imresize_single_image` accepts, e.g. ``cubic``.
 
             * If this is KeepSizeByResize.NO_RESIZE then images will not be resized.
             * If this is a single string, it is expected to have one of the following values: ``nearest``, ``linear``,

@@ -23,8 +23,10 @@ List of augmenters:
     * Lambda
     * AssertLambda
     * AssertShape
+    * ChannelShuffle
 
-Note that WithColorspace is in ``color.py``.
+Note: WithColorspace is in ``color.py``.
+
 """
 from __future__ import print_function, division, absolute_import
 
@@ -42,6 +44,37 @@ from .. import imgaug as ia
 from .. import parameters as iap
 
 
+def restore_dtypes_(images, dtypes, clip=True):
+    if ia.is_np_array(images):
+        if ia.is_iterable(dtypes):
+            assert len(dtypes) > 0
+
+            if len(dtypes) > 1:
+                assert all([dtype_i == dtypes[0] for dtype_i in dtypes])
+
+            dtypes = dtypes[0]
+
+        dtypes = np.dtype(dtypes)
+
+        dtype_to = dtypes
+        if images.dtype.type == dtype_to:
+            result = images
+        else:
+            if clip:
+                min_value, _, max_value = get_value_range_of_dtype(dtype_to)
+                images = np.clip(images, min_value, max_value, out=images)
+            result = images.astype(dtype_to, copy=False)
+    elif ia.is_iterable(images):
+        result = images
+        dtypes = dtypes if not isinstance(dtypes, np.dtype) else [dtypes] * len(images)
+        for i, (image, dtype) in enumerate(zip(images, dtypes)):
+            assert ia.is_np_array(image)
+            result[i] = restore_dtypes_(image, dtype, clip=clip)
+    else:
+        raise Exception("Expected numpy array or iterable of numpy arrays, got type '%s'." % (type(images),))
+    return result
+
+
 def copy_dtypes_for_restore(images, force_list=False):
     if ia.is_np_array(images):
         if force_list:
@@ -52,6 +85,142 @@ def copy_dtypes_for_restore(images, force_list=False):
         return [image.dtype for image in images]
 
 
+def get_minimal_dtype(arrays, increase_itemsize_factor=1):
+    input_dts = [array.dtype if not isinstance(array, np.dtype) else array
+                 for array in arrays]
+    promoted_dt = np.promote_types(*input_dts)
+    if increase_itemsize_factor > 1:
+        promoted_dt_highres = "%s%d" % (promoted_dt.kind, promoted_dt.itemsize * increase_itemsize_factor)
+        try:
+            promoted_dt_highres = np.dtype(promoted_dt_highres)
+            return promoted_dt_highres
+        except TypeError:
+            raise TypeError(
+                ("Unable to create a numpy dtype matching the name '%s'. "
+                 + "This error was caused when trying to find a minimal dtype covering the dtypes '%s' (which was "
+                 + "determined to be '%s') and then increasing its resolution (aka itemsize) by a factor of %d. "
+                 + "This error can be avoided by choosing arrays with lower resolution dtypes as inputs, e.g. by "
+                 + "reducing float32 to float16.") % (
+                    promoted_dt_highres,
+                    ", ".join([input_dt.name for input_dt in input_dts]),
+                    promoted_dt.name,
+                    increase_itemsize_factor
+                )
+            )
+    return promoted_dt
+
+
+def promote_array_dtypes_(arrays, dtypes=None, increase_itemsize_factor=1, affects=None):
+    if dtypes is None:
+        dtypes = [array.dtype for array in arrays]
+    dt = get_minimal_dtype(dtypes, increase_itemsize_factor=increase_itemsize_factor)
+    if affects is None:
+        affects = arrays
+    result = []
+    for array in affects:
+        if array.dtype.type != dt:
+            array = array.astype(dt, copy=False)
+        result.append(array)
+    return result
+
+
+def increase_array_resolutions_(arrays, factor):
+    assert ia.is_single_integer(factor)
+    assert factor in [1, 2, 4, 8]
+    if factor == 1:
+        return arrays
+
+    for i, array in enumerate(arrays):
+        dtype = array.dtype
+        dtype_target = np.dtype("%s%d" % (dtype.kind, dtype.itemsize * factor))
+        arrays[i] = array.astype(dtype_target, copy=False)
+
+    return arrays
+
+
+def get_value_range_of_dtype(dtype):
+    # normalize inputs, makes it work with strings (e.g. "uint8"), types like np.uint8 and also proper dtypes, like
+    # np.dtype("uint8")
+    dtype = np.dtype(dtype)
+
+    # This check seems to fail sometimes, e.g. get_value_range_of_dtype(np.int8)
+    # assert isinstance(dtype, np.dtype), "Expected instance of numpy.dtype, got %s." % (type(dtype),)
+
+    if dtype.kind == "f":
+        finfo = np.finfo(dtype)
+        return finfo.min, 0.0, finfo.max
+    elif dtype.kind == "u":
+        iinfo = np.iinfo(dtype)
+        return iinfo.min, int(iinfo.min + 0.5 * iinfo.max), iinfo.max
+    elif dtype.kind == "i":
+        iinfo = np.iinfo(dtype)
+        return iinfo.min, -0.5, iinfo.max
+    elif dtype.kind == "b":
+        return 0, None, 1
+    else:
+        raise Exception("Cannot estimate value range of dtype '%s' (type: %s)" % (str(dtype), type(dtype)))
+
+
+def clip_to_dtype_value_range_(array, dtype, validate=True, validate_values=None):
+    # for some reason, using 'out' did not work for uint64 (would clip max value to 0)
+    # but removing out then results in float64 array instead of uint64
+    assert array.dtype.name not in ["uint64", "uint128"]
+
+    dtype = np.dtype(dtype)
+    min_value, _, max_value = get_value_range_of_dtype(dtype)
+    if validate:
+        array_val = array
+        if ia.is_single_integer(validate):
+            assert validate_values is None
+            array_val = array.flat[0:validate]
+        if validate_values is not None:
+            min_value_found, max_value_found = validate_values
+        else:
+            min_value_found = np.min(array_val)
+            max_value_found = np.max(array_val)
+        assert min_value <= min_value_found <= max_value
+        assert min_value <= max_value_found <= max_value
+    array = np.clip(array, min_value, max_value, out=array)
+    return array
+
+
+def gate_dtypes(dtypes, allowed, disallowed, augmenter=None):
+    assert len(allowed) > 0
+    assert ia.is_string(allowed[0])
+    if len(disallowed) > 0:
+        assert ia.is_string(disallowed[0])
+
+    if ia.is_np_array(dtypes):
+        dtypes = [dtypes.dtype]
+    else:
+        dtypes = [np.dtype(dtype) if not ia.is_np_array(dtype) else dtype.dtype for dtype in dtypes]
+    for dtype in dtypes:
+        if dtype.name in allowed:
+            pass
+        elif dtype.name in disallowed:
+            if augmenter is None:
+                raise ValueError("Got dtype '%s', which is a forbidden dtype (%s)." % (
+                    dtype.name, ", ".join(disallowed)
+                ))
+            else:
+                raise ValueError("Got dtype '%s' in augmenter '%s' (class '%s'), which is a forbidden dtype (%s)." % (
+                    dtype.name, augmenter.name, augmenter.__class__.__name__, ", ".join(disallowed)
+                ))
+        else:
+            if augmenter is None:
+                warnings.warn(("Got dtype '%s', which was neither explicitly allowed "
+                               "(%s), nor explicitly disallowed (%s). Generated outputs may contain errors..") % (
+                        dtype.name, augmenter.name, augmenter.__class__.__name__, ", ".join(allowed),
+                        ", ".join(disallowed)
+                    ))
+            else:
+                warnings.warn(("Got dtype '%s' in augmenter '%s' (class '%s'), which was neither explicitly allowed "
+                               "(%s), nor explicitly disallowed (%s). Generated outputs may contain errors..") % (
+                    dtype.name, augmenter.name, augmenter.__class__.__name__, ", ".join(allowed), ", ".join(disallowed)
+                ))
+
+
+# TODO switch all calls to restore_dtypes_()
 def restore_augmented_image_dtype_(image, orig_dtype):
     return image.astype(orig_dtype, copy=False)
 
@@ -131,6 +300,18 @@ def invert_reduce_to_nonempty(objs, ids, objs_reduced):
     for idx, obj_from_reduced in zip(ids, objs_reduced):
         objs_inv[idx] = obj_from_reduced
     return objs_inv
+
+
+def estimate_max_number_of_channels(images):
+    if ia.is_np_array(images):
+        assert images.ndim == 4
+        return images.shape[3]
+    else:
+        assert ia.is_iterable(images)
+        if len(images) == 0:
+            return None
+        channels = [el.shape[2] if len(el.shape) >= 3 else 1 for el in images]
+        return max(channels)
 
 
 @six.add_metaclass(ABCMeta)
@@ -219,7 +400,7 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         batches : imgaug.Batch or list of imgaug.Batch or list of imgaug.HeatmapsOnImage\
                   or list of imgaug.SegmentationMapOnImage or list of imgaug.KeypointsOnImage\
                   or list of ([N],H,W,[C]) ndarray
-            List of image batches to augment.
+            List of batches to augment.
             The expected input is a list, with each entry having one of the following datatypes:
 
                 * imgaug.Batch
@@ -329,7 +510,7 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
                 batch_unnormalized = batch_aug.segmentation_maps_aug
             elif dt_orig == "list_of_imgaug.KeypointsOnImage":
                 batch_unnormalized = batch_aug.keypoints_aug
-            else: # only option left
+            else:  # only option left
                 ia.do_assert(dt_orig == "list_of_imgaug.BoundingBoxesOnImage")
                 batch_unnormalized = batch_aug.bounding_boxes_aug
             return batch_unnormalized
@@ -391,7 +572,11 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         Parameters
         ----------
         image : (H,W,C) ndarray or (H,W) ndarray
-            The image to augment. Should have dtype uint8 (range 0-255).
+            The image to augment.
+            Channel-axis is optional, but expected to be the last axis if present.
+            In most cases, this array should be of dtype ``uint8``, which is supported by all
+            augmenters. Support for other dtypes varies by augmenter -- see the respective
+            augmenter-specific documentation for more details.
 
         hooks : None or imgaug.HooksImages, optional
             HooksImages object to dynamically interfere with the augmentation process.
@@ -413,13 +598,14 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         Parameters
         ----------
         images : (N,H,W,C) ndarray or (N,H,W) ndarray or list of (H,W,C) ndarray or list of (H,W) ndarray
-            Images to augment. The input can be a list of numpy arrays or
-            a single array. Each array is expected to have shape ``(H, W, C)``
-            or ``(H, W)``, where H is the height, ``W`` is the width and ``C`` are the
-            channels. Number of channels may differ between images.
+            Images to augment.
+            The input can be a list of numpy arrays or a single array. Each array is expected to
+            have shape ``(H, W, C)`` or ``(H, W)``, where H is the height, ``W`` is the width and
+            ``C`` are the channels. Number of channels may differ between images.
             If a list is chosen, height and width may differ per between images.
-            Currently the recommended dtype is uint8 (i.e. integer values in
-            the range 0 to 255). Other dtypes are not tested.
+            In most cases, this array (or these arrays) should be of dtype ``uint8``, which is
+            supported by all augmenters. Support for other dtypes varies by augmenter -- see the
+            respective augmenter-specific documentation for more details.
 
         parents : None or list of imgaug.augmenters.Augmenter, optional
             Parent augmenters that have previously been called before the
@@ -1713,6 +1899,22 @@ class Sequential(Augmenter, list):
         aug = iaa.Fliplr(0.5)
         image_aug = aug.augment_image(image)
 
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
+
     Parameters
     ----------
     children : imgaug.augmenters.meta.Augmenter or list of imgaug.augmenters.meta.Augmenter or None, optional
@@ -1868,6 +2070,22 @@ class SomeOf(Augmenter, list):
     This augmenter currently does not support replacing (i.e. picking the same
     child multiple times) due to implementation difficulties in connection
     with deterministic augmenters.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
 
     Parameters
     ----------
@@ -2189,6 +2407,10 @@ def OneOf(children, name=None, deterministic=False, random_state=None):
     """
     Augmenter that always executes exactly one of its children.
 
+    dtype support::
+
+        See ``imgaug.augmenters.meta.SomeOf``.
+
     Parameters
     ----------
     children : list of imgaug.augmenters.meta.Augmenter
@@ -2241,6 +2463,22 @@ class Sometimes(Augmenter):
     Let ``p`` be the percent of images to augment.
     Let ``I`` be the input images.
     Then (on average) ``p`` percent of all images in ``I`` will be augmented using ``C``.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
 
     Parameters
     ----------
@@ -2438,8 +2676,23 @@ class WithChannels(Augmenter):
     Let ``I`` be the input images.
     Then this augmenter will pick the channels ``H`` from each image
     in ``I`` (resulting in new images) and apply ``C`` to them.
-    The result of the augmentation will be merged back into the original
-    images.
+    The result of the augmentation will be merged back into the original images.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
 
     Parameters
     ----------
@@ -2595,6 +2848,22 @@ class Noop(Augmenter):
     in some situation, so that you can continue to call :func:`imgaug.augmenters.meta.Augmenter.augment_images`,
     without actually changing them (e.g. when switching from training to test).
 
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
+
     Parameters
     ----------
     name : None or str, optional
@@ -2630,9 +2899,25 @@ class Lambda(Augmenter):
 
     This is useful to add missing functions to a list of augmenters.
 
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
+
     Parameters
     ----------
-    func_images : callable
+    func_images : None or callable, optional
         The function to call for each batch of images.
         It must follow the form
 
@@ -2641,8 +2926,9 @@ class Lambda(Augmenter):
         and return the changed images (may be transformed in-place).
         This is essentially the interface of
         :func:`imgaug.augmenters.meta.Augmenter._augment_images`.
+        If this is None instead of a function, the images will not be altered.
 
-    func_heatmaps : callable
+    func_heatmaps : None or callable, optional
         The function to call for each batch of heatmaps.
         It must follow the form
 
@@ -2651,8 +2937,9 @@ class Lambda(Augmenter):
         and return the changed heatmaps (may be transformed in-place).
         This is essentially the interface of
         :func:`imgaug.augmenters.meta.Augmenter._augment_heatmaps`.
+        If this is None instead of a function, the heatmaps will not be altered.
 
-    func_keypoints : callable
+    func_keypoints : None or callable, optional
         The function to call for each batch of image keypoints.
         It must follow the form
 
@@ -2661,6 +2948,7 @@ class Lambda(Augmenter):
         and return the changed keypoints (may be transformed in-place).
         This is essentially the interface of
         :func:`imgaug.augmenters.meta.Augmenter._augment_keypoints`.
+        If this is None instead of a function, the keypoints will not be altered.
 
     name : None or str, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
@@ -2673,6 +2961,16 @@ class Lambda(Augmenter):
 
     Examples
     --------
+    >>> def func_images(images, random_state, parents, hooks):
+    >>>     images[:, ::2, :, :] = 0
+    >>>     return images
+    >>>
+    >>> aug = iaa.Lambda(
+    >>>     func_images=func_images
+    >>> )
+
+    Replaces every second row in images with black pixels. Leaves heatmaps and keypoints unchanged.
+
     >>> def func_images(images, random_state, parents, hooks):
     >>>     images[:, ::2, :, :] = 0
     >>>     return images
@@ -2691,45 +2989,53 @@ class Lambda(Augmenter):
     >>>     func_keypoints=func_keypoints
     >>> )
 
-    Replaces every second row in images with black pixels and leaves keypoints
-    unchanged.
+    Replaces every second row in images with black pixels, sets every second row in heatmapps to
+    zero and leaves keypoints unchanged.
 
     """
 
-    def __init__(self, func_images, func_heatmaps, func_keypoints, name=None, deterministic=False, random_state=None):
+    def __init__(self, func_images=None, func_heatmaps=None, func_keypoints=None, name=None, deterministic=False,
+                 random_state=None):
         super(Lambda, self).__init__(name=name, deterministic=deterministic, random_state=random_state)
         self.func_images = func_images
         self.func_heatmaps = func_heatmaps
         self.func_keypoints = func_keypoints
 
     def _augment_images(self, images, random_state, parents, hooks):
-        return self.func_images(images, random_state, parents, hooks)
+        if self.func_images is not None:
+            return self.func_images(images, random_state, parents, hooks)
+        return images
 
     def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        result = self.func_heatmaps(heatmaps, random_state, parents, hooks)
-        ia.do_assert(ia.is_iterable(result),
-                     "Expected callback function for heatmaps to return list of imgaug.HeatmapsOnImage() instances, "
-                     + "got %s." % (type(result),))
-        ia.do_assert(all([isinstance(el, ia.HeatmapsOnImage) for el in result]),
-                     "Expected callback function for heatmaps to return list of imgaug.HeatmapsOnImage() instances, "
-                     + "got %s." % ([type(el) for el in result],))
-        return result
+        if self.func_heatmaps is not None:
+            result = self.func_heatmaps(heatmaps, random_state, parents, hooks)
+            ia.do_assert(ia.is_iterable(result),
+                         "Expected callback function for heatmaps to return list of imgaug.HeatmapsOnImage() instances, "
+                         + "got %s." % (type(result),))
+            ia.do_assert(all([isinstance(el, ia.HeatmapsOnImage) for el in result]),
+                         "Expected callback function for heatmaps to return list of imgaug.HeatmapsOnImage() instances, "
+                         + "got %s." % ([type(el) for el in result],))
+            return result
+        return heatmaps
 
     def _augment_keypoints(self, keypoints_on_images, random_state, parents, hooks):
-        result = self.func_keypoints(keypoints_on_images, random_state, parents, hooks)
-        ia.do_assert(ia.is_iterable(result),
-                     "Expected callback function for keypoints to return list of imgaug.KeypointsOnImage() instances, "
-                     + "got %s." % (type(result),))
-        ia.do_assert(all([isinstance(el, ia.KeypointsOnImage) for el in result]),
-                     "Expected callback function for keypoints to return list of imgaug.KeypointsOnImage() instances, "
-                     + "got %s." % ([type(el) for el in result],))
-        return result
+        if self.func_keypoints is not None:
+            result = self.func_keypoints(keypoints_on_images, random_state, parents, hooks)
+            ia.do_assert(ia.is_iterable(result),
+                         "Expected callback function for keypoints to return list of imgaug.KeypointsOnImage() instances, "
+                         + "got %s." % (type(result),))
+            ia.do_assert(all([isinstance(el, ia.KeypointsOnImage) for el in result]),
+                         "Expected callback function for keypoints to return list of imgaug.KeypointsOnImage() instances, "
+                         + "got %s." % ([type(el) for el in result],))
+            return result
+        return keypoints_on_images
 
     def get_parameters(self):
         return []
 
 
-def AssertLambda(func_images, func_heatmaps, func_keypoints, name=None, deterministic=False, random_state=None):
+def AssertLambda(func_images=None, func_heatmaps=None, func_keypoints=None, name=None, deterministic=False,
+                 random_state=None):
     """
     Augmenter that runs an assert on each batch of input images
     using a lambda function as condition.
@@ -2737,23 +3043,39 @@ def AssertLambda(func_images, func_heatmaps, func_keypoints, name=None, determin
     This is useful to make generic assumption about the input images and error
     out early if they aren't met.
 
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
+
     Parameters
     ----------
-    func_images : callable
+    func_images : None or callable, optional
         The function to call for each batch of images.
         It must follow the form ``function(images, random_state, parents, hooks)``
         and return either True (valid input) or False (invalid input).
         It essentially reuses the interface of
         :func:`imgaug.augmenters.meta.Augmenter._augment_images`.
 
-    func_heatmaps : callable
+    func_heatmaps : None or callable, optional
         The function to call for each batch of heatmaps.
         It must follow the form ``function(heatmaps, random_state, parents, hooks)``
         and return either True (valid input) or False (invalid input).
         It essentially reuses the interface of
         :func:`imgaug.augmenters.meta.Augmenter._augment_heatmaps`.
 
-    func_keypoints : callable
+    func_keypoints : None or callable, optional
         The function to call for each batch of keypoints.
         It must follow the form ``function(keypoints_on_images, random_state, parents, hooks)``
         and return either True (valid input) or False (invalid input).
@@ -2787,22 +3109,42 @@ def AssertLambda(func_images, func_heatmaps, func_keypoints, name=None, determin
 
     if name is None:
         name = "Unnamed%s" % (ia.caller_name(),)
-    return Lambda(func_images_assert, func_heatmaps_assert, func_keypoints_assert,
+    return Lambda(func_images_assert if func_images is not None else None,
+                  func_heatmaps_assert if func_heatmaps is not None else None,
+                  func_keypoints_assert if func_keypoints is not None else None,
                   name=name, deterministic=deterministic, random_state=random_state)
 
 
 def AssertShape(shape, check_images=True, check_heatmaps=True, check_keypoints=True,
                 name=None, deterministic=False, random_state=None):
     """
-    Augmenter to make assumptions about the shape of input image(s)
-    and keypoints.
+    Augmenter to make assumptions about the shape of input image(s), heatmaps and keypoints.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
 
     Parameters
     ----------
     shape : tuple
-        The expected shape, given as a tuple. The number of entries in the tuple
-        must match the number of dimensions, i.e. usually four entries for ``(N, H, W, C)``.
-        Each each entry may be None or a tuple of two ints or a list of ints.
+        The expected shape, given as a tuple. The number of entries in the tuple must match the
+        number of dimensions, i.e. it must contain four entries for ``(N, H, W, C)``. If only a
+        single image is augmented via ``augment_image()``, then ``N`` is viewed as 1 by this
+        augmenter. If the input image(s) don't have a channel axis, then ``C`` is viewed as 1
+        by this augmenter.
+        Each of the four entries may be None or a tuple of two ints or a list of ints.
 
             * If an entry is None, any value for that dimensions is accepted.
             * If an entry is int, exactly that integer value will be accepted
@@ -2940,6 +3282,22 @@ class ChannelShuffle(Augmenter):
     """
     Augmenter that randomly shuffles the channels in images.
 
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
+
     Parameters
     ----------
     p : float or imgaug.parameters.StochasticParameter, optional
@@ -3004,6 +3362,22 @@ class ChannelShuffle(Augmenter):
 def shuffle_channels(image, random_state, channels=None):
     """
     Randomize the order of (color) channels in an image.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: ?
+        * ``uint32``: ?
+        * ``uint64``: ?
+        * ``int8``: ?
+        * ``int16``: ?
+        * ``int32``: ?
+        * ``int64``: ?
+        * ``float16``: ?
+        * ``float32``: ?
+        * ``float64``: ?
+        * ``float128``: ?
+        * ``bool``: ?
 
     Parameters
     ----------

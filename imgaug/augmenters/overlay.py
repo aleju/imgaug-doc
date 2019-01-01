@@ -30,6 +30,119 @@ from .. import imgaug as ia
 from .. import parameters as iap
 
 
+def blend_alpha(image_fg, image_bg, alpha, eps=1e-2):
+    """
+    Blend two images using an alpha blending.
+
+    In an alpha blending, the two images are naively mixed. Let ``A`` be the foreground image
+    and ``B`` the background image and ``a`` is the alpha value. Each pixel intensity is then
+    computed as ``a * A_ij + (1-a) * B_ij``.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; fully tested
+        * ``uint32``: yes; fully tested
+        * ``uint64``: yes; fully tested (1)
+        * ``int8``: yes; fully tested
+        * ``int16``: yes; fully tested
+        * ``int32``: yes; fully tested
+        * ``int64``: yes; fully tested (1)
+        * ``float16``: yes; fully tested
+        * ``float32``: yes; fully tested
+        * ``float64``: yes; fully tested
+        * ``float128``: no (2)
+        * ``bool``: yes; fully tested (2)
+
+        - (1) Tests show that these dtypes work, but a conversion to float128 happens, which only
+              has 96 bits of size instead of true 128 bits and hence not twice as much resolution.
+              It is possible that these dtypes result in inaccuracies.
+        - (2) Not available due to the input dtype having to be increased to an equivalent float
+              dtype with two times the input resolution.
+        - (3) Mapped internally to ``float16``.
+
+    Parameters
+    ----------
+    image_fg : (H,W,C) ndarray
+        Foreground image. Channel axis must be provided. Shape and dtype kind must match the one
+        of the background image.
+
+    image_bg : (H,W,C) ndarray
+        Background image. Channel axis must be provided. Shape and dtype kind must match the one
+        of the foreground image.
+
+    alpha : number or iterable of number or ndarray
+        The blending factor, between 0.0 and 1.0. Can be interpreted as the opacity of the
+        foreground image. Values around 1.0 result in only the foreground image being visible.
+        Values around 0.0 result in only the background image being visible.
+        Multiple alphas may be provided. In these cases, there must be exactly one alpha per
+        channel in the foreground/background image. Alternatively, for ``(H,W,C)`` images,
+        either one ``(H,W)`` array or an ``(H,W,C)`` array of alphas may be provided,
+        denoting the elementwise alpha value.
+
+    eps : number, optional
+        Controls when an alpha is to be interpreted as exactly 1.0 or exactly 0.0, resulting
+        in only the foreground/background being visible and skipping the actual computation.
+
+    Returns
+    -------
+    image_blend : (H,W,C) ndarray
+        Blend of foreground and background image.
+
+    """
+    assert image_fg.shape == image_bg.shape
+    assert image_fg.dtype.kind == image_bg.dtype.kind
+
+    input_was_bool = False
+    if image_fg.dtype.kind == "b":
+        input_was_bool = True
+        image_fg = image_fg.astype(np.float16)
+        image_bg = image_bg.astype(np.float16)
+
+    alpha = np.array(alpha, dtype=np.float64)
+    if alpha.ndim == 2:
+        assert alpha.shape == image_fg.shape[0:2]
+        alpha = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
+    elif alpha.ndim == 3:
+        assert alpha.shape == image_fg.shape or alpha.shape == image_fg.shape[0:2] + (1,)
+    else:
+        alpha = alpha.reshape((1, 1, -1))
+    if alpha.shape[2] != image_fg.shape[2]:
+        alpha = np.tile(alpha, (1, 1, image_fg.shape[2]))
+
+    if not input_was_bool:
+        if np.all(alpha >= 1.0 - eps):
+            return np.copy(image_fg)
+        elif np.all(alpha <= eps):
+            return np.copy(image_bg)
+    assert np.all(np.logical_and(0 <= alpha, alpha <= 1.0))
+
+    dt_images = meta.get_minimal_dtype([image_fg, image_bg])
+
+    # doing this only for non-float images led to inaccuracies for large floats values
+    isize = dt_images.itemsize * 2
+    dt_blend = np.dtype("f%d" % (isize,))
+
+    if alpha.dtype != dt_blend:
+        alpha = alpha.astype(dt_blend)
+    if image_fg.dtype != dt_blend:
+        image_fg = image_fg.astype(dt_blend)
+    if image_bg.dtype != dt_blend:
+        image_bg = image_bg.astype(dt_blend)
+
+    # the following is equivalent to
+    #     image_blend = alpha * image_fg + (1 - alpha) * image_bg
+    # but supposedly faster
+    image_blend = image_bg + alpha * (image_fg - image_bg)
+
+    if input_was_bool:
+        image_blend = image_blend > 0.5
+    else:
+        image_blend = meta.restore_dtypes_(image_blend, dt_images)
+
+    return image_blend
+
+
 class Alpha(meta.Augmenter):  # pylint: disable=locally-disabled, unused-variable, line-too-long
     """
     Augmenter to overlay two image sources with each other using an
@@ -45,6 +158,10 @@ class Alpha(meta.Augmenter):  # pylint: disable=locally-disabled, unused-variabl
     from the first or the second branch. The first one is picked if
     ``factor >= 0.5`` is true (per image). It is recommended to *not* use
     augmenters that change keypoint positions with this class.
+
+    dtype support::
+
+        See :func:`imgaug.augmenters.overlay.blend_alpha`.
 
     Parameters
     ----------
@@ -136,6 +253,7 @@ class Alpha(meta.Augmenter):  # pylint: disable=locally-disabled, unused-variabl
 
     """
 
+    # TODO rename first/second to foreground/background?
     def __init__(self, factor=0, first=None, second=None, per_channel=False,
                  name=None, deterministic=False, random_state=None):
         super(Alpha, self).__init__(name=name, deterministic=deterministic, random_state=random_state)
@@ -151,12 +269,15 @@ class Alpha(meta.Augmenter):  # pylint: disable=locally-disabled, unused-variabl
 
         self.per_channel = iap.handle_probability_param(per_channel, "per_channel")
 
-        self.epsilon = 0.01
+        self.epsilon = 1e-2
 
     def _augment_images(self, images, random_state, parents, hooks):
         result = images
         nb_images = len(images)
-        seeds = random_state.randint(0, 10**6, (nb_images,))
+        nb_channels = meta.estimate_max_number_of_channels(images)
+        rss = ia.derive_random_states(random_state, 2)
+        per_channel = self.per_channel.draw_samples(nb_images, random_state=rss[0])
+        alphas = self.factor.draw_samples((nb_images, nb_channels), random_state=rss[1])
 
         if hooks.is_propagating(images, augmenter=self, parents=parents, default=True):
             if self.first is None:
@@ -180,49 +301,26 @@ class Alpha(meta.Augmenter):  # pylint: disable=locally-disabled, unused-variabl
             images_first = images
             images_second = images
 
-        for i in sm.xrange(nb_images):
-            image = images[i]
-            image_first = images_first[i]
-            image_second = images_second[i]
-            rs_image = ia.new_random_state(seeds[i])
-            per_channel = self.per_channel.draw_sample(random_state=rs_image)
-            input_dtype = image.dtype
-            if per_channel == 1:
-                nb_channels = image.shape[2]
-                samples = self.factor.draw_samples((nb_channels,), random_state=rs_image)
-                for c, sample in enumerate(samples):
-                    ia.do_assert(0 <= sample <= 1.0)
-                    # if the value is nearly 1.0 or 0.0 skip the computation
-                    # and just use only the first/second image
-                    if sample >= 1.0 - self.epsilon:
-                        image[..., c] = image_first[..., c]
-                    elif sample <= 0.0 + self.epsilon:
-                        image[..., c] = image_second[..., c]
-                    else:
-                        image[..., c] = sample * image_first[..., c] + (1 - sample) * image_second[..., c]
-                # TODO change this to meta.clip_* and meta.restore_*
-                np.clip(image, 0, 255, out=image)
-                result[i] = image.astype(input_dtype)
+        for i, (image_first, image_second) in enumerate(zip(images_first, images_second)):
+            if per_channel[i] > 0.5:
+                nb_channels_i = image_first.shape[2]
+                alphas_i = alphas[i, 0:nb_channels_i]
             else:
-                sample = self.factor.draw_sample(random_state=rs_image)
-                ia.do_assert(0 <= sample <= 1.0)
-                # if the value is nearly 1.0 or 0.0 skip the computation
-                # and just use only the first/second image
-                if sample >= 1.0 - self.epsilon:
-                    image = image_first
-                elif sample <= 0.0 + self.epsilon:
-                    image = image_second
-                else:
-                    image = sample * image_first + (1 - sample) * image_second
-                # TODO change this to meta.clip_* and meta.restore_*
-                np.clip(image, 0, 255, out=image)
-                result[i] = image.astype(input_dtype)
+                alphas_i = alphas[i, 0]
+
+            result[i] = blend_alpha(image_first, image_second, alphas_i, eps=self.epsilon)
         return result
 
     def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
         result = heatmaps
         nb_heatmaps = len(heatmaps)
-        seeds = random_state.randint(0, 10**6, (nb_heatmaps,))
+        if nb_heatmaps == 0:
+            return heatmaps
+
+        nb_channels = meta.estimate_max_number_of_channels(heatmaps)
+        rss = ia.derive_random_states(random_state, 2)
+        per_channel = self.per_channel.draw_samples(nb_heatmaps, random_state=rss[0])
+        alphas = self.factor.draw_samples((nb_heatmaps, nb_channels), random_state=rss[1])
 
         if hooks.is_propagating(heatmaps, augmenter=self, parents=parents, default=True):
             if self.first is None:
@@ -246,32 +344,35 @@ class Alpha(meta.Augmenter):  # pylint: disable=locally-disabled, unused-variabl
             heatmaps_first = heatmaps
             heatmaps_second = heatmaps
 
-        for i in sm.xrange(nb_heatmaps):
-            heatmaps_first_i = heatmaps_first[i]
-            heatmaps_second_i = heatmaps_second[i]
-            rs_image = ia.new_random_state(seeds[i])
+        for i, (heatmaps_first_i, heatmaps_second_i) in enumerate(zip(heatmaps_first, heatmaps_second)):
             # sample alphas channelwise if necessary and try to use the image's channel number
             # values properly synchronized with the image augmentation
-            per_channel = self.per_channel.draw_sample(random_state=rs_image)
-            if per_channel == 1:
-                nb_channels = heatmaps[i].shape[2] if len(heatmaps[i].shape) >= 3 else 1
-                samples = self.factor.draw_samples((nb_channels,), random_state=rs_image)
-                sample = np.average(samples)
+            # per_channel = self.per_channel.draw_sample(random_state=rs_image)
+            if per_channel[i] > 0.5:
+                nb_channels_i = heatmaps[i].shape[2] if len(heatmaps[i].shape) >= 3 else 1
+                alpha = np.average(alphas[i, 0:nb_channels_i])
             else:
-                sample = self.factor.draw_sample(random_state=rs_image)
-                ia.do_assert(0 <= sample <= 1.0)
+                alpha = alphas[i, 0]
+            ia.do_assert(0 <= alpha <= 1.0)
 
-            mask = sample >= 0.5
-            heatmaps_arr_aug = mask * heatmaps_first_i.arr_0to1 + (~mask) * heatmaps_second_i.arr_0to1
-
-            result[i].arr_0to1 = heatmaps_arr_aug
+            if alpha >= 0.5:
+                result[i].arr_0to1 = heatmaps_first_i.arr_0to1
+            else:
+                result[i].arr_0to1 = heatmaps_second_i.arr_0to1
 
         return result
 
     def _augment_keypoints(self, keypoints_on_images, random_state, parents, hooks):
-        result = keypoints_on_images
         nb_images = len(keypoints_on_images)
-        seeds = random_state.randint(0, 10**6, (nb_images,))
+        if nb_images == 0:
+            return keypoints_on_images
+
+        nb_channels = meta.estimate_max_number_of_channels(keypoints_on_images)
+        rss = ia.derive_random_states(random_state, 2)
+        per_channel = self.per_channel.draw_samples(nb_images, random_state=rss[0])
+        alphas = self.factor.draw_samples((nb_images, nb_channels), random_state=rss[1])
+
+        result = keypoints_on_images
 
         if hooks.is_propagating(keypoints_on_images, augmenter=self, parents=parents, default=True):
             if self.first is None:
@@ -295,28 +396,24 @@ class Alpha(meta.Augmenter):  # pylint: disable=locally-disabled, unused-variabl
             kps_ois_first = keypoints_on_images
             kps_ois_second = keypoints_on_images
 
-        for i in sm.xrange(nb_images):
-            kps_oi_first = kps_ois_first[i]
-            kps_oi_second = kps_ois_second[i]
-            rs_image = ia.new_random_state(seeds[i])
+        for i, (kps_oi_first, kps_oi_second) in enumerate(zip(kps_ois_first, kps_ois_second)):
             # keypoint augmentation also works channel-wise, even though
             # keypoints do not have channels, in order to keep the random
             # values properly synchronized with the image augmentation
-            per_channel = self.per_channel.draw_sample(random_state=rs_image)
-            if per_channel == 1:
-                nb_channels = keypoints_on_images[i].shape[2]
-                samples = self.factor.draw_samples((nb_channels,), random_state=rs_image)
-                sample = np.average(samples)
+            # per_channel = self.per_channel.draw_sample(random_state=rs_image)
+            if per_channel[i] > 0.5:
+                nb_channels_i = keypoints_on_images[i].shape[2] if len(keypoints_on_images[i].shape) >= 3 else 1
+                alpha = np.average(alphas[i, 0:nb_channels_i])
             else:
-                sample = self.factor.draw_sample(random_state=rs_image)
-                ia.do_assert(0 <= sample <= 1.0)
+                alpha = alphas[i, 0]
+            ia.do_assert(0 <= alpha <= 1.0)
 
             # We cant choose "just a bit" of one keypoint augmentation result
             # without messing up the positions (interpolation doesn't make much
             # sense here),
             # so if the alpha is >= 0.5 (branch A is more visible than
             # branch B), the result of branch A, otherwise branch B.
-            if sample >= 0.5:
+            if alpha >= 0.5:
                 result[i] = kps_oi_first
             else:
                 result[i] = kps_oi_second
@@ -338,6 +435,7 @@ class Alpha(meta.Augmenter):  # pylint: disable=locally-disabled, unused-variabl
         return [self.first, self.second]
 
 
+# TODO merge this with Alpha
 class AlphaElementwise(Alpha):  # pylint: disable=locally-disabled, unused-variable, line-too-long
     """
     Augmenter to overlay two image sources with each other using pixelwise
@@ -348,6 +446,10 @@ class AlphaElementwise(Alpha):  # pylint: disable=locally-disabled, unused-varia
     per_channel is True).
 
     See ``Alpha`` for more description.
+
+    dtype support::
+
+        See :func:`imgaug.augmenters.overlay.blend_alpha`.
 
     Parameters
     ----------
@@ -479,30 +581,24 @@ class AlphaElementwise(Alpha):  # pylint: disable=locally-disabled, unused-varia
             images_first = images
             images_second = images
 
+        # TODO simplify this loop and the ones for heatmaps, keypoints; similar to Alpha
         for i in sm.xrange(nb_images):
             image = images[i]
             h, w, nb_channels = image.shape[0:3]
             image_first = images_first[i]
             image_second = images_second[i]
             per_channel = self.per_channel.draw_sample(random_state=ia.new_random_state(seeds[i]))
-            input_dtype = image.dtype
-            if per_channel == 1:
+            if per_channel > 0.5:
+                alphas = []
                 for c in sm.xrange(nb_channels):
                     samples_c = self.factor.draw_samples((h, w), random_state=ia.new_random_state(seeds[i]+1+c))
                     ia.do_assert(0 <= samples_c.item(0) <= 1.0) # validate only first value
-                    image[..., c] = samples_c * image_first[..., c] + (1.0 - samples_c) * image_second[..., c]
-                # TODO change this to meta.clip_* and meta.restore_*
-                np.clip(image, 0, 255, out=image)
-                result[i] = image.astype(input_dtype)
+                    alphas.append(samples_c)
+                alphas = np.float64(alphas).transpose((1, 2, 0))
             else:
-                samples = self.factor.draw_samples((h, w), random_state=ia.new_random_state(seeds[i]))
-                samples = np.tile(samples[..., np.newaxis], (1, 1, nb_channels))
-                ia.do_assert(0.0 <= samples.item(0) <= 1.0)
-
-                image = samples * image_first + (1.0 - samples) * image_second
-                # TODO change this to meta.clip_* and meta.restore_*
-                np.clip(image, 0, 255, out=image)
-                result[i] = image.astype(input_dtype)
+                alphas = self.factor.draw_samples((h, w), random_state=ia.new_random_state(seeds[i]))
+                ia.do_assert(0.0 <= alphas.item(0) <= 1.0)
+            result[i] = blend_alpha(image_first, image_second, alphas, eps=self.epsilon)
         return result
 
     def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
@@ -552,7 +648,7 @@ class AlphaElementwise(Alpha):  # pylint: disable=locally-disabled, unused-varia
             heatmaps_first_i = heatmaps_first[i]
             heatmaps_second_i = heatmaps_second[i]
             per_channel = self.per_channel.draw_sample(random_state=ia.new_random_state(seeds[i]))
-            if per_channel == 1:
+            if per_channel > 0.5:
                 samples = []
                 for c in sm.xrange(nb_channels_img):
                     # We sample here at the same size as the original image, as some effects
@@ -618,7 +714,7 @@ class AlphaElementwise(Alpha):  # pylint: disable=locally-disabled, unused-varia
             # keypoints do not have channels, in order to keep the random
             # values properly synchronized with the image augmentation
             per_channel = self.per_channel.draw_sample(random_state=ia.new_random_state(seeds[i]))
-            if per_channel == 1:
+            if per_channel > 0.5:
                 samples = np.zeros((h, w, nb_channels), dtype=np.float32)
                 for c in sm.xrange(nb_channels):
                     samples_c = self.factor.draw_samples((h, w), random_state=ia.new_random_state(seeds[i]+1+c))
@@ -651,6 +747,10 @@ def SimplexNoiseAlpha(first=None, second=None, per_channel=False, size_px_max=(2
     The alpha masks are sampled using a simplex noise method, roughly creating
     connected blobs of 1s surrounded by 0s. If nearest neighbour upsampling
     is used, these blobs can be rectangular with sharp edges.
+
+    dtype support::
+
+        See ``imgaug.augmenters.overlay.AlphaElementwise``.
 
     Parameters
     ----------
@@ -836,6 +936,10 @@ def FrequencyNoiseAlpha(exponent=(-4, 4), first=None, second=None, per_channel=F
     which can sometimes create large connected blobs of 1s surrounded by 0s
     and other times results in smaller patterns. If nearest neighbour
     upsampling is used, these blobs can be rectangular with sharp edges.
+
+    dtype support::
+
+        See ``imgaug.augmenters.overlay.AlphaElementwise``.
 
     Parameters
     ----------
