@@ -9,7 +9,7 @@ CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
 BLACKLIST = {
     "/external/opensimplex.py"
 }
-WRITE_TO = os.path.join(CURRENT_DIR, "images", "dtype_support", "dtype_support__%s.png")
+WRITE_TO = os.path.join(CURRENT_DIR, "images", "dtype_support", "%s.png")
 
 EMPTY_LINE_PATTERN = re.compile(r"^[\s\t]*$")
 CLASS_START_PATTERN = re.compile(r"^\s*class [a-zA-Z0-9_.(),\s]+:?[\s]*$")
