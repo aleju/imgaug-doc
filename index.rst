@@ -25,6 +25,7 @@ processes for improved performance.
    source/parameters
    source/alpha
    source/augmenters
+   source/dtype_support
    source/api
 
 See :ref:`modindex` for API.
