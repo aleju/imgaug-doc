@@ -202,7 +202,7 @@ def plot(dtype_supports, save_fp_pattern):
         ax.axis("off")
         ax.grid(False)
 
-        fig.set_size_inches(w=12, h=20)
+        fig.set_size_inches(w=12, h=5+int(0.5*len(dts_by_groups[group])))
 
         plt.gcf().canvas.draw()
         points = table.get_window_extent(plt.gcf()._cachedRenderer).get_points()
@@ -211,6 +211,7 @@ def plot(dtype_supports, save_fp_pattern):
         nbbox = matplotlib.transforms.Bbox.from_extents(points / plt.gcf().dpi)
 
         fig.savefig(save_fp_pattern % (group.replace(".", "_"),), bbox_inches=nbbox)
+        plt.close()
 
 
 def count_inset(line):
