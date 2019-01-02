@@ -3,9 +3,9 @@ imgaug
 
 `imgaug` is a library for image augmentation in machine learning experiments.
 It supports a wide range of augmentation techniques, allows to easily combine
-these, has a simple yet powerful stochastic interface, can augment images
-and keypoints/landmarks on these and offers augmentation in background
-processes for improved performance.
+these and to execute them in random order or on multiple CPU cores,
+has a simple yet powerful stochastic interface and can not only augment images,
+but also keypoints/landmarks, bounding boxes, heatmaps and segmentation maps.
 
 .. figure:: images/examples_basics/heavy.jpg
     :alt: Heavy augmentations
