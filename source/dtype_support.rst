@@ -23,17 +23,19 @@ Legend
 ------
 
 Support level (color of table cells):
-* Green: Datatype is considered supported by the augmenter.
-* Yellow: Limited support for the datatype. The API for the respective augmenter will contain
-details.
-* Red: Datatype is not supported by the augmenter.
+
+    * Green: Datatype is considered supported by the augmenter.
+    * Yellow: Limited support for the datatype, e.g. due to inaccuracies around large values.
+      See the API for the respective augmenter for more details.
+    * Red: Datatype is not supported by the augmenter.
 
 Test level (symbols in table cells):
-* ``+++``: Datatype support is thoroughly tested (via unittests or integration tests).
-* ``++``: Datatype support is tested, though not thoroughly.
-* ``+``: Datatype support is indirectly tested via tests for other augmenters.
-* ``-``: Datatype support is not tested.
-* ``?``: Unknown support level for the datatype.
+
+    * ``+++``: Datatype support is thoroughly tested (via unittests or integration tests).
+    * ``++``: Datatype support is tested, though not thoroughly.
+    * ``+``: Datatype support is indirectly tested via tests for other augmenters.
+    * ``-``: Datatype support is not tested.
+    * ``?``: Unknown support level for the datatype.
 
 imgaug helper functions
 -----------------------
