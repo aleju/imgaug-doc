@@ -24,8 +24,8 @@ IMAGES_DIR = "readme_images"
 
 
 def main():
-    draw_small_overview()
-    draw_single_sequential_images()
+    # draw_small_overview()
+    # draw_single_sequential_images()
     draw_per_augmenter_videos()
 
 
@@ -408,7 +408,11 @@ def draw_per_augmenter_videos():
             frames_heatmap = []
             frames_segmap = []
             any_subtitle = any([len(subtitle) > 0 for subtitle in self.subtitles])
-            for augmenter, subtitle in zip(self.augmenters, self.subtitles):
+            for i, (augmenter, subtitle) in enumerate(zip(self.augmenters, self.subtitles)):
+                # print("seeding", augmenter.name, self.seed+i)
+                augmenter.localize_random_state_(recursive=True)
+                augmenter.reseed(random_state=self.seed+i)
+
                 def _subt(img, toptitle):
                     if self.affects_geometry:
                         #return self._draw_cell(img, subtitle, subtitle_height if any_subtitle else 0, toptitle, 16)
@@ -847,7 +851,40 @@ def draw_per_augmenter_videos():
             "contrast",
             "LinearContrast\n(per_channel=True)",
             [("alpha=(0.25, 1.75)", iaa.LinearContrast(alpha=(0.25, 1.75), per_channel=True)) for _ in range(5)]
-        )
+        ),
+        _Descriptor.from_augsubs(
+            "contrast",
+            "AllChannels-\nHistogramEqualization",
+            [("", iaa.AllChannelsHistogramEqualization()) for _ in range(1)]
+        ),
+        _Descriptor.from_augsubs(
+            "contrast",
+            "HistogramEqualization",
+            [("to_colorspace=%s" % (to_colorspace,), iaa.HistogramEqualization(to_colorspace=to_colorspace))
+             for to_colorspace
+             in [iaa.HistogramEqualization.Lab, iaa.HistogramEqualization.HSV, iaa.HistogramEqualization.HLS]]
+        ),
+        _Descriptor.from_augsubs(
+            "contrast",
+            "AllChannelsCLAHE",
+            [("clip_limit=%d" % (int(clip_limit),), iaa.AllChannelsCLAHE(clip_limit=int(clip_limit)))
+             for clip_limit
+             in np.linspace(1, 20, num=5)]
+        ),
+        _Descriptor.from_augsubs(
+            "contrast",
+            "AllChannelsCLAHE\n(per_channel=True)",
+            [("clip_limit=(1, 20)", iaa.AllChannelsCLAHE(clip_limit=(1, 20), per_channel=True)) for _ in range(5)],
+            seed=4
+        ),
+        _Descriptor.from_augsubs(
+            "contrast",
+            "CLAHE",
+            [("clip_limit=%d,\nto_colorspace=%s" % (int(clip_limit), to_colorspace),
+              iaa.CLAHE(clip_limit=int(clip_limit), to_colorspace=to_colorspace))
+             for to_colorspace, clip_limit
+             in zip([iaa.CLAHE.Lab] * 5, np.linspace(1, 20, num=5))]
+        ),
     ])
 
     # ###
