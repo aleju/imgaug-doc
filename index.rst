@@ -25,6 +25,7 @@ but also keypoints/landmarks, bounding boxes, heatmaps and segmentation maps.
    source/parameters
    source/alpha
    source/augmenters
+   source/performance
    source/dtype_support
    source/api
 
