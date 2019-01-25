@@ -10,17 +10,18 @@ heatmap augmentation (`augment_heatmaps()`) and keypoint/landmark augmentation
 memory. That is a rather dated system by today's standards. A modern, high-end system
 should achieve higher bandwidths.
 
-**Experiment Settings**: All augmenters were run with reasonable parameter choices that
+**Experiments Settings**: All augmenters were run with reasonable parameter choices that
 should reflect expected real-world usage, while avoiding too simple parameter values that
 would lead to inflated scores. Some parameter choices are listed below, the remaining ones
 can be looked up in `measure_performance.py`. Kernel sizes were all set to `3x3`, unless
 otherwise mentioned. The inputs focused on a small and large image-size setting, using
 `64x64x3` and `224x224x3` as the respective sizes. The base image was taken from
-[skimage.data.astronaut](http://scikit-image.org/docs/dev/api/skimage.data.html#skimage.data.astronaut),
-which should be a representative real-world image. Batch sizes of `1` and `128` were
-tested. Each augmenter was run `100` times on the generated input and the average of the
-measured runtimes was computed to derive bandwidth in mbit per second and the raw
-number of augmented items (e.g. images) per second.
+skimage.data.astronaut_, which should be a representative real-world image.
+Batch sizes of `1` and `128` were tested. Each augmenter was run `100` times on the generated
+input and the average of the measured runtimes was computed to derive bandwidth in mbit per
+second and the raw number of augmented items (e.g. images) per second.
+
+.. _skimage.data.astronaut: http://scikit-image.org/docs/dev/api/skimage.data.html#skimage.data.astronaut
 
 ---------------------
 Results Overview
@@ -31,9 +32,9 @@ From the results, the following points can be derived.
 **Inputs:**
 
 * Use large batch sizes whenever possible. Many augmenters are significantly faster with these.
-* Large image sizes are usually faster to augment than small ones, when measuring based on mbit/sec.
-  In items/sec however, small images are naturally faster due to containing far less data and
-  will be augmented roughly 4-10x as fast as large images.
+* Large image sizes lead to higher throughput based on mbit/sec.
+  Smaller images lead to lower throughput, but significantly more items/sec (roughly 4-10x more).
+  Use small images whenever possible.
 * For keypoint-based and heatmap-based augmentation, try to increase the number of items
   per augmented instance. E.g. `augment_keypoints()` accepts a list of `KeypointsOnImage` instances,
   with each such instance representing the keypoints on an image. Try to place for each image all
@@ -290,8 +291,6 @@ Numbers below are for small images (64x64x3) and large images (224x224x3).
 | Snowflakes                                | 22.1   | 27.0    | 110.8   | 96.7    |
 +-------------------------------------------+--------+---------+---------+---------+
 | SnowflakesLayer                           | 51.6   | 53.8    | 231.4   | 195.2   |
-+-------------------------------------------+--------+---------+---------+---------+
-|                                           | 0.0    | 0.0     | 0.0     | 0.0     |
 +-------------------------------------------+--------+---------+---------+---------+
 
 
