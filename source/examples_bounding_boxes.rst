@@ -112,7 +112,7 @@ When augmenting images and their respective bounding boxes, the boxes
 can end up fully or partially outside of the image plane. By default, the
 library still returns these boxes, even though that may not be desired.
 The following example shows how to (a) remove bounding boxes that are
-fully/partially outside of the image and (b) how to cut bounding boxes that
+fully/partially outside of the image and (b) how to clip bounding boxes that
 are partially outside of the image so that their are fully inside.
 
 ::
@@ -178,11 +178,11 @@ are partially outside of the image so that their are fully inside.
     # Draw the BBs (a) in their original form, (b) after augmentation,
     # (c) after augmentation and removing those fully outside the image,
     # (d) after augmentation and removing those fully outside the image and
-    # cutting those partially inside the image so that they are fully inside.
+    # clipping those partially inside the image so that they are fully inside.
     image_before = draw_bbs(image, bbs, 100)
     image_after1 = draw_bbs(image_aug, bbs_aug, 100)
     image_after2 = draw_bbs(image_aug, bbs_aug.remove_out_of_image(), 100)
-    image_after3 = draw_bbs(image_aug, bbs_aug.remove_out_of_image().cut_out_of_image(), 100)
+    image_after3 = draw_bbs(image_aug, bbs_aug.remove_out_of_image().clip_out_of_image(), 100)
 
 .. figure:: ../images/examples_bounding_boxes/ooi.jpg
     :alt: Bounding box augmentation with OOIs
@@ -194,8 +194,8 @@ are partially outside of the image so that their are fully inside.
     (red), one is partially outside of it (orange). Right, middle: After using
     `.remove_out_of_image()` the BB that was fully outside of the image area
     was removed. Right, center: After using `.remove_out_of_image()` and
-    `.cut_out_of_image()`, one BB was removed and the one partially outside of
-    of image area was cut to be fully inside it.
+    `.clip_out_of_image()`, one BB was removed and the one partially outside of
+    of image area was clipped to be fully inside it.
 
 
 Shifting/Moving Bounding Boxes
