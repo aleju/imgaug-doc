@@ -209,38 +209,38 @@ a width of exactly 64 and either 1 or 3 channels::
     ])
 
 -----
-Scale
+Resize
 -----
-Augmenter that scales/resizes images to specified heights and widths.
+Augmenter that resizes images to specified heights and widths.
 
-Scale each image to height=32 and width=64::
+Resize each image to height=32 and width=64::
 
-    aug = iaa.Scale({"height": 32, "width": 64})
+    aug = iaa.Resize({"height": 32, "width": 64})
 
-.. figure:: ../images/overview_of_augmenters/scale_32x64.jpg
-    :alt: Scale to 32x64
+.. figure:: ../images/overview_of_augmenters/resize_32x64.jpg
+    :alt: Resize to 32x64
 
-Scale each image to height=32 and keep the aspect ratio for width the same::
+Resize each image to height=32 and keep the aspect ratio for width the same::
 
-    aug = iaa.Scale({"height": 32, "width": "keep-aspect-ratio"})
+    aug = iaa.Resize({"height": 32, "width": "keep-aspect-ratio"})
 
-.. figure:: ../images/overview_of_augmenters/scale_32xkar.jpg
-    :alt: Scale to 32xKAR
+.. figure:: ../images/overview_of_augmenters/resize_32xkar.jpg
+    :alt: Resize to 32xKAR
 
-Scale each image to something between 50 and 100% of its original size::
+Resize each image to something between 50 and 100% of its original size::
 
-    aug = iaa.Scale((0.5, 1.0))
+    aug = iaa.Resize((0.5, 1.0))
 
-.. figure:: ../images/overview_of_augmenters/scale_50_to_100_percent.jpg
-    :alt: Scale to 50 to 100 percent
+.. figure:: ../images/overview_of_augmenters/resize_50_to_100_percent.jpg
+    :alt: Resize to 50 to 100 percent
 
-Scale each image's height to 50-75% of its original size and width to
+Resize each image's height to 50-75% of its original size and width to
 either 16px or 32px or 64px::
 
-    aug = iaa.Scale({"height": (0.5, 0.75), "width": [16, 32, 64]})
+    aug = iaa.Resize({"height": (0.5, 0.75), "width": [16, 32, 64]})
 
-.. figure:: ../images/overview_of_augmenters/scale_h_uniform_w_choice.jpg
-    :alt: Scale with uniform distribution and choice
+.. figure:: ../images/overview_of_augmenters/resize_h_uniform_w_choice.jpg
+    :alt: Resize with uniform distribution and choice
 
 ----------
 CropAndPad

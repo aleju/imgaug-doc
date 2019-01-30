@@ -422,9 +422,9 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
                         name="Superpixels_max_size_224_linear"),
     ]
     augmenters_size = [
-        iaa.Scale((0.8, 1.2), interpolation="nearest", name="Scale_nearest"),
-        iaa.Scale((0.8, 1.2), interpolation="linear", name="Scale_linear"),
-        iaa.Scale((0.8, 1.2), interpolation="cubic", name="Scale_cubic"),
+        iaa.Resize((0.8, 1.2), interpolation="nearest", name="Resize_nearest"),
+        iaa.Resize((0.8, 1.2), interpolation="linear", name="Resize_linear"),
+        iaa.Resize((0.8, 1.2), interpolation="cubic", name="Resize_cubic"),
         iaa.CropAndPad(percent=(-0.2, 0.2), pad_mode="constant", pad_cval=(0, 255), keep_size=False,
                        name="CropAndPad"),
         iaa.CropAndPad(percent=(-0.2, 0.2), pad_mode="edge", pad_cval=(0, 255), keep_size=False,

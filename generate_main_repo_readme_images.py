@@ -1069,7 +1069,7 @@ def draw_per_augmenter_videos():
     # size
     # ###
     descriptors.extend([
-        # Scale
+        # TODO Scale
         _Descriptor.from_augsubs(
             "size",
             "CropAndPad",

@@ -81,9 +81,12 @@ EXP_NAME_MAPPING = OrderedDict([
     ("Superpixels_max_size_64_linear", "Superpixels (max_size=64, linear)"),
     ("Superpixels_max_size_128_linear", "Superpixels (max_size=128, linear)"),
     ("Superpixels_max_size_224_linear", "Superpixels (max_size=224, linear)"),
-    ("Scale_nearest", "Scale (nearest)"),
-    ("Scale_linear", "Scale (linear)"),
-    ("Scale_cubic", "Scale (cubic)"),
+    ("Scale_nearest", "Resize (nearest)"),  # legacy support
+    ("Scale_linear", "Resize (linear)"),  # legacy support
+    ("Scale_cubic", "Resize (cubic)"),  # legacy support
+    ("Resize_nearest", "Resize (nearest)"),
+    ("Resize_linear", "Resize (linear)"),
+    ("Resize_cubic", "Resize (cubic)"),
     ("CropAndPad", "CropAndPad"),
     ("CropAndPad_edge", "CropAndPad (edge)"),
     ("CropAndPad_keep_size", "CropAndPad (keep_size)"),
