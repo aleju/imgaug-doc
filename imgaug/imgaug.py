@@ -1,17 +1,13 @@
 from __future__ import print_function, division, absolute_import
 
-import random
 import math
 import copy
 import numbers
-import multiprocessing
-import threading
-import traceback
 import sys
 import os
-import time
 import json
 import types
+import warnings
 
 import numpy as np
 import cv2
@@ -23,16 +19,6 @@ import skimage.draw
 import skimage.measure
 import collections
 from PIL import Image as PIL_Image, ImageDraw as PIL_ImageDraw, ImageFont as PIL_ImageFont
-
-if sys.version_info[0] == 2:
-    import cPickle as pickle
-    from Queue import Empty as QueueEmpty, Full as QueueFull
-    import socket
-    BrokenPipeError = socket.error
-elif sys.version_info[0] == 3:
-    import pickle
-    from queue import Empty as QueueEmpty, Full as QueueFull
-    xrange = range
 
 ALL = "ALL"
 
@@ -54,7 +40,7 @@ DEFAULT_FONT_FP = os.path.join(
 # here (and in all augmenters) instead of np.random.
 CURRENT_RANDOM_STATE = np.random.RandomState(42)
 SEED_MIN_VALUE = 0
-SEED_MAX_VALUE = 2**32 - 1
+SEED_MAX_VALUE = 2**31-1  # use 2**31 instead of 2**32 here because 2**31 errored on some systems
 
 
 # to check if a dtype instance is among these dtypes, use e.g. `dtype.type in NP_FLOAT_TYPES`
@@ -696,7 +682,7 @@ def quokka_segmentation_map(size=None, extract=None):
 
     if size is not None:
         shape_resized = _compute_resized_shape(img_seg.shape, size)
-        segmap = segmap.scale(shape_resized[0:2])
+        segmap = segmap.resize(shape_resized[0:2])
         segmap.shape = tuple(shape_resized[0:2]) + (3,)
 
     return segmap
@@ -817,13 +803,13 @@ def angle_between_vectors(v1, v2):
     Examples
     --------
     >>> angle_between_vectors(np.float32([1, 0, 0]), np.float32([0, 1, 0]))
-    1.5707963267948966
+    1.570796...
 
     >>> angle_between_vectors(np.float32([1, 0, 0]), np.float32([1, 0, 0]))
     0.0
 
     >>> angle_between_vectors(np.float32([1, 0, 0]), np.float32([-1, 0, 0]))
-    3.141592653589793
+    3.141592...
 
     """
     v1_u = v1 / np.linalg.norm(v1)
@@ -1029,17 +1015,20 @@ def imresize_many_images(images, sizes=None, interpolation=None):
     Examples
     --------
     >>> imresize_many_images(np.zeros((2, 16, 16, 3), dtype=np.uint8), 2.0)
+
     Converts 2 RGB images of height and width 16 to images of height and width 16*2 = 32.
 
     >>> imresize_many_images(np.zeros((2, 16, 16, 3), dtype=np.uint8), (16, 32))
+
     Converts 2 RGB images of height and width 16 to images of height 16 and width 32.
 
     >>> imresize_many_images(np.zeros((2, 16, 16, 3), dtype=np.uint8), (2.0, 4.0))
+
     Converts 2 RGB images of height and width 16 to images of height 32 and width 64.
 
     """
     # we just do nothing if the input contains zero images
-    # one could also argue that an exception would be appropiate here
+    # one could also argue that an exception would be appropriate here
     if len(images) == 0:
         return images
 
@@ -1443,7 +1432,7 @@ def pad_to_aspect_ratio(arr, aspect_ratio, mode="constant", cval=0, return_pad_a
 
 def pool(arr, block_size, func, cval=0, preserve_dtype=True):
     """
-    Rescale an array by pooling values within blocks.
+    Resize an array by pooling values within blocks.
 
     dtype support::
 
@@ -1525,7 +1514,7 @@ def pool(arr, block_size, func, cval=0, preserve_dtype=True):
 
 def avg_pool(arr, block_size, cval=0, preserve_dtype=True):
     """
-    Rescale an array using average pooling.
+    Resize an array using average pooling.
 
     dtype support::
 
@@ -1556,7 +1545,7 @@ def avg_pool(arr, block_size, cval=0, preserve_dtype=True):
 
 def max_pool(arr, block_size, cval=0, preserve_dtype=True):
     """
-    Rescale an array using max-pooling.
+    Resize an array using max-pooling.
 
     dtype support::
 
@@ -1745,8 +1734,12 @@ def imshow(image, backend=IMSHOW_BACKEND_DEFAULT):
         # import only when necessary (faster startup; optional dependency; less fragile -- see issue #225)
         import matplotlib.pyplot as plt
 
-        plt.imshow(image, cmap="gray")
-        plt.gcf().canvas.set_window_title("imgaug.imshow(%s)" % (image.shape,))
+        dpi = 96
+        h, w = image.shape[0] / dpi, image.shape[1] / dpi
+        w = max(w, 6)  # if the figure is too narrow, the footer may appear and make the fig suddenly wider (ugly)
+        fig, ax = plt.subplots(figsize=(w, h), dpi=dpi)
+        fig.canvas.set_window_title("imgaug.imshow(%s)" % (image.shape,))
+        ax.imshow(image, cmap="gray")  # cmap is only activate for grayscale images
         plt.show()
 
 
@@ -1816,12 +1809,14 @@ class HooksImages(object):
     >>>     iaa.Dropout(0.05, name="dropout"),
     >>>     iaa.Affine(translate_px=-5, name="affine")
     >>> ])
+    >>> images = [np.zeros((10, 10), dtype=np.uint8)]
     >>>
     >>> def activator(images, augmenter, parents, default):
     >>>     return False if augmenter.name in ["blur", "dropout"] else default
     >>>
     >>> seq_det = seq.to_deterministic()
     >>> images_aug = seq_det.augment_images(images)
+    >>> heatmaps = [np.random.rand(*(3, 10, 10))]
     >>> heatmaps_aug = seq_det.augment_images(
     >>>     heatmaps,
     >>>     hooks=ia.HooksImages(activator=activator)
@@ -2162,6 +2157,7 @@ class KeypointsOnImage(object):
 
     Examples
     --------
+    >>> image = np.zeros((70, 70))
     >>> kps = [Keypoint(x=10, y=20), Keypoint(x=34, y=60)]
     >>> kps_oi = KeypointsOnImage(kps, shape=image.shape)
 
@@ -3037,10 +3033,15 @@ class BoundingBox(object):
         else:
             return fully
 
-    # TODO rename to clip_*()
-    def cut_out_of_image(self, image):
+    def cut_out_of_image(self, *args, **kwargs):
+        warnings.warn(DeprecationWarning("BoundingBox.cut_out_of_image() is deprecated. Use "
+                                         "BoundingBox.clip_out_of_image() instead. It has the "
+                                         "exactly same interface (simple renaming)."))
+        return self.clip_out_of_image(*args, **kwargs)
+
+    def clip_out_of_image(self, image):
         """
-        Cut off all parts of the bounding box that are outside of the image.
+        Clip off all parts of the bounding box that are outside of the image.
 
         Parameters
         ----------
@@ -3078,6 +3079,7 @@ class BoundingBox(object):
             label=self.label
         )
 
+    # TODO convert this to x/y params?
     def shift(self, top=None, right=None, bottom=None, left=None):
         """
         Shift the bounding box from one or more image sides, i.e. move it on the x/y-axis.
@@ -3374,6 +3376,7 @@ class BoundingBoxesOnImage(object):
 
     Examples
     --------
+    >>> image = np.zeros((100, 100))
     >>> bbs = [
     >>>     BoundingBox(x1=10, y1=20, x2=20, y2=30),
     >>>     BoundingBox(x1=25, y1=50, x2=30, y2=70)
@@ -3581,8 +3584,14 @@ class BoundingBoxesOnImage(object):
         return BoundingBoxesOnImage(bbs_clean, shape=self.shape)
 
     def cut_out_of_image(self):
+        warnings.warn(DeprecationWarning("BoundingBoxesOnImage.cut_out_of_image() is deprecated."
+                                         "Use BoundingBoxesOnImage.clip_out_of_image() instead. It "
+                                         "has the exactly same interface (simple renaming)."))
+        return self.clip_out_of_image()
+
+    def clip_out_of_image(self):
         """
-        Cut off all parts from all bounding boxes that are outside of the image.
+        Clip off all parts from all bounding boxes that are outside of the image.
 
         Returns
         -------
@@ -3590,7 +3599,7 @@ class BoundingBoxesOnImage(object):
             Bounding boxes, clipped to fall within the image dimensions.
 
         """
-        bbs_cut = [bb.cut_out_of_image(self.shape)
+        bbs_cut = [bb.clip_out_of_image(self.shape)
                    for bb in self.bounding_boxes if bb.is_partly_within_image(self.shape)]
         return BoundingBoxesOnImage(bbs_cut, shape=self.shape)
 
@@ -3848,7 +3857,7 @@ class Polygon(object):
             Index of the closest point.
 
         number
-            Euclidean distance to the the closest point.
+            Euclidean distance to the closest point.
             This value is only returned if `return_distance` was set to True.
 
         """
@@ -3951,9 +3960,10 @@ class Polygon(object):
         else:
             return fully
 
-    # TODO mark as deprecated
-    # TODO rename cut_* to clip_* in BoundingBox
     def cut_out_of_image(self, image):
+        warnings.warn(DeprecationWarning("Polygon.cut_out_of_image() is deprecated. Use "
+                                         "Polygon.clip_out_of_image() instead. It has the exactly "
+                                         "same interface (simple renaming)."))
         return self.clip_out_of_image(image)
 
     def clip_out_of_image(self, image):
@@ -4918,7 +4928,7 @@ class HeatmapsOnImage(object):
 
     def avg_pool(self, block_size):
         """
-        Rescale the heatmap(s) array using average pooling of a given block/kernel size.
+        Resize the heatmap(s) array using average pooling of a given block/kernel size.
 
         Parameters
         ----------
@@ -4937,7 +4947,7 @@ class HeatmapsOnImage(object):
 
     def max_pool(self, block_size):
         """
-        Rescale the heatmap(s) array using max-pooling of a given block/kernel size.
+        Resize the heatmap(s) array using max-pooling of a given block/kernel size.
 
         Parameters
         ----------
@@ -4954,9 +4964,16 @@ class HeatmapsOnImage(object):
         return HeatmapsOnImage.from_0to1(arr_0to1_reduced, shape=self.shape, min_value=self.min_value,
                                          max_value=self.max_value)
 
-    def scale(self, sizes, interpolation="cubic"):
+    def scale(self, *args, **kwargs):
+        warnings.warn(DeprecationWarning("HeatmapsOnImage.scale() is deprecated. "
+                                         "Use HeatmapsOnImage.resize() instead. "
+                                         "It has the exactly same interface "
+                                         "(simple renaming)."))
+        return self.resize(*args, **kwargs)
+
+    def resize(self, sizes, interpolation="cubic"):
         """
-        Rescale the heatmap(s) array to the provided size given the provided interpolation.
+        Resize the heatmap(s) array to the provided size given the provided interpolation.
 
         Parameters
         ----------
@@ -4971,17 +4988,17 @@ class HeatmapsOnImage(object):
         Returns
         -------
         imgaug.HeatmapsOnImage
-            Rescaled heatmaps object.
+            Resized heatmaps object.
 
         """
-        arr_0to1_rescaled = imresize_single_image(self.arr_0to1, sizes, interpolation=interpolation)
+        arr_0to1_resized = imresize_single_image(self.arr_0to1, sizes, interpolation=interpolation)
 
         # cubic interpolation can lead to values outside of [0.0, 1.0],
         # see https://github.com/opencv/opencv/issues/7195
         # TODO area interpolation too?
-        arr_0to1_rescaled = np.clip(arr_0to1_rescaled, 0.0, 1.0)
+        arr_0to1_resized = np.clip(arr_0to1_resized, 0.0, 1.0)
 
-        return HeatmapsOnImage.from_0to1(arr_0to1_rescaled, shape=self.shape, min_value=self.min_value,
+        return HeatmapsOnImage.from_0to1(arr_0to1_resized, shape=self.shape, min_value=self.min_value,
                                          max_value=self.max_value)
 
     def to_uint8(self):
@@ -5565,9 +5582,15 @@ class SegmentationMapOnImage(object):
         else:
             return segmap
 
-    def scale(self, sizes, interpolation="cubic"):
+    def scale(self, *args, **kwargs):
+        warnings.warn(DeprecationWarning("SegmentationMapOnImage.scale() is deprecated. "
+                                         "Use SegmentationMapOnImage.resize() instead. "
+                                         "It has the exactly same interface (simple renaming)."))
+        return self.resize(*args, **kwargs)
+
+    def resize(self, sizes, interpolation="cubic"):
         """
-        Rescale the segmentation map array to the provided size given the provided interpolation.
+        Resize the segmentation map array to the provided size given the provided interpolation.
 
         Parameters
         ----------
@@ -5585,16 +5608,16 @@ class SegmentationMapOnImage(object):
         Returns
         -------
         segmap : imgaug.SegmentationMapOnImage
-            Rescaled segmentation map object.
+            Resized segmentation map object.
 
         """
-        arr_rescaled = imresize_single_image(self.arr, sizes, interpolation=interpolation)
+        arr_resized = imresize_single_image(self.arr, sizes, interpolation=interpolation)
 
         # cubic interpolation can lead to values outside of [0.0, 1.0],
         # see https://github.com/opencv/opencv/issues/7195
         # TODO area interpolation too?
-        arr_rescaled = np.clip(arr_rescaled, 0.0, 1.0)
-        segmap = SegmentationMapOnImage(arr_rescaled, shape=self.shape)
+        arr_resized = np.clip(arr_resized, 0.0, 1.0)
+        segmap = SegmentationMapOnImage(arr_resized, shape=self.shape)
         segmap.input_was = self.input_was
         return segmap
 
@@ -5712,10 +5735,6 @@ class SegmentationMapOnImage(object):
         return segmap
 
 
-############################
-# Background augmentation
-############################
-
 class Batch(object):
     """
     Class encapsulating a batch before and after augmentation.
@@ -5747,17 +5766,55 @@ class Batch(object):
     """
     def __init__(self, images=None, heatmaps=None, segmentation_maps=None, keypoints=None, bounding_boxes=None,
                  data=None):
-        self.images = images
+        self.images_unaug = images
         self.images_aug = None
-        self.heatmaps = heatmaps
+        self.heatmaps_unaug = heatmaps
         self.heatmaps_aug = None
-        self.segmentation_maps = segmentation_maps
+        self.segmentation_maps_unaug = segmentation_maps
         self.segmentation_maps_aug = None
-        self.keypoints = keypoints
+        self.keypoints_unaug = keypoints
         self.keypoints_aug = None
-        self.bounding_boxes = bounding_boxes
+        self.bounding_boxes_unaug = bounding_boxes
         self.bounding_boxes_aug = None
         self.data = data
+
+    @property
+    def images(self):
+        warnings.warn(DeprecationWarning(
+            "Accessing imgaug.Batch.images is deprecated. Access instead "
+            "imgaug.Batch.images_unaug or imgaug.Batch.images_aug."))
+        return self.images_unaug
+
+    @property
+    def heatmaps(self):
+        warnings.warn(DeprecationWarning(
+            "Accessing imgaug.Batch.heatmaps is deprecated. Access instead "
+            "imgaug.Batch.heatmaps_unaug or imgaug.Batch.heatmaps_aug."))
+        return self.heatmaps_unaug
+
+    @property
+    def segmentation_maps(self):
+        warnings.warn(DeprecationWarning(
+            "Accessing imgaug.Batch.segmentation_maps is deprecated. Access "
+            "instead imgaug.Batch.segmentation_maps_unaug or "
+            "imgaug.Batch.segmentation_maps_aug."))
+        return self.segmentation_maps_unaug
+
+    @property
+    def keypoints(self):
+        warnings.warn(DeprecationWarning(
+            "Accessing imgaug.Batch.keypoints is deprecated. Access "
+            "instead imgaug.Batch.keypoints_unaug or "
+            "imgaug.Batch.keypoints_aug."))
+        return self.keypoints_unaug
+
+    @property
+    def bounding_boxes(self):
+        warnings.warn(DeprecationWarning(
+            "Accessing imgaug.Batch.bounding_boxes is deprecated. Access "
+            "instead imgaug.Batch.bounding_boxes_unaug or "
+            "imgaug.Batch.bounding_boxes_aug."))
+        return self.bounding_boxes_unaug
 
     def deepcopy(self):
         def _copy_images(images):
@@ -5781,11 +5838,11 @@ class Batch(object):
             return augmentables_copy
 
         batch = Batch(
-            images=_copy_images(self.images),
-            heatmaps=_copy_augmentable_objects(self.heatmaps, HeatmapsOnImage),
-            segmentation_maps=_copy_augmentable_objects(self.segmentation_maps, SegmentationMapOnImage),
-            keypoints=_copy_augmentable_objects(self.keypoints, KeypointsOnImage),
-            bounding_boxes=_copy_augmentable_objects(self.bounding_boxes, BoundingBoxesOnImage),
+            images=_copy_images(self.images_unaug),
+            heatmaps=_copy_augmentable_objects(self.heatmaps_unaug, HeatmapsOnImage),
+            segmentation_maps=_copy_augmentable_objects(self.segmentation_maps_unaug, SegmentationMapOnImage),
+            keypoints=_copy_augmentable_objects(self.keypoints_unaug, KeypointsOnImage),
+            bounding_boxes=_copy_augmentable_objects(self.bounding_boxes_unaug, BoundingBoxesOnImage),
             data=copy.deepcopy(self.data)
         )
         batch.images_aug = _copy_images(self.images_aug)
@@ -5797,333 +5854,17 @@ class Batch(object):
         return batch
 
 
-class BatchLoader(object):
-    """
-    Class to load batches in the background.
+def BatchLoader(*args, **kwargs):
+    warnings.warn(DeprecationWarning("Using imgaug.imgaug.BatchLoader is depcrecated. "
+                                     "Use imgaug.multicore.BatchLoader instead."))
 
-    Loaded batches can be accesses using :attr:`imgaug.BatchLoader.queue`.
-
-    Parameters
-    ----------
-    load_batch_func : callable or generator
-        Generator or generator function (i.e. function that yields Batch objects)
-        or a function that returns a list of Batch objects.
-        Background loading automatically stops when the last batch was yielded or the
-        last batch in the list was reached.
-
-    queue_size : int, optional
-        Maximum number of batches to store in the queue. May be set higher
-        for small images and/or small batches.
-
-    nb_workers : int, optional
-        Number of workers to run in the background.
-
-    threaded : bool, optional
-        Whether to run the background processes using threads (True) or full processes (False).
-
-    """
-
-    def __init__(self, load_batch_func, queue_size=50, nb_workers=1, threaded=True):
-        do_assert(queue_size >= 2, "Queue size for BatchLoader must be at least 2, got %d." % (queue_size,))
-        do_assert(nb_workers >= 1, "Number of workers for BatchLoader must be at least 1, got %d" % (nb_workers,))
-        self._queue_internal = multiprocessing.Queue(queue_size//2)
-        self.queue = multiprocessing.Queue(queue_size//2)
-        self.join_signal = multiprocessing.Event()
-        self.workers = []
-        self.threaded = threaded
-        seeds = current_random_state().randint(0, 10**6, size=(nb_workers,))
-        for i in range(nb_workers):
-            if threaded:
-                worker = threading.Thread(
-                    target=self._load_batches,
-                    args=(load_batch_func, self._queue_internal, self.join_signal, None)
-                )
-            else:
-                worker = multiprocessing.Process(
-                    target=self._load_batches,
-                    args=(load_batch_func, self._queue_internal, self.join_signal, seeds[i])
-                )
-            worker.daemon = True
-            worker.start()
-            self.workers.append(worker)
-
-        self.main_worker_thread = threading.Thread(
-            target=self._main_worker,
-            args=()
-        )
-        self.main_worker_thread.daemon = True
-        self.main_worker_thread.start()
-
-    def count_workers_alive(self):
-        return sum([int(worker.is_alive()) for worker in self.workers])
-
-    def all_finished(self):
-        """
-        Determine whether the workers have finished the loading process.
-
-        Returns
-        -------
-        out : bool
-            True if all workers have finished. Else False.
-
-        """
-        return self.count_workers_alive() == 0
-
-    def _main_worker(self):
-        workers_running = self.count_workers_alive()
-
-        while workers_running > 0 and not self.join_signal.is_set():
-            # wait for a new batch in the source queue and load it
-            try:
-                batch_str = self._queue_internal.get(timeout=0.1)
-                if batch_str == "":
-                    workers_running -= 1
-                else:
-                    self.queue.put(batch_str)
-            except QueueEmpty:
-                time.sleep(0.01)
-            except (EOFError, BrokenPipeError):
-                break
-
-            workers_running = self.count_workers_alive()
-
-        # All workers have finished, move the remaining entries from internal to external queue
-        while True:
-            try:
-                batch_str = self._queue_internal.get(timeout=0.005)
-                if batch_str != "":
-                    self.queue.put(batch_str)
-            except QueueEmpty:
-                break
-            except (EOFError, BrokenPipeError):
-                break
-
-        self.queue.put(pickle.dumps(None, protocol=-1))
-        time.sleep(0.01)
-
-    def _load_batches(self, load_batch_func, queue_internal, join_signal, seedval):
-        if seedval is not None:
-            random.seed(seedval)
-            np.random.seed(seedval)
-            seed(seedval)
-
-        try:
-            gen = load_batch_func() if not is_generator(load_batch_func) else load_batch_func
-            for batch in gen:
-                do_assert(isinstance(batch, Batch),
-                          "Expected batch returned by load_batch_func to be of class imgaug.Batch, got %s." % (
-                              type(batch),))
-                batch_pickled = pickle.dumps(batch, protocol=-1)
-                while not join_signal.is_set():
-                    try:
-                        queue_internal.put(batch_pickled, timeout=0.005)
-                        break
-                    except QueueFull:
-                        pass
-                if join_signal.is_set():
-                    break
-        except Exception:
-            traceback.print_exc()
-        finally:
-            queue_internal.put("")
-        time.sleep(0.01)
-
-    def terminate(self):
-        """Stop all workers."""
-        if not self.join_signal.is_set():
-            self.join_signal.set()
-        # give minimal time to put generated batches in queue and gracefully shut down
-        time.sleep(0.01)
-
-        if self.main_worker_thread.is_alive():
-            self.main_worker_thread.join()
-
-        if self.threaded:
-            for worker in self.workers:
-                if worker.is_alive():
-                    worker.join()
-        else:
-            for worker in self.workers:
-                if worker.is_alive():
-                    worker.terminate()
-                    worker.join()
-
-            # wait until all workers are fully terminated
-            while not self.all_finished():
-                time.sleep(0.001)
-
-        # empty queue until at least one element can be added and place None as signal that BL finished
-        if self.queue.full():
-            self.queue.get()
-        self.queue.put(pickle.dumps(None, protocol=-1))
-        time.sleep(0.01)
-
-        # clean the queue, this reportedly prevents hanging threads
-        while True:
-            try:
-                self._queue_internal.get(timeout=0.005)
-            except QueueEmpty:
-                break
-
-        if not self._queue_internal._closed:
-            self._queue_internal.close()
-        if not self.queue._closed:
-            self.queue.close()
-        self._queue_internal.join_thread()
-        self.queue.join_thread()
-        time.sleep(0.025)
-
-    def __del__(self):
-        if not self.join_signal.is_set():
-            self.join_signal.set()
+    from . import multicore
+    return multicore.BatchLoader(*args, **kwargs)
 
 
-class BackgroundAugmenter(object):
-    """
-    Class to augment batches in the background (while training on the GPU).
+def BackgroundAugmenter(*args, **kwargs):
+    warnings.warn(DeprecationWarning("Using imgaug.imgaug.BackgroundAugmenter is depcrecated. "
+                                     "Use imgaug.multicore.BackgroundAugmenter instead."))
 
-    This is a wrapper around the multiprocessing module.
-
-    Parameters
-    ----------
-    batch_loader : BatchLoader or multiprocessing.Queue
-        BatchLoader object that loads the data fed into the BackgroundAugmenter, or alternatively a Queue.
-        If a Queue, then it must be made sure that a final ``None`` in the Queue signals that the loading is
-        finished and no more batches will follow. Otherwise the BackgroundAugmenter will wait forever for the next
-        batch.
-
-    augseq : Augmenter
-        An augmenter to apply to all loaded images.
-        This may be e.g. a Sequential to apply multiple augmenters.
-
-    queue_size : int
-        Size of the queue that is used to temporarily save the augmentation
-        results. Larger values offer the background processes more room
-        to save results when the main process doesn't load much, i.e. they
-        can lead to smoother and faster training. For large images, high
-        values can block a lot of RAM though.
-
-    nb_workers : 'auto' or int
-        Number of background workers to spawn.
-        If ``auto``, it will be set to ``C-1``, where ``C`` is the number of CPU cores.
-
-    """
-    def __init__(self, batch_loader, augseq, queue_size=50, nb_workers="auto"):
-        do_assert(queue_size > 0)
-        self.augseq = augseq
-        self.queue_source = batch_loader if isinstance(batch_loader, multiprocessing.queues.Queue) else batch_loader.queue
-        self.queue_result = multiprocessing.Queue(queue_size)
-
-        if nb_workers == "auto":
-            try:
-                nb_workers = multiprocessing.cpu_count()
-            except (ImportError, NotImplementedError):
-                nb_workers = 1
-            # try to reserve at least one core for the main process
-            nb_workers = max(1, nb_workers - 1)
-        else:
-            do_assert(nb_workers >= 1)
-
-        self.nb_workers = nb_workers
-        self.workers = []
-        self.nb_workers_finished = 0
-
-        seeds = current_random_state().randint(0, 10**6, size=(nb_workers,))
-        for i in range(nb_workers):
-            worker = multiprocessing.Process(
-                target=self._augment_images_worker,
-                args=(augseq, self.queue_source, self.queue_result, seeds[i])
-            )
-            worker.daemon = True
-            worker.start()
-            self.workers.append(worker)
-
-    def all_finished(self):
-        return self.nb_workers_finished == self.nb_workers
-
-    def get_batch(self):
-        """
-        Returns a batch from the queue of augmented batches.
-
-        If workers are still running and there are no batches in the queue,
-        it will automatically wait for the next batch.
-
-        Returns
-        -------
-        out : None or imgaug.Batch
-            One batch or None if all workers have finished.
-
-        """
-        if self.all_finished():
-            return None
-
-        batch_str = self.queue_result.get()
-        batch = pickle.loads(batch_str)
-        if batch is not None:
-            return batch
-        else:
-            self.nb_workers_finished += 1
-            if self.nb_workers_finished >= self.nb_workers:
-                try:
-                    self.queue_source.get(timeout=0.001)  # remove the None from the source queue
-                except QueueEmpty:
-                    pass
-                return None
-            else:
-                return self.get_batch()
-
-    def _augment_images_worker(self, augseq, queue_source, queue_result, seedval):
-        """
-        Augment endlessly images in the source queue.
-
-        This is a worker function for that endlessly queries the source queue (input batches),
-        augments batches in it and sends the result to the output queue.
-
-        """
-        np.random.seed(seedval)
-        random.seed(seedval)
-        augseq.reseed(seedval)
-        seed(seedval)
-
-        loader_finished = False
-
-        while not loader_finished:
-            # wait for a new batch in the source queue and load it
-            try:
-                batch_str = queue_source.get(timeout=0.1)
-                batch = pickle.loads(batch_str)
-                if batch is None:
-                    loader_finished = True
-                    # put it back in so that other workers know that the loading queue is finished
-                    queue_source.put(pickle.dumps(None, protocol=-1))
-                else:
-                    batch_aug = list(augseq.augment_batches([batch], background=False))[0]
-
-                    # send augmented batch to output queue
-                    batch_str = pickle.dumps(batch_aug, protocol=-1)
-                    queue_result.put(batch_str)
-            except QueueEmpty:
-                time.sleep(0.01)
-
-        queue_result.put(pickle.dumps(None, protocol=-1))
-        time.sleep(0.01)
-
-    def terminate(self):
-        """
-        Terminates all background processes immediately.
-
-        This will also free their RAM.
-
-        """
-        for worker in self.workers:
-            if worker.is_alive():
-                worker.terminate()
-        self.nb_workers_finished = len(self.workers)
-
-        if not self.queue_result._closed:
-            self.queue_result.close()
-        time.sleep(0.01)
-
-    def __del__(self):
-        time.sleep(0.1)
-        self.terminate()
+    from . import multicore
+    return multicore.BackgroundAugmenter(*args, **kwargs)

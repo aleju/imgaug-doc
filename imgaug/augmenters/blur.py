@@ -33,7 +33,6 @@ import six.moves as sm
 
 from . import meta
 from . import convolutional as iaa_convolutional
-from . import geometric as iaa_geometric
 from .. import imgaug as ia
 from .. import parameters as iap
 from .. import dtypes as iadt
@@ -133,7 +132,7 @@ def blur_gaussian_(image, sigma, ksize=None, backend="auto", eps=1e-3):
 
     ksize : None or int, optional
         Size in height/width of the gaussian kernel. This argument is only understood by the ``cv2`` backend.
-        If it is set to None, an appropiate value for `ksize` will automatically be derived from `sigma`.
+        If it is set to None, an appropriate value for `ksize` will automatically be derived from `sigma`.
         The value is chosen tighter for larger sigmas to avoid as much as possible very large kernel sizes
         and therey improve performance.
 
@@ -800,6 +799,9 @@ def MotionBlur(k=5, angle=(0, 360), direction=(-1.0, 1.0), order=1, name=None, d
                                                   tuple_to_uniform=True, list_to_choice=True)
 
     def create_matrices(image, nb_channels, random_state_func):
+        # avoid cyclic import between blur and geometric
+        from . import geometric as iaa_geometric
+
         # force discrete for k_sample via int() in case of stochastic parameter
         k_sample = int(k_param.draw_sample(random_state=random_state_func))
         angle_sample = angle_param.draw_sample(random_state=random_state_func)

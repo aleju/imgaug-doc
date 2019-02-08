@@ -859,6 +859,7 @@ class MultiplyElementwise(meta.Augmenter):
 
     Examples
     --------
+    >>> from imgaug import augmenters as iaa
     >>> aug = iaa.MultiplyElementwise(2.0)
 
     multiply all images by a factor of 2.0, making them significantly
@@ -1144,30 +1145,30 @@ def CoarseDropout(p=0, size_px=None, size_percent=None, per_channel=False, min_s
 
     Examples
     --------
-    >>> aug = iaa.Dropout(0.02, size_percent=0.5)
+    >>> aug = iaa.CoarseDropout(0.02, size_percent=0.5)
 
     drops 2 percent of all pixels on an lower-resolution image that has
     50 percent of the original image's size, leading to dropped areas that
     have roughly 2x2 pixels size.
 
 
-    >>> aug = iaa.Dropout((0.0, 0.05), size_percent=(0.05, 0.5))
+    >>> aug = iaa.CoarseDropout((0.0, 0.05), size_percent=(0.05, 0.5))
 
     generates a dropout mask at 5 to 50 percent of image's size. In that mask,
     0 to 5 percent of all pixels are dropped (random per image).
 
-    >>> aug = iaa.Dropout((0.0, 0.05), size_px=(2, 16))
+    >>> aug = iaa.CoarseDropout((0.0, 0.05), size_px=(2, 16))
 
     same as previous example, but the lower resolution image has 2 to 16 pixels
     size.
 
-    >>> aug = iaa.Dropout(0.02, size_percent=0.5, per_channel=True)
+    >>> aug = iaa.CoarseDropout(0.02, size_percent=0.5, per_channel=True)
 
     drops 2 percent of all pixels at 50 percent resolution (2x2 sizes)
     in a channel-wise fashion, i.e. it is unlikely
     for any pixel to have all channels set to zero (black pixels).
 
-    >>> aug = iaa.Dropout(0.02, size_percent=0.5, per_channel=0.5)
+    >>> aug = iaa.CoarseDropout(0.02, size_percent=0.5, per_channel=0.5)
 
     same as previous example, but the `per_channel` feature is only active
     for 50 percent of all images.
@@ -1289,14 +1290,12 @@ class ReplaceElementwise(meta.Augmenter):
                                      "float96", "float128", "float256"],
                          augmenter=self)
 
-        input_dtypes = iadt.copy_dtypes_for_restore(images, force_list=True)
-
         nb_images = len(images)
         rss = ia.derive_random_states(random_state, 2*nb_images+1)
         per_channel_samples = self.per_channel.draw_samples((nb_images,), random_state=rss[-1])
 
-        gen = enumerate(zip(images, per_channel_samples, rss[:-1:2], rss[1:-1:2], input_dtypes))
-        for i, (image, per_channel_i, rs_mask, rs_replacement, input_dtype) in gen:
+        gen = zip(images, per_channel_samples, rss[:-1:2], rss[1:-1:2])
+        for image, per_channel_i, rs_mask, rs_replacement in gen:
             height, width, nb_channels = image.shape
             sampling_shape = (height, width, nb_channels if per_channel_i > 0.5 else 1)
             mask_samples = self.mask.draw_samples(sampling_shape, random_state=rs_mask)
@@ -1424,6 +1423,8 @@ def CoarseSaltAndPepper(p=0, size_px=None, size_percent=None, per_channel=False,
                         deterministic=False, random_state=None):
     """
     Adds coarse salt and pepper noise to an image, i.e. rectangles that contain noisy white-ish and black-ish pixels.
+
+    TODO replace dtype support with uint8 only, because replacement is geared towards that value range
 
     dtype support::
 

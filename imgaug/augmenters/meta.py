@@ -43,206 +43,6 @@ import six.moves as sm
 from .. import imgaug as ia
 from .. import parameters as iap
 
-"""
-KIND_TO_DTYPES = {
-    "i": ["int8", "int16", "int32", "int64"],
-    "u": ["uint8", "uint16", "uint32", "uint64"],
-    "b": ["bool"],
-    "f": ["float16", "float32", "float64", "float128"]
-}
-
-
-def restore_dtypes_(images, dtypes, clip=True, round=True):
-    if ia.is_np_array(images):
-        if ia.is_iterable(dtypes):
-            assert len(dtypes) > 0
-
-            if len(dtypes) > 1:
-                assert all([dtype_i == dtypes[0] for dtype_i in dtypes])
-
-            dtypes = dtypes[0]
-
-        dtypes = np.dtype(dtypes)
-
-        dtype_to = dtypes
-        if images.dtype.type == dtype_to:
-            result = images
-        else:
-            if round and dtype_to.kind in ["u", "i", "b"]:
-                images = np.round(images)
-            if clip:
-                min_value, _, max_value = get_value_range_of_dtype(dtype_to)
-                images = np.clip(images, min_value, max_value, out=images)
-            result = images.astype(dtype_to, copy=False)
-    elif ia.is_iterable(images):
-        result = images
-        dtypes = dtypes if not isinstance(dtypes, np.dtype) else [dtypes] * len(images)
-        for i, (image, dtype) in enumerate(zip(images, dtypes)):
-            assert ia.is_np_array(image)
-            result[i] = restore_dtypes_(image, dtype, clip=clip)
-    else:
-        raise Exception("Expected numpy array or iterable of numpy arrays, got type '%s'." % (type(images),))
-    return result
-
-
-def copy_dtypes_for_restore(images, force_list=False):
-    if ia.is_np_array(images):
-        if force_list:
-            return [images.dtype for _ in sm.xrange(len(images))]
-        else:
-            return images.dtype
-    else:
-        return [image.dtype for image in images]
-
-
-def get_minimal_dtype(arrays, increase_itemsize_factor=1):
-    input_dts = [array.dtype if not isinstance(array, np.dtype) else array
-                 for array in arrays]
-    promoted_dt = np.promote_types(*input_dts)
-    if increase_itemsize_factor > 1:
-        promoted_dt_highres = "%s%d" % (promoted_dt.kind, promoted_dt.itemsize * increase_itemsize_factor)
-        try:
-            promoted_dt_highres = np.dtype(promoted_dt_highres)
-            return promoted_dt_highres
-        except TypeError:
-            raise TypeError(
-                ("Unable to create a numpy dtype matching the name '%s'. "
-                 + "This error was caused when trying to find a minimal dtype covering the dtypes '%s' (which was "
-                 + "determined to be '%s') and then increasing its resolution (aka itemsize) by a factor of %d. "
-                 + "This error can be avoided by choosing arrays with lower resolution dtypes as inputs, e.g. by "
-                 + "reducing float32 to float16.") % (
-                    promoted_dt_highres,
-                    ", ".join([input_dt.name for input_dt in input_dts]),
-                    promoted_dt.name,
-                    increase_itemsize_factor
-                )
-            )
-    return promoted_dt
-
-
-def get_minimal_dtype_for_values(values, allowed_kinds, default, allow_bool_as_intlike=True):
-    values_normalized = []
-    for value in values:
-        if ia.is_np_array(value):
-            values_normalized.extend([np.min(values), np.max(values)])
-        else:
-            values_normalized.append(value)
-    vmin = np.min(values_normalized)
-    vmax = np.max(values_normalized)
-    possible_kinds = []
-    if ia.is_single_float(vmin) or ia.is_single_float(vmax):
-        # at least one is a float
-        possible_kinds.append("f")
-    elif ia.is_single_bool(vmin) and ia.is_single_bool(vmax):
-        # both are bools
-        possible_kinds.extend(["b", "u", "i"])
-    else:
-        # at least one of them is an integer and none is float
-        if vmin >= 0:
-            possible_kinds.append("u")
-        possible_kinds.append("i")
-        # vmin and vmax are already guarantueed to not be float due to if-statement above
-        if allow_bool_as_intlike and 0 <= vmin <= 1 and 0 <= vmax <= 1:
-            possible_kinds.append("b")
-
-    for allowed_kind in allowed_kinds:
-        if allowed_kind in possible_kinds:
-            dt = get_minimal_dtype_by_value_range(vmin, vmax, allowed_kind, default=None)
-            if dt is not None:
-                return dt
-
-    if ia.is_string(default) and default == "raise":
-        raise Exception(("Did not find matching dtypes for vmin=%s (type %s) and vmax=%s (type %s). "
-                         + "Got %s input values of types %s.") % (
-            vmin, type(vmin), vmax, type(vmax), ", ".join([str(type(value)) for value in values])))
-    return default
-
-
-def get_minimal_dtype_by_value_range(low, high, kind, default):
-    assert low <= high, "Expected low to be less or equal than high, got %s and %s." % (low, high)
-    for dt in KIND_TO_DTYPES[kind]:
-        min_value, _center_value, max_value = get_value_range_of_dtype(dt)
-        if min_value <= low and high <= max_value:
-            return np.dtype(dt)
-    if ia.is_string(default) and default == "raise":
-        raise Exception("Could not find dtype of kind '%s' within value range [%s, %s]" % (kind, low, high))
-    return default
-
-
-def promote_array_dtypes_(arrays, dtypes=None, increase_itemsize_factor=1, affects=None):
-    if dtypes is None:
-        dtypes = [array.dtype for array in arrays]
-    dt = get_minimal_dtype(dtypes, increase_itemsize_factor=increase_itemsize_factor)
-    if affects is None:
-        affects = arrays
-    result = []
-    for array in affects:
-        if array.dtype.type != dt:
-            array = array.astype(dt, copy=False)
-        result.append(array)
-    return result
-
-
-def increase_array_resolutions_(arrays, factor):
-    assert ia.is_single_integer(factor)
-    assert factor in [1, 2, 4, 8]
-    if factor == 1:
-        return arrays
-
-    for i, array in enumerate(arrays):
-        dtype = array.dtype
-        dtype_target = np.dtype("%s%d" % (dtype.kind, dtype.itemsize * factor))
-        arrays[i] = array.astype(dtype_target, copy=False)
-
-    return arrays
-
-
-def get_value_range_of_dtype(dtype):
-    # normalize inputs, makes it work with strings (e.g. "uint8"), types like np.uint8 and also proper dtypes, like
-    # np.dtype("uint8")
-    dtype = np.dtype(dtype)
-
-    # This check seems to fail sometimes, e.g. get_value_range_of_dtype(np.int8)
-    # assert isinstance(dtype, np.dtype), "Expected instance of numpy.dtype, got %s." % (type(dtype),)
-
-    if dtype.kind == "f":
-        finfo = np.finfo(dtype)
-        return finfo.min, 0.0, finfo.max
-    elif dtype.kind == "u":
-        iinfo = np.iinfo(dtype)
-        return iinfo.min, int(iinfo.min + 0.5 * iinfo.max), iinfo.max
-    elif dtype.kind == "i":
-        iinfo = np.iinfo(dtype)
-        return iinfo.min, -0.5, iinfo.max
-    elif dtype.kind == "b":
-        return 0, None, 1
-    else:
-        raise Exception("Cannot estimate value range of dtype '%s' (type: %s)" % (str(dtype), type(dtype)))
-
-
-def clip_to_dtype_value_range_(array, dtype, validate=True, validate_values=None):
-    # for some reason, using 'out' did not work for uint64 (would clip max value to 0)
-    # but removing out then results in float64 array instead of uint64
-    assert array.dtype.name not in ["uint64", "uint128"]
-
-    dtype = np.dtype(dtype)
-    min_value, _, max_value = get_value_range_of_dtype(dtype)
-    if validate:
-        array_val = array
-        if ia.is_single_integer(validate):
-            assert validate_values is None
-            array_val = array.flat[0:validate]
-        if validate_values is not None:
-            min_value_found, max_value_found = validate_values
-        else:
-            min_value_found = np.min(array_val)
-            max_value_found = np.max(array_val)
-        assert min_value <= min_value_found <= max_value
-        assert min_value <= max_value_found <= max_value
-    array = np.clip(array, min_value, max_value, out=array)
-    return array
-"""
-
 
 def clip_augmented_image_(image, min_value, max_value):
     return clip_augmented_images_(image, min_value, max_value)
@@ -530,12 +330,14 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
             return batch_unnormalized
 
         if not background:
+            # singlecore augmentation
+
             for batch_normalized in batches_normalized:
-                batch_augment_images = batch_normalized.images is not None
-                batch_augment_heatmaps = batch_normalized.heatmaps is not None
-                batch_augment_segmaps = batch_normalized.segmentation_maps is not None
-                batch_augment_keypoints = batch_normalized.keypoints is not None
-                batch_augment_bounding_boxes = batch_normalized.bounding_boxes is not None
+                batch_augment_images = batch_normalized.images_unaug is not None
+                batch_augment_heatmaps = batch_normalized.heatmaps_unaug is not None
+                batch_augment_segmaps = batch_normalized.segmentation_maps_unaug is not None
+                batch_augment_keypoints = batch_normalized.keypoints_unaug is not None
+                batch_augment_bounding_boxes = batch_normalized.bounding_boxes_unaug is not None
 
                 nb_to_aug = sum([1 if to_aug else 0
                                  for to_aug in [batch_augment_images, batch_augment_heatmaps, batch_augment_segmaps,
@@ -547,37 +349,36 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
                     augseq = self
 
                 if batch_augment_images:
-                    batch_normalized.images_aug = augseq.augment_images(batch_normalized.images, hooks=hooks)
+                    batch_normalized.images_aug = augseq.augment_images(
+                        batch_normalized.images_unaug, hooks=hooks)
                 if batch_augment_heatmaps:
-                    batch_normalized.heatmaps_aug = augseq.augment_heatmaps(batch_normalized.heatmaps, hooks=hooks)
+                    batch_normalized.heatmaps_aug = augseq.augment_heatmaps(
+                        batch_normalized.heatmaps_unaug, hooks=hooks)
                 if batch_augment_segmaps:
                     batch_normalized.segmentation_maps_aug = augseq.augment_segmentation_maps(
-                        batch_normalized.segmentation_maps, hooks=hooks)
+                        batch_normalized.segmentation_maps_unaug, hooks=hooks)
                 if batch_augment_keypoints:
-                    batch_normalized.keypoints_aug = augseq.augment_keypoints(batch_normalized.keypoints, hooks=hooks)
+                    batch_normalized.keypoints_aug = augseq.augment_keypoints(
+                        batch_normalized.keypoints_unaug, hooks=hooks)
                 if batch_augment_bounding_boxes:
                     batch_normalized.bounding_boxes_aug = augseq.augment_bounding_boxes(
-                        batch_normalized.bounding_boxes, hooks=hooks)
+                        batch_normalized.bounding_boxes_unaug, hooks=hooks)
 
                 batch_unnormalized = unnormalize_batch(batch_normalized)
 
                 yield batch_unnormalized
         else:
+            # multicore augmentation
+            import imgaug.multicore as multicore
+
+            # TODO skip this if the input is already a generator
             def load_batches():
                 for batch in batches_normalized:
                     yield batch
 
-            batch_loader = ia.BatchLoader(load_batches)
-            bg_augmenter = ia.BackgroundAugmenter(batch_loader, self)
-            while True:
-                batch_aug = bg_augmenter.get_batch()
-                if batch_aug is None:
-                    break
-                else:
-                    batch_unnormalized = unnormalize_batch(batch_aug)
-                    yield batch_unnormalized
-            batch_loader.terminate()
-            bg_augmenter.terminate()
+            with multicore.Pool(self) as pool:
+                for batch_aug in pool.imap_batches(load_batches()):
+                    yield unnormalize_batch(batch_aug)
 
     def augment_image(self, image, hooks=None):
         """
@@ -826,8 +627,9 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         Parameters
         ----------
-        heatmaps : list of imgaug.HeatmapsOnImage
-            Heatmaps to augment.
+        heatmaps : imgaug.HeatmapsOnImage or list of imgaug.HeatmapsOnImage
+            Heatmap(s) to augment. Either a single heatmap or a list of
+            heatmaps.
 
         parents : None or list of imgaug.augmenters.meta.Augmenter, optional
             Parent augmenters that have previously been called before the
@@ -839,8 +641,8 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         Returns
         -------
-        heatmap_result : list of imgaug.HeatmapsOnImage
-            Corresponding augmented heatmaps.
+        heatmap_result : imgaug.HeatmapsOnImage or list of imgaug.HeatmapsOnImage
+            Corresponding augmented heatmap(s).
 
         """
         if self.deterministic:
@@ -848,6 +650,11 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         if parents is None:
             parents = []
+
+        input_was_single_instance = False
+        if isinstance(heatmaps, ia.HeatmapsOnImage):
+            input_was_single_instance = True
+            heatmaps = [heatmaps]
 
         ia.do_assert(ia.is_iterable(heatmaps),
                      "Expected to get list of imgaug.HeatmapsOnImage() instances, got %s." % (type(heatmaps),))
@@ -886,6 +693,8 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         if self.deterministic:
             self.random_state.set_state(state_orig)
 
+        if input_was_single_instance:
+            return heatmaps_result[0]
         return heatmaps_result
 
     @abstractmethod
@@ -946,8 +755,10 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         Parameters
         ----------
-        segmaps : list of imgaug.SegmentationMapOnImage
-            The segmentation maps to augment.
+        segmaps : imgaug.SegmentationMapOnImage or \
+                  list of imgaug.SegmentationMapOnImage
+            Segmentation map(s) to augment. Either a single heatmap or a list of
+            segmentation maps.
 
         parents : None or list of imgaug.augmenters.meta.Augmenter, optional
             Parent augmenters that have previously been called before the
@@ -959,10 +770,16 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         Returns
         -------
-        segmaps_aug : list of imgaug.SegmentationMapOnImage
-            Corresponding augmented segmentation maps.
+        segmaps_aug : imgaug.SegmentationMapOnImage or \
+                      list of imgaug.SegmentationMapOnImage
+            Corresponding augmented segmentation map(s).
 
         """
+        input_was_single_instance = False
+        if isinstance(segmaps, ia.SegmentationMapOnImage):
+            input_was_single_instance = True
+            segmaps = [segmaps]
+
         heatmaps_with_nonempty = [segmap.to_heatmaps(only_nonempty=True, not_none_if_no_nonempty=True)
                                   for segmap in segmaps]
         heatmaps = [heatmaps_i for heatmaps_i, nonempty_class_indices_i in heatmaps_with_nonempty]
@@ -976,6 +793,9 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
                                                                  nb_classes=segmap.nb_classes)
             segmap_aug.input_was = segmap.input_was
             segmaps_aug.append(segmap_aug)
+
+        if input_was_single_instance:
+            return segmaps_aug[0]
         return segmaps_aug
 
     def augment_keypoints(self, keypoints_on_images, parents=None, hooks=None):
@@ -994,6 +814,8 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         before augmenting images and their corresponding keypoints,
         e.g. by
 
+        >>> A = B = C = np.zeros((10, 10), dtype=np.uint8)
+        >>> Ak = Bk = Ck = ia.KeypointsOnImage([ia.Keypoint(2, 2)], (10, 10))
         >>> seq = iaa.Fliplr(0.5)
         >>> seq_det = seq.to_deterministic()
         >>> imgs_aug = seq_det.augment_images([A, B, C])
@@ -1007,10 +829,12 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         Parameters
         ----------
-        keypoints_on_images : list of imgaug.KeypointsOnImage
+        keypoints_on_images : imgaug.KeypointsOnImage or \
+                              list of imgaug.KeypointsOnImage
             The keypoints/landmarks to augment.
-            Expected is a list of imgaug.KeypointsOnImage objects,
-            each containing the keypoints of a single image.
+            Expected is an instance of imgaug.KeypointsOnImage or a list of
+            imgaug.KeypointsOnImage objects, with each such object containing
+            the keypoints of a single image.
 
         parents : None or list of imgaug.augmenters.meta.Augmenter, optional
             Parent augmenters that have previously been called before the
@@ -1018,11 +842,13 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
             It is set automatically for child augmenters.
 
         hooks : None or imgaug.HooksKeypoints, optional
-            HooksKeypoints object to dynamically interfere with the augmentation process.
+            HooksKeypoints object to dynamically interfere with the
+            augmentation process.
 
         Returns
         -------
-        keypoints_on_images_result : list of imgaug.KeypointsOnImage
+        keypoints_on_images_result : imgaug.KeypointsOnImage or \
+                                     list of imgaug.KeypointsOnImage
             Augmented keypoints.
 
         """
@@ -1031,6 +857,11 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         if parents is None:
             parents = []
+
+        input_was_single_instance = False
+        if isinstance(keypoints_on_images, ia.KeypointsOnImage):
+            input_was_single_instance = True
+            keypoints_on_images = [keypoints_on_images]
 
         ia.do_assert(ia.is_iterable(keypoints_on_images))
         ia.do_assert(all([isinstance(keypoints_on_image, ia.KeypointsOnImage)
@@ -1050,25 +881,12 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
                     and hooks.is_activated(keypoints_on_images_copy,
                                            augmenter=self, parents=parents, default=self.activated)):
             if len(keypoints_on_images_copy) > 0:
-                # TODO empty KeypointsOnImage objects are filtered here, which means that their
-                # .shape is not altered by augmentation. Add a separate augment_shape() method and
-                # augment empty KPs via that or alternatively change all augmenters to be able to
-                # handle empty KeypointsOnImage objects
-                keypoints_on_images_to_aug, nonempty_idx = reduce_to_nonempty(keypoints_on_images_copy)
-
-                if len(nonempty_idx) > 0:
-                    keypoints_on_images_result = self._augment_keypoints(
-                        keypoints_on_images_to_aug,
-                        random_state=ia.copy_random_state(self.random_state),
-                        parents=parents,
-                        hooks=hooks
-                    )
-                else:
-                    keypoints_on_images_result = []
-
-                keypoints_on_images_result = invert_reduce_to_nonempty(keypoints_on_images_copy, nonempty_idx,
-                                                                       keypoints_on_images_result)
-
+                keypoints_on_images_result = self._augment_keypoints(
+                    keypoints_on_images_copy,
+                    random_state=ia.copy_random_state(self.random_state),
+                    parents=parents,
+                    hooks=hooks
+                )
                 ia.forward_random_state(self.random_state)
             else:
                 keypoints_on_images_result = keypoints_on_images_copy
@@ -1081,6 +899,8 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         if self.deterministic:
             self.random_state.set_state(state_orig)
 
+        if input_was_single_instance:
+            return keypoints_on_images_result[0]
         return keypoints_on_images_result
 
     @abstractmethod
@@ -1134,10 +954,12 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         before augmenting images and their corresponding bounding boxes,
         e.g. by
 
+        >>> A = B = C = np.ones((10, 10), dtype=np.uint8)
+        >>> Abb = Bbb = Cbb = ia.BoundingBoxesOnImage([ia.BoundingBox(1, 1, 9, 9)], (10, 10))
         >>> seq = iaa.Fliplr(0.5)
         >>> seq_det = seq.to_deterministic()
         >>> imgs_aug = seq_det.augment_images([A, B, C])
-        >>> bbs_aug = seq_det.augment_keypoints([Abb, Bbb, Cbb])
+        >>> bbs_aug = seq_det.augment_bounding_boxes([Abb, Bbb, Cbb])
 
         Otherwise, different random values will be sampled for the image
         and bounding box augmentations, resulting in different augmentations
@@ -1147,10 +969,12 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         Parameters
         ----------
-        bounding_boxes_on_images : list of imgaug.BoundingBoxesOnImage
+        bounding_boxes_on_images : imgaug.BoundingBoxesOnImage or \
+                                   list of imgaug.BoundingBoxesOnImage
             The bounding boxes to augment.
-            Expected is a list of imgaug.BoundingBoxesOnImage objects,
-            each containing the bounding boxes of a single image.
+            Expected is an instance of imgaug.BoundingBoxesOnImage or a list of
+            imgaug.BoundingBoxesOnImage objects, witch each such object
+            containing the bounding boxes of a single image.
 
         hooks : None or imgaug.HooksKeypoints, optional
             HooksKeypoints object to dynamically interfere with the
@@ -1158,10 +982,16 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         Returns
         -------
-        result : list of imgaug.BoundingBoxesOnImage
+        result : imgaug.BoundingBoxesOnImage or \
+                 list of imgaug.BoundingBoxesOnImage
             Augmented bounding boxes.
 
         """
+        input_was_single_instance = False
+        if isinstance(bounding_boxes_on_images, ia.BoundingBoxesOnImage):
+            input_was_single_instance = True
+            bounding_boxes_on_images = [bounding_boxes_on_images]
+
         kps_ois = []
         for bbs_oi in bounding_boxes_on_images:
             kps = []
@@ -1194,7 +1024,76 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
                     shape=kps_oi_aug.shape
                 )
             )
+        if input_was_single_instance:
+            return result[0]
         return result
+
+    def pool(self, processes=None, maxtasksperchild=None, seed=None):
+        """
+        Create a pool used for multicore augmentation from this augmenter.
+
+        Parameters
+        ----------
+        processes : None or int, optional
+            Same as for :func:`imgaug.multicore.Pool.__init__`.
+            The number of background workers, similar to the same parameter in multiprocessing.Pool.
+            If ``None``, the number of the machine's CPU cores will be used (this counts hyperthreads as CPU cores).
+            If this is set to a negative value ``p``, then ``P - abs(p)`` will be used, where ``P`` is the number
+            of CPU cores. E.g. ``-1`` would use all cores except one (this is useful to e.g. reserve one core to
+            feed batches to the GPU).
+
+        maxtasksperchild : None or int, optional
+            Same as for :func:`imgaug.multicore.Pool.__init__`.
+            The number of tasks done per worker process before the process is killed and restarted, similar to the
+            same parameter in multiprocessing.Pool. If ``None``, worker processes will not be automatically restarted.
+
+        seed : None or int, optional
+            Same as for :func:`imgaug.multicore.Pool.__init__`.
+            The seed to use for child processes. If ``None``, a random seed will be used.
+
+        Returns
+        -------
+        imgaug.multicore.Pool
+            Pool for multicore augmentation.
+
+        Examples
+        --------
+        >>> import imgaug as ia
+        >>> from imgaug import augmenters as iaa
+        >>> import numpy as np
+        >>> aug = iaa.Add(1)
+        >>> images = np.zeros((16, 128, 128, 3), dtype=np.uint8)
+        >>> batches = [ia.Batch(images=np.copy(images)) for _ in range(100)]
+        >>> with aug.pool(processes=-1, seed=2) as pool:
+        >>>     batches_aug = pool.map_batches(batches, chunksize=8)
+        >>> print(np.sum(batches_aug[0].images_aug[0]))
+        49152
+
+        Creates ``100`` batches of empty images. Each batch contains ``16`` images of size ``128x128``. The batches
+        are then augmented on all CPU cores except one (``processes=-1``). After augmentation, the sum of pixel values
+        from the first augmented image is printed.
+
+        >>> import imgaug as ia
+        >>> from imgaug import augmenters as iaa
+        >>> import numpy as np
+        >>> aug = iaa.Dropout(0.2)
+        >>> images = np.zeros((16, 128, 128, 3), dtype=np.uint8)
+        >>> def generate_batches():
+        >>>     for _ in range(100):
+        >>>         yield ia.Batch(images=np.copy(images))
+        >>>
+        >>> with aug.pool(processes=-1, seed=2) as pool:
+        >>>     batches_aug = pool.imap_batches(generate_batches(), chunksize=8)
+        >>>     batch_aug = next(batches_aug)
+        >>>     print(np.sum(batch_aug.images_aug[0]))
+        0
+
+        Same as above. This time, a generator is used to generate batches of images. Again, the first augmented image's
+        sum of pixels is printed.
+
+        """
+        import imgaug.multicore as multicore
+        return multicore.Pool(self, processes=processes, maxtasksperchild=maxtasksperchild, seed=seed)
 
     # TODO most of the code of this function could be replaced with ia.draw_grid()
     # TODO add parameter for handling multiple images ((a) next to each other in each row or (b) multiply row count
@@ -1385,7 +1284,16 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         """
         aug = self.copy()
-        aug.random_state = ia.new_random_state()
+
+        # This was changed for 0.2.8 from deriving a new random state based on the global random state to deriving
+        # it from the augmenter's local random state. This should reduce the risk that re-runs of scripts lead to
+        # different results upon small changes somewhere. It also decreases the likelihood of problems when using
+        # multiprocessing (the child processes might use the same global random state as the parent process).
+        # Note for the latter point that augment_batches() might call to_deterministic() if the batch contains
+        # multiply types of augmentables.
+        # aug.random_state = ia.new_random_state()
+        aug.random_state = ia.derive_random_state(self.random_state)
+
         aug.deterministic = True
         return aug
 
@@ -1396,9 +1304,16 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         This function is useful, when augmentations are run in the
         background (i.e. on multiple cores).
         It should be called before sending this Augmenter object to a
-        background worker (i.e., if ``N`` workers are used, the function
-        should be called ``N`` times). Otherwise, all background workers will
+        background worker or once within each worker with different seeds
+        (i.e., if ``N`` workers are used, the function should be called
+        ``N`` times). Otherwise, all background workers will
         use the same seeds and therefore apply the same augmentations.
+
+        If this augmenter or any child augmenter had a random state that
+        pointed to the global random state, it will automatically be
+        replaced with a local random state. This is similar to what
+        :func:`imgaug.augmenters.meta.Augmenter.localize_random_state`
+        does.
 
         Parameters
         ----------
@@ -1423,6 +1338,7 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
             random_state = ia.new_random_state(random_state)
 
         if not self.deterministic or deterministic_too:
+            # TODO replace by ia.derive_random_state()
             seed = random_state.randint(0, 10**6, 1)[0]
             self.random_state = ia.new_random_state(seed)
 
@@ -1458,7 +1374,7 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
 
         A global random state exists exactly once. Many augmenters can point
         to it (and thereby use it to sample random numbers).
-        Local random usually exists for exactly one augmenter and are
+        Local random states usually exist for exactly one augmenter and are
         saved within that augmenter.
 
         Usually there is no need to change global into local random states.
@@ -1721,8 +1637,8 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         Examples
         --------
         >>> aug = iaa.Sequential([
-        >>>     nn.Fliplr(0.5, name="fliplr"),
-        >>>     nn.Flipud(0.5, name="flipud")
+        >>>     iaa.Fliplr(0.5, name="fliplr"),
+        >>>     iaa.Flipud(0.5, name="flipud")
         >>> ])
         >>> print(aug.find_augmenters(lambda a, parents: a.name == "fliplr"))
 
@@ -1989,6 +1905,7 @@ class Sequential(Augmenter, list):
 
     Examples
     --------
+    >>> imgs = [np.random.rand(10, 10)]
     >>> seq = iaa.Sequential([
     >>>     iaa.Fliplr(0.5),
     >>>     iaa.Flipud(0.5)
@@ -2088,7 +2005,7 @@ class Sequential(Augmenter, list):
         augs = [aug.to_deterministic() for aug in self]
         seq = self.copy()
         seq[:] = augs
-        seq.random_state = ia.new_random_state()
+        seq.random_state = ia.derive_random_state(self.random_state)
         seq.deterministic = True
         return seq
 
@@ -2176,6 +2093,7 @@ class SomeOf(Augmenter, list):
 
     Examples
     --------
+    >>> imgs = [np.random.rand(10, 10)]
     >>> seq = iaa.SomeOf(1, [
     >>>     iaa.Fliplr(1.0),
     >>>     iaa.Flipud(1.0)
@@ -2431,7 +2349,7 @@ class SomeOf(Augmenter, list):
         augs = [aug.to_deterministic() for aug in self]
         seq = self.copy()
         seq[:] = augs
-        seq.random_state = ia.new_random_state()
+        seq.random_state = ia.derive_random_state(self.random_state)
         seq.deterministic = True
         return seq
 
@@ -2482,6 +2400,7 @@ def OneOf(children, name=None, deterministic=False, random_state=None):
 
     Examples
     --------
+    >>> imgs = [np.ones((10, 10))]
     >>> seq = iaa.OneOf([
     >>>     iaa.Fliplr(1.0),
     >>>     iaa.Flipud(1.0)
@@ -2720,7 +2639,7 @@ class Sometimes(Augmenter):
         aug.then_list = aug.then_list.to_deterministic() if aug.then_list is not None else aug.then_list
         aug.else_list = aug.else_list.to_deterministic() if aug.else_list is not None else aug.else_list
         aug.deterministic = True
-        aug.random_state = ia.new_random_state()
+        aug.random_state = ia.derive_random_state(self.random_state)
         return aug
 
     def get_parameters(self):
@@ -2902,7 +2821,7 @@ class WithChannels(Augmenter):
         aug = self.copy()
         aug.children = aug.children.to_deterministic()
         aug.deterministic = True
-        aug.random_state = ia.new_random_state()
+        aug.random_state = ia.derive_random_state(self.random_state)
         return aug
 
     def get_parameters(self):

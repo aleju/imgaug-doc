@@ -133,11 +133,10 @@ class FastSnowyLandscape(meta.Augmenter):
         return thresh_samples, lmul_samples
 
     def _augment_images(self, images, random_state, parents, hooks):
-        input_dtypes = iadt.copy_dtypes_for_restore(images, force_list=True)
         thresh_samples, lmul_samples = self._draw_samples(images, random_state)
         result = images
 
-        for i, (image, input_dtype, thresh, lmul) in enumerate(zip(images, input_dtypes, thresh_samples, lmul_samples)):
+        for i, (image, thresh, lmul) in enumerate(zip(images, thresh_samples, lmul_samples)):
             color_transform = augmenters_color.ChangeColorspace.CV_VARS["%s2HLS" % (self.from_colorspace,)]
             color_transform_inverse = augmenters_color.ChangeColorspace.CV_VARS["HLS2%s" % (self.from_colorspace,)]
 
@@ -195,7 +194,7 @@ def Clouds(name=None, deterministic=False, random_state=None):
 
         - (1) Parameters of this augmenter are optimized for the value range of uint8.
               While other dtypes may be accepted, they will lead to images augmented in
-              ways inappropiate for the respective dtype.
+              ways inappropriate for the respective dtype.
 
     Parameters
     ----------
@@ -262,7 +261,7 @@ def Fog(name=None, deterministic=False, random_state=None):
 
         - (1) Parameters of this augmenter are optimized for the value range of uint8.
               While other dtypes may be accepted, they will lead to images augmented in
-              ways inappropiate for the respective dtype.
+              ways inappropriate for the respective dtype.
 
     Parameters
     ----------
@@ -551,7 +550,7 @@ def Snowflakes(density=(0.005, 0.075), density_uniformity=(0.3, 0.9), flake_size
 
         - (1) Parameters of this augmenter are optimized for the value range of uint8.
               While other dtypes may be accepted, they will lead to images augmented in
-              ways inappropiate for the respective dtype.
+              ways inappropriate for the respective dtype.
 
     Parameters
     ----------
