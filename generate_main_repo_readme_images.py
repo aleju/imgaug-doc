@@ -406,7 +406,7 @@ def draw_per_augmenter_videos():
                                subtitles=[el[0] for el in augsubs],
                                seed=seed, affects_geometry=affects_geometry, comment=comment)
 
-        def generate_frames(self, image, keypoints, bounding_boxes, heatmap, segmap, subtitle_height):
+        def generate_frames(self, image, keypoints, bounding_boxes, polygons, heatmap, segmap, subtitle_height):
             frames_images = []
             frames_kps = []
             frames_bbs = []
@@ -429,13 +429,23 @@ def draw_per_augmenter_videos():
                 image_aug = aug_det.augment_image(image)
                 kps_aug = aug_det.augment_keypoints([keypoints])[0]
                 bbs_aug = aug_det.augment_bounding_boxes([bounding_boxes])[0]
+                polys_aug = aug_det.augment_polygons([polygons])[0]
                 heatmap_aug = aug_det.augment_heatmaps([heatmap])[0]
                 segmap_aug = aug_det.augment_segmentation_maps([segmap])[0]
 
                 if self.affects_geometry:
                     image_with_coordsaug = _subt(
-                        bbs_aug.draw_on_image(kps_aug.draw_on_image(image_aug, size=5)),
-                        "Images, KPs, BBs"
+                        polys_aug.draw_on_image(
+                            bbs_aug.draw_on_image(
+                                kps_aug.draw_on_image(image_aug, size=5)
+                            ),
+                            color_perimeter=(0, 128, 0),
+                            color_points=(0, 128, 0),
+                            alpha=0,
+                            alpha_perimeter=0.5,
+                            alpha_points=1.0
+                        ),
+                        "IMG, KPs, BBs, Polys"
                     )
                     frames_images.append(image_with_coordsaug)
                     #frames_kps.append(_subt(kps_aug.draw_on_image(image_aug, size=5), "keypoints"))
@@ -556,6 +566,7 @@ def draw_per_augmenter_videos():
     image = ia.quokka_square(size=(h, w))
     keypoints = ia.quokka_keypoints(size=(h, w), extract="square")
     bbs = ia.quokka_bounding_boxes(size=(h, w), extract="square")
+    polygons = ia.quokka_polygons(size=(h, w), extract="square")
     heatmap = ia.quokka_heatmap(size=(h, w), extract="square")
     segmap = ia.quokka_segmentation_map(size=(h, w), extract="square")
 
@@ -1186,7 +1197,7 @@ def draw_per_augmenter_videos():
         frames_images, frames_kps, frames_bbs, frames_hm, frames_segmap = \
             descriptor.generate_frames(
                 image if descriptor.module != "weather" else image_landscape,
-                keypoints, bbs, heatmap, segmap, h_subtitle)
+                keypoints, bbs, polygons, heatmap, segmap, h_subtitle)
 
         if descriptor.affects_geometry:
             frames_images = [np.hstack([frame_image, frame_hm, frame_segmap])
