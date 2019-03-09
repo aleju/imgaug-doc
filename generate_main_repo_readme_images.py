@@ -25,12 +25,12 @@ IMAGES_DIR = "readme_images"
 
 def main():
     draw_small_overview()
-    draw_single_sequential_images()
-    draw_per_augmenter_videos()
+    #draw_single_sequential_images()
+    #draw_per_augmenter_videos()
 
 
 def draw_small_overview():
-    ia.seed(42)
+    ia.seed(44)
     image = ia.quokka(size=0.2)
     heatmap = ia.quokka_heatmap(size=0.2)
     segmap = ia.quokka_segmentation_map(size=0.2)
@@ -69,12 +69,13 @@ def draw_small_overview():
         image_aug_bbs = result.bounding_boxes_aug[0].clip_out_of_image().draw_on_image(image_aug, thickness=3)
         # add polys for now to BBs image to save (screen) space
         image_aug_bbs = result.polygons_aug[0].clip_out_of_image().draw_on_image(
-            image_aug_bbs, color=[0, 0, 255], color_points=[0, 0, 128], alpha=0.1, alpha_points=1.0)
-        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_image.jpg" % (name,)), image_aug)
-        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_heatmap.jpg" % (name,)), image_aug_heatmap)
-        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_segmap.jpg" % (name,)), image_aug_segmap)
-        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_kps.jpg" % (name,)), image_aug_kps)
-        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_bbs.jpg" % (name,)), image_aug_bbs)
+            image_aug_bbs, color=[0, 128, 0], color_points=[0, 128, 0], alpha=0.0,
+            alpha_points=1.0, alpha_perimeter=0.5)
+        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_image.jpg" % (name,)), image_aug, quality=90)
+        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_heatmap.jpg" % (name,)), image_aug_heatmap, quality=90)
+        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_segmap.jpg" % (name,)), image_aug_segmap, quality=90)
+        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_kps.jpg" % (name,)), image_aug_kps, quality=90)
+        imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_bbs.jpg" % (name,)), image_aug_bbs, quality=90)
 
 
 def draw_single_sequential_images():
