@@ -24,8 +24,8 @@ IMAGES_DIR = "readme_images"
 
 
 def main():
-    # draw_small_overview()
-    # draw_single_sequential_images()
+    draw_small_overview()
+    draw_single_sequential_images()
     draw_per_augmenter_videos()
 
 
@@ -36,12 +36,14 @@ def draw_small_overview():
     segmap = ia.quokka_segmentation_map(size=0.2)
     kps = ia.quokka_keypoints(size=0.2)
     bbs = ia.quokka_bounding_boxes(size=0.2)
+    polys = ia.quokka_polygons(size=0.2)
     batch = ia.Batch(
         images=[image],
         heatmaps=[heatmap.invert()],
         segmentation_maps=[segmap],
         keypoints=[kps],
-        bounding_boxes=[bbs]
+        bounding_boxes=[bbs],
+        polygons=[polys]
     )
 
     augs = []
@@ -65,6 +67,9 @@ def draw_small_overview():
         image_aug_segmap = result.segmentation_maps_aug[0].draw_on_image(image_aug, alpha=0.8)
         image_aug_kps = result.keypoints_aug[0].draw_on_image(image_aug, color=[0, 255, 0], size=7)
         image_aug_bbs = result.bounding_boxes_aug[0].clip_out_of_image().draw_on_image(image_aug, thickness=3)
+        # add polys for now to BBs image to save (screen) space
+        image_aug_bbs = result.polygons_aug[0].clip_out_of_image().draw_on_image(
+            image_aug_bbs, color=[0, 0, 255], color_points=[0, 0, 128], alpha=0.1, alpha_points=1.0)
         imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_image.jpg" % (name,)), image_aug)
         imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_heatmap.jpg" % (name,)), image_aug_heatmap)
         imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_segmap.jpg" % (name,)), image_aug_segmap)
