@@ -781,6 +781,54 @@ def quokka_bounding_boxes(size=None, extract=None):
     return bbsoi
 
 
+def quokka_polygons(size=None, extract=None):
+    """
+    Returns example polygons on the standard example quokke image.
+
+    The result contains one polygon, covering the quokka's outline.
+
+    Parameters
+    ----------
+    size : None or float or tuple of int or tuple of float, optional
+        Size of the output image on which the polygons are placed. If None,
+        then the polygons are not projected to any new size (positions on the
+        original image are used). Floats lead to relative size changes, ints
+        to absolute sizes in pixels.
+
+    extract : None or 'square' or tuple of number or imgaug.BoundingBox or \
+              imgaug.BoundingBoxesOnImage
+        Subarea to extract from the image. See :func:`imgaug.quokka`.
+
+    Returns
+    -------
+    psoi : imgaug.PolygonsOnImage
+        Example polygons on the quokka image.
+
+    """
+    left, top = 0, 0
+    if extract is not None:
+        bb_extract = _quokka_normalize_extract(extract)
+        left = bb_extract.x1
+        top = bb_extract.y1
+    with open(QUOKKA_ANNOTATIONS_FP, "r") as f:
+        json_dict = json.load(f)
+    polygons = []
+    for poly_json in json_dict["polygons"]:
+        polygons.append(
+            Polygon([(point["x"] - left, point["y"] - top)
+                    for point in poly_json["keypoints"]])
+        )
+    if extract is not None:
+        shape = (bb_extract.height, bb_extract.width, 3)
+    else:
+        shape = (643, 960, 3)
+    psoi = PolygonsOnImage(polygons, shape=shape)
+    if size is not None:
+        shape_resized = _compute_resized_shape(shape, size)
+        psoi = psoi.on(shape_resized)
+    return psoi
+
+
 def angle_between_vectors(v1, v2):
     """
     Returns the angle in radians between vectors `v1` and `v2`.
@@ -812,8 +860,10 @@ def angle_between_vectors(v1, v2):
     3.141592...
 
     """
-    v1_u = v1 / np.linalg.norm(v1)
-    v2_u = v2 / np.linalg.norm(v2)
+    l1 = np.linalg.norm(v1)
+    l2 = np.linalg.norm(v2)
+    v1_u = (v1 / l1) if l1 > 0 else np.float32(v1) * 0
+    v2_u = (v2 / l2) if l2 > 0 else np.float32(v2) * 0
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
 
@@ -940,7 +990,15 @@ def draw_text(img, y, x, text, color=(0, 255, 0), size=25):
     context = PIL_ImageDraw.Draw(img)
     context.text((x, y), text, fill=tuple(color), font=font)
     img_np = np.asarray(img)
-    img_np.setflags(write=True)  # PIL/asarray returns read only array
+
+    # PIL/asarray returns read only array
+    if not img_np.flags["WRITEABLE"]:
+        try:
+            # this seems to no longer work with np 1.16 (or was pillow updated?)
+            img_np.setflags(write=True)
+        except ValueError as ex:
+            if "cannot set WRITEABLE flag to True of this array" in str(ex):
+                img_np = np.copy(img_np)
 
     if img_np.dtype != input_dtype:
         img_np = img_np.astype(input_dtype)
@@ -2043,13 +2101,23 @@ class Keypoint(object):
 
         """
         if from_shape[0:2] == to_shape[0:2]:
-            return Keypoint(x=self.x, y=self.y)
-        else:
-            from_height, from_width = from_shape[0:2]
-            to_height, to_width = to_shape[0:2]
-            x = (self.x / from_width) * to_width
-            y = (self.y / from_height) * to_height
-            return Keypoint(x=x, y=y)
+            return self.deepcopy(x=self.x, y=self.y)
+
+        # avoid division by zeros
+        # TODO add this to other project() functions too
+        assert all([v > 0 for v in from_shape[0:2]]), \
+            "Got invalid from_shape %s in Keypoint.project()" % (
+                str(from_shape),)
+        if any([v <= 0 for v in to_shape[0:2]]):
+            import warnings
+            warnings.warn("Got invalid to_shape %s in Keypoint.project()" % (
+                str(to_shape),))
+
+        from_height, from_width = from_shape[0:2]
+        to_height, to_width = to_shape[0:2]
+        x = (self.x / from_width) * to_width
+        y = (self.y / from_height) * to_height
+        return self.deepcopy(x=x, y=y)
 
     def shift(self, x=0, y=0):
         """
@@ -2069,7 +2137,7 @@ class Keypoint(object):
             Keypoint object with new coordinates.
 
         """
-        return Keypoint(self.x + x, self.y + y)
+        return self.deepcopy(self.x + x, self.y + y)
 
     def generate_similar_points_manhattan(self, nb_steps, step_size, return_array=False):
         """
@@ -2134,7 +2202,53 @@ class Keypoint(object):
 
         if return_array:
             return points
-        return [Keypoint(x=points[i, 0], y=points[i, 1]) for i in sm.xrange(points.shape[0])]
+        return [self.deepcopy(x=points[i, 0], y=points[i, 1]) for i in sm.xrange(points.shape[0])]
+
+    def copy(self, x=None, y=None):
+        """
+        Create a shallow copy of the Keypoint object.
+
+        Parameters
+        ----------
+        x : None or number, optional
+            Coordinate of the keypoint on the x axis.
+            If ``None``, the instance's value will be copied.
+
+        y : None or number, optional
+            Coordinate of the keypoint on the y axis.
+            If ``None``, the instance's value will be copied.
+
+        Returns
+        -------
+        imgaug.Keypoint
+            Shallow copy.
+
+        """
+        return self.deepcopy(x=x, y=y)
+
+    def deepcopy(self, x=None, y=None):
+        """
+        Create a deep copy of the Keypoint object.
+
+        Parameters
+        ----------
+        x : None or number, optional
+            Coordinate of the keypoint on the x axis.
+            If ``None``, the instance's value will be copied.
+
+        y : None or number, optional
+            Coordinate of the keypoint on the y axis.
+            If ``None``, the instance's value will be copied.
+
+        Returns
+        -------
+        imgaug.Keypoint
+            Deep copy.
+
+        """
+        x = self.x if x is None else x
+        y = self.y if y is None else y
+        return Keypoint(x=x, y=y)
 
     def __repr__(self):
         return self.__str__()
@@ -2216,7 +2330,7 @@ class KeypointsOnImage(object):
             return self.deepcopy()
         else:
             keypoints = [kp.project(self.shape, shape) for kp in self.keypoints]
-            return KeypointsOnImage(keypoints, shape)
+            return self.deepcopy(keypoints, shape)
 
     def draw_on_image(self, image, color=(0, 255, 0), size=3, copy=True, raise_if_out_of_image=False):
         """
@@ -2286,7 +2400,7 @@ class KeypointsOnImage(object):
 
         """
         keypoints = [keypoint.shift(x=x, y=y) for keypoint in self.keypoints]
-        return KeypointsOnImage(keypoints, self.shape)
+        return self.deepcopy(keypoints)
 
     def get_coords_array(self):
         """
@@ -2573,9 +2687,19 @@ class KeypointsOnImage(object):
             out_shape += (nb_channels,)
         return KeypointsOnImage(keypoints, shape=out_shape)
 
-    def copy(self):
+    def copy(self, keypoints=None, shape=None):
         """
         Create a shallow copy of the KeypointsOnImage object.
+
+        Parameters
+        ----------
+        keypoints : None or list of imgaug.Keypoint, optional
+            List of keypoints on the image. If ``None``, the instance's
+            keypoints will be copied.
+
+        shape : tuple of int, optional
+            The shape of the image on which the keypoints are placed.
+            If ``None``, the instance's shape will be copied.
 
         Returns
         -------
@@ -2583,11 +2707,26 @@ class KeypointsOnImage(object):
             Shallow copy.
 
         """
-        return copy.copy(self)
+        result = copy.copy(self)
+        if keypoints is not None:
+            result.keypoints = keypoints
+        if shape is not None:
+            result.shape = shape
+        return result
 
-    def deepcopy(self):
+    def deepcopy(self, keypoints=None, shape=None):
         """
         Create a deep copy of the KeypointsOnImage object.
+
+        Parameters
+        ----------
+        keypoints : None or list of imgaug.Keypoint, optional
+            List of keypoints on the image. If ``None``, the instance's
+            keypoints will be copied.
+
+        shape : tuple of int, optional
+            The shape of the image on which the keypoints are placed.
+            If ``None``, the instance's shape will be copied.
 
         Returns
         -------
@@ -2596,8 +2735,11 @@ class KeypointsOnImage(object):
 
         """
         # for some reason deepcopy is way slower here than manual copy
-        kps = [Keypoint(x=kp.x, y=kp.y) for kp in self.keypoints]
-        return KeypointsOnImage(kps, tuple(self.shape))
+        if keypoints is None:
+            keypoints = [kp.deepcopy() for kp in self.keypoints]
+        if shape is None:
+            shape = tuple(self.shape)
+        return KeypointsOnImage(keypoints, shape)
 
     def __repr__(self):
         return self.__str__()
@@ -3652,7 +3794,7 @@ class BoundingBoxesOnImage(object):
             Deep copy.
 
         """
-        # Manual copy is far faster than deepcopy for KeypointsOnImage,
+        # Manual copy is far faster than deepcopy for BoundingBoxesOnImage,
         # so use manual copy here too
         bbs = [bb.deepcopy() for bb in self.bounding_boxes]
         return BoundingBoxesOnImage(bbs, tuple(self.shape))
@@ -3703,9 +3845,13 @@ class Polygon(object):
                 # list of tuples (x, y)
                 self.exterior = np.float32([[point[0], point[1]] for point in exterior])
         else:
-            do_assert(is_np_array(exterior))
-            do_assert(exterior.ndim == 2)
-            do_assert(exterior.shape[1] == 2)
+            do_assert(is_np_array(exterior),
+                      ("Expected exterior to be a list of tuples (x, y) or "
+                       + "an (N, 2) array, got type %s") % (exterior,))
+            do_assert(exterior.ndim == 2 and exterior.shape[1] == 2,
+                      ("Expected exterior to be a list of tuples (x, y) or "
+                       + "an (N, 2) array, got an array of shape %s") % (
+                          exterior.shape,))
             self.exterior = np.float32(exterior)
 
         # Remove last point if it is essentially the same as the first point (polygons are always assumed to be
@@ -3966,6 +4112,8 @@ class Polygon(object):
                                          "same interface (simple renaming)."))
         return self.clip_out_of_image(image)
 
+    # TODO this currently can mess up the order of points - change somehow to
+    #      keep the order
     def clip_out_of_image(self, image):
         """
         Cut off all parts of the polygon that are outside of the image.
@@ -3994,7 +4142,7 @@ class Polygon(object):
         if self.is_out_of_image(image, fully=True, partly=False):
             return MultiPolygon([])
 
-        h, w = image.shape[0:2]
+        h, w = image.shape[0:2] if is_np_array(image) else image[0:2]
         poly_shapely = self.to_shapely_polygon()
         poly_image = shapely.geometry.Polygon([(0, 0), (w, 0), (w, h), (0, h)])
         multipoly_inter_shapely = poly_shapely.intersection(poly_image)
@@ -4054,11 +4202,13 @@ class Polygon(object):
         exterior[:, 1] += (top - bottom)
         return self.deepcopy(exterior=exterior)
 
-    # TODO add boundary thickness
+    # TODO add perimeter thickness
     def draw_on_image(self,
                       image,
                       color=(0, 255, 0), color_perimeter=(0, 128, 0),
-                      alpha=0.5, alpha_perimeter=1.0,
+                      color_points=(0, 128, 0),
+                      alpha=0.5, alpha_perimeter=1.0, alpha_points=0.0,
+                      size_points=3,
                       raise_if_out_of_image=False):
         """
         Draw the polygon on an image.
@@ -4066,29 +4216,43 @@ class Polygon(object):
         Parameters
         ----------
         image : (H,W,C) ndarray
-            The image onto which to draw the polygon. Usually expected to be of dtype uint8, though other dtypes
-            are also handled.
+            The image onto which to draw the polygon. Usually expected to be
+            of dtype ``uint8``, though other dtypes are also handled.
 
         color : iterable of int, optional
-            The color to use for the polygon (excluding perimeter). Must correspond to the channel layout of the
-            image. Usually RGB.
+            The color to use for the polygon (excluding perimeter).
+            Must correspond to the channel layout of the image. Usually RGB.
 
         color_perimeter : iterable of int, optional
-            The color to use for the perimeter/border of the polygon. Must correspond to the channel layout of the
-            image. Usually RGB.
+            The color to use for the perimeter (aka border) of the polygon.
+            Must correspond to the channel layout of the image. Usually RGB.
+
+        color_points : iterable of int, optional
+            The color to use for the corner points of the polygon.
+            Must correspond to the channel layout of the image. Usually RGB.
 
         alpha : float, optional
-            The transparency of the polygon (excluding the perimeter), where 1.0 denotes no transparency and 0.0 is
-            invisible.
+            The transparency of the polygon (excluding the perimeter),
+            where 1.0 denotes no transparency and 0.0 is invisible.
 
         alpha_perimeter : float, optional
-            The transparency of the polygon's perimeter/border, where 1.0 denotes no transparency and 0.0 is
-            invisible.
+            The transparency of the polygon's perimeter (aka border),
+            where 1.0 denotes no transparency and 0.0 is invisible.
+
+        alpha_points : 0 or 1 or 0.0 or 1.0, optional
+            The transparency of the polygon's corner points,
+            where 1.0 denotes no transparency and 0.0 is invisible.
+            Currently this is an on/off choice, i.e. only ``0.0`` or ``1.0``
+            are allowed. Transparency will be implemented later on.
+
+        size_points : int, optional
+            The size of each corner point. If set to ``C``, each corner point
+            will be drawn as a square of size ``C x C``.
 
         raise_if_out_of_image : bool, optional
-            Whether to raise an error if the polygon is partially/fully outside of the
-            image. If set to False, no error will be raised and only the parts inside the image
-            will be drawn.
+            Whether to raise an error if the polygon is partially/fully
+            outside of the image. If set to False, no error will be raised and
+            only the parts inside the image will be drawn.
 
         Returns
         -------
@@ -4096,6 +4260,13 @@ class Polygon(object):
             Image with polygon drawn on it. Result dtype is the same as the input dtype.
 
         """
+        assert (
+            np.isclose(alpha_points, 0.0, rtol=0, atol=1e-2)
+            or np.isclose(alpha_points, 1.0, rtol=0, atol=1e-2)
+        ), ("Got alpha_points of %.2f, but currently only 0.0 (point drawing "
+            + "completely off) or 1.0 (point drawing completely on) are "
+            + "implemented.") % (alpha_points,)
+
         # TODO separate this into draw_face_on_image() and draw_border_on_image()
 
         if raise_if_out_of_image and self.is_out_of_image(image):
@@ -4130,6 +4301,13 @@ class Polygon(object):
                 pass  # invisible, do nothing
             else:
                 result[rr, cc, :] = (1 - alpha) * result[rr, cc, :] + alpha * color
+
+        if alpha_points > 0:
+            kpsoi = KeypointsOnImage.from_coords_array(self.exterior,
+                                                       shape=image.shape)
+            result = kpsoi.draw_on_image(
+                result, color=color_points, size=size_points, copy=False,
+                raise_if_out_of_image=raise_if_out_of_image)
 
         if input_dtype.type == np.uint8:
             result = np.clip(result, 0, 255).astype(input_dtype)  # TODO make clipping more flexible
@@ -4290,12 +4468,24 @@ class Polygon(object):
         Returns
         -------
         imgaug.BoundingBox
-            The bounding box tightly containing the polygon.
+            Tight bounding box around the polygon.
 
         """
         xx = self.xx
         yy = self.yy
         return BoundingBox(x1=min(xx), x2=max(xx), y1=min(yy), y2=max(yy), label=self.label)
+
+    def to_keypoints(self):
+        """
+        Convert this polygon's `exterior` to ``Keypoint`` instances.
+
+        Returns
+        -------
+        list of imgaug.Keypoint
+            Exterior vertices as ``Keypoint`` instances.
+
+        """
+        return [Keypoint(x=point[0], y=point[1]) for point in self.exterior]
 
     @staticmethod
     def from_shapely(polygon_shapely, label=None):
@@ -4341,10 +4531,12 @@ class Polygon(object):
 
         Parameters
         ----------
-        other_polygon : imgaug.Polygon or (N,2) ndarray
+        other_polygon : imgaug.Polygon or (N,2) ndarray or list of tuple
             The other polygon with which to compare the exterior.
             If this is an ndarray, it is assumed to represent an exterior.
             It must then have dtype float32 and shape (N,2) with the second dimension denoting xy-coordinates.
+            If this is a list of tuples, it is assumed to represent an exterior.
+            Each tuple then must contain exactly two numbers, denoting xy-coordinates.
 
         max_distance : number
             The maximum euclidean distance between a point on one polygon and the closest point on the other polygon.
@@ -4369,7 +4561,13 @@ class Polygon(object):
         atol = max_distance
 
         ext_a = self.exterior
-        ext_b = other_polygon.exterior if not is_np_array(other_polygon) else other_polygon
+        if isinstance(other_polygon, list):
+            ext_b = np.float32(other_polygon)
+        elif is_np_array(other_polygon):
+            ext_b = other_polygon
+        else:
+            assert isinstance(other_polygon, Polygon)
+            ext_b = other_polygon.exterior
         len_a = len(ext_a)
         len_b = len(ext_b)
 
@@ -4403,9 +4601,12 @@ class Polygon(object):
         # After this point, both polygons have at least 2 points, i.e. LineStrings can be used.
         # We can also safely go back to the original exteriors (before close points were merged).
         ls_a = self.to_shapely_line_string(closed=True, interpolate=interpolate)
-        ls_b = other_polygon.to_shapely_line_string(closed=True, interpolate=interpolate) \
-            if not is_np_array(other_polygon) \
-            else _convert_points_to_shapely_line_string(other_polygon, closed=True, interpolate=interpolate)
+        if isinstance(other_polygon, list) or is_np_array(other_polygon):
+            ls_b = _convert_points_to_shapely_line_string(
+                other_polygon, closed=True, interpolate=interpolate)
+        else:
+            ls_b = other_polygon.to_shapely_line_string(
+                closed=True, interpolate=interpolate)
 
         # Measure the distance from each point in A to LineString B and vice versa.
         # Make sure that no point violates the tolerance.
@@ -4508,6 +4709,270 @@ class Polygon(object):
         return "Polygon([%s] (%d points), label=%s)" % (points_str, len(self.exterior), self.label)
 
 
+class PolygonsOnImage(object):
+    """
+    Object that represents all polygons on a single image.
+
+    Parameters
+    ----------
+    polygons : list of imgaug.Polygon
+        List of polygons on the image.
+
+    shape : tuple of int
+        The shape of the image on which the polygons are placed.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import imgaug as ia
+    >>> image = np.zeros((100, 100))
+    >>> polys = [
+    >>>     ia.Polygon([(0, 0), (100, 0), (100, 100), (0, 100)]),
+    >>>     ia.Polygon([(50, 0), (100, 50), (50, 100), (0, 50)])
+    >>> ]
+    >>> polys_oi = ia.PolygonsOnImage(polys, shape=image.shape)
+
+    """
+
+    def __init__(self, polygons, shape):
+        self.polygons = polygons
+        if is_np_array(shape):
+            self.shape = shape.shape
+        else:
+            do_assert(isinstance(shape, (tuple, list)))
+            self.shape = tuple(shape)
+
+    @property
+    def empty(self):
+        """
+        Returns whether this object contains zero polygons.
+
+        Returns
+        -------
+        bool
+            True if this object contains zero polygons.
+
+        """
+        return len(self.polygons) == 0
+
+    def on(self, image):
+        """
+        Project polygons from one image to a new one.
+
+        Parameters
+        ----------
+        image : ndarray or tuple of int
+            New image onto which the polygons are to be projected.
+            May also simply be that new image's shape tuple.
+
+        Returns
+        -------
+        imgaug.PolygonsOnImage
+            Object containing all projected polygons.
+
+        """
+        if is_np_array(image):
+            shape = image.shape
+        else:
+            shape = image
+
+        if shape[0:2] == self.shape[0:2]:
+            return self.deepcopy()
+        else:
+            polygons = [poly.project(self.shape, shape) for poly in self.polygons]
+            return PolygonsOnImage(polygons, shape)
+
+    def draw_on_image(self,
+                      image,
+                      color=(0, 255, 0), color_perimeter=(0, 128, 0),
+                      color_points=(0, 128, 0),
+                      alpha=0.5, alpha_perimeter=1.0, alpha_points=0.0,
+                      size_points=3,
+                      raise_if_out_of_image=False):
+        """
+        Draw all polygons onto a given image.
+
+        Parameters
+        ----------
+        image : (H,W,C) ndarray
+            The image onto which to draw the bounding boxes.
+            This image should usually have the same shape as set in
+            ``PolygonsOnImage.shape``.
+
+        color : iterable of int, optional
+            The color to use for all polygons (excluding their perimeters).
+            Must correspond to the channel layout of the image. Usually RGB.
+
+        color_perimeter : iterable of int, optional
+            The color to use for all perimeters (aka borders) of the polygons.
+            Must correspond to the channel layout of the image. Usually RGB.
+
+        color_points : iterable of int, optional
+            The color to use for the corner points of the polygond.
+            Must correspond to the channel layout of the image. Usually RGB.
+
+        alpha : float, optional
+            The transparency of all polygons (excluding their perimeters),
+            where 1.0 denotes no transparency and 0.0 is invisible.
+
+        alpha_perimeter : float, optional
+            The transparency of all polygon perimeters (aka borders), where 1.0
+            denotes no transparency and 0.0 is invisible.
+
+        alpha_points : 0 or 1 or 0.0 or 1.0, optional
+            The transparency of all polygon corner points,
+            where 1.0 denotes no transparency and 0.0 is invisible.
+            Currently this is an on/off choice, i.e. only ``0.0`` or ``1.0``
+            are allowed. Transparency will be implemented later on.
+
+        size_points : int, optional
+            The size of all corner points. If set to ``C``, each corner point
+            will be drawn as a square of size ``C x C``.
+
+        raise_if_out_of_image : bool, optional
+            Whether to raise an error if any polygon is partially/fully
+            outside of the image. If set to False, no error will be raised and
+            only the parts inside the image will be drawn.
+
+        Returns
+        -------
+        image : (H,W,C) ndarray
+            Image with drawn polygons.
+
+        """
+        for poly in self.polygons:
+            image = poly.draw_on_image(
+                image,
+                color=color,
+                color_perimeter=color_perimeter,
+                color_points=color_points,
+                alpha=alpha,
+                alpha_perimeter=alpha_perimeter,
+                alpha_points=alpha_points,
+                size_points=size_points,
+                raise_if_out_of_image=raise_if_out_of_image
+            )
+        return image
+
+    def remove_out_of_image(self, fully=True, partly=False):
+        """
+        Remove all polygons that are fully or partially outside of the image.
+
+        Parameters
+        ----------
+        fully : bool, optional
+            Whether to remove polygons that are fully outside of the image.
+
+        partly : bool, optional
+            Whether to remove polygons that are partially outside of the image.
+
+        Returns
+        -------
+        imgaug.PolygonsOnImage
+            Reduced set of polygons, with those that were fully/partially
+            outside of the image removed.
+
+        """
+        polys_clean = [
+            poly for poly in self.polygons
+            if not poly.is_out_of_image(self.shape, fully=fully, partly=partly)
+        ]
+        return PolygonsOnImage(polys_clean, shape=self.shape)
+
+    def clip_out_of_image(self):
+        """
+        Clip off all parts from all polygons that are outside of the image.
+
+        NOTE: The result can contain less polygons than the input did. That
+        happens when a polygon is fully outside of the image plane.
+
+        NOTE: The result can also contain *more* polygons than the input
+        did. That happens when distinct parts of a polygon are only
+        connected by areas that are outside of the image plane and hence will
+        be clipped off, resulting in two or more unconnected polygon parts that
+        are left in the image plane.
+
+        Returns
+        -------
+        imgaug.PolygonsOnImage
+            Polygons, clipped to fall within the image dimensions. Count of
+            output polygons may differ from the input count.
+
+        """
+        polys_cut = [
+            poly.clip_out_of_image(self.shape).geoms
+            for poly
+            in self.polygons
+            if poly.is_partly_within_image(self.shape)
+        ]
+        polys_cut_flat = [poly for poly_lst in polys_cut for poly in poly_lst]
+        return PolygonsOnImage(polys_cut_flat, shape=self.shape)
+
+    def shift(self, top=None, right=None, bottom=None, left=None):
+        """
+        Shift all polygons from one or more image sides, i.e. move them on the x/y-axis.
+
+        Parameters
+        ----------
+        top : None or int, optional
+            Amount of pixels by which to shift all polygons from the top.
+
+        right : None or int, optional
+            Amount of pixels by which to shift all polygons from the right.
+
+        bottom : None or int, optional
+            Amount of pixels by which to shift all polygons from the bottom.
+
+        left : None or int, optional
+            Amount of pixels by which to shift all polygons from the left.
+
+        Returns
+        -------
+        imgaug.PolygonsOnImage
+            Shifted polygons.
+
+        """
+        polys_new = [
+            poly.shift(top=top, right=right, bottom=bottom, left=left)
+            for poly
+            in self.polygons
+        ]
+        return PolygonsOnImage(polys_new, shape=self.shape)
+
+    def copy(self):
+        """
+        Create a shallow copy of the PolygonsOnImage object.
+
+        Returns
+        -------
+        imgaug.PolygonsOnImage
+            Shallow copy.
+
+        """
+        return copy.copy(self)
+
+    def deepcopy(self):
+        """
+        Create a deep copy of the PolygonsOnImage object.
+
+        Returns
+        -------
+        imgaug.PolygonsOnImage
+            Deep copy.
+
+        """
+        # Manual copy is far faster than deepcopy for PolygonsOnImage,
+        # so use manual copy here too
+        polys = [poly.deepcopy() for poly in self.polygons]
+        return PolygonsOnImage(polys, tuple(self.shape))
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return "PolygonsOnImage(%s, shape=%s)" % (str(self.polygons), self.shape)
+
+
 def _convert_points_to_shapely_line_string(points, closed=False, interpolate=0):
     # load shapely lazily, which makes the dependency more optional
     import shapely.geometry
@@ -4569,6 +5034,463 @@ def _interpolate_points_by_max_distance(points, max_distance, closed=True):
     if not closed:
         points_interp.append(points[-1])
     return points_interp
+
+
+class _ConcavePolygonRecoverer(object):
+    def __init__(self, threshold_duplicate_points=1e-4, noise_strength=1e-4,
+                 oversampling=0.01, max_segment_difference=1e-4):
+        self.threshold_duplicate_points = threshold_duplicate_points
+        self.noise_strength = noise_strength
+        self.oversampling = oversampling
+        self.max_segment_difference = max_segment_difference
+
+        # this limits the maximum amount of points after oversampling, i.e.
+        # if N points are input into oversampling, then M oversampled points are
+        # generated such that N+M <= this value
+        self.oversample_up_to_n_points_max = 75
+
+        # ----
+        # parameters for _fit_best_valid_polygon()
+        # ----
+        # how many changes may be done max to the initial (convex hull) polygon
+        # before simply returning the result
+        self.fit_n_changes_max = 100
+        # for how many iterations the optimization loop may run max
+        # before simply returning the result
+        self.fit_n_iters_max = 3
+        # how far (wrt. to their position in the input list) two points may be
+        # apart max to consider adding an edge between them (in the first loop
+        # iteration and the ones after that)
+        self.fit_max_dist_first_iter = 1
+        self.fit_max_dist_other_iters = 2
+        # The fit loop first generates candidate edges and then modifies the
+        # polygon based on these candidates. This limits the maximum amount
+        # of considered candidates. If the number is less than the possible
+        # number of candidates, they are randomly subsampled. Values beyond
+        # 100 significantly increase runtime (for polygons that reach that
+        # number).
+        self.fit_n_candidates_before_sort_max = 100
+
+    def recover_from(self, new_exterior, old_polygon, random_state=0):
+        assert isinstance(new_exterior, list) or (
+                is_np_array(new_exterior)
+                and new_exterior.ndim == 2
+                and new_exterior.shape[1] == 2)
+        assert len(new_exterior) >= 3, \
+            "Cannot recover a concave polygon from less than three points."
+
+        # create Polygon instance, if it is already valid then just return
+        # immediately
+        polygon = old_polygon.deepcopy(exterior=new_exterior)
+        if polygon.is_valid:
+            return polygon
+
+        if not isinstance(random_state, np.random.RandomState):
+            random_state = np.random.RandomState(random_state)
+        rss = derive_random_states(random_state, 3)
+
+        # remove consecutive duplicate points
+        new_exterior = self._remove_consecutive_duplicate_points(new_exterior)
+
+        # check that points are not all identical or on a line
+        new_exterior = self._fix_polygon_is_line(new_exterior, rss[0])
+
+        # jitter duplicate points
+        new_exterior = self._jitter_duplicate_points(new_exterior, rss[1])
+
+        # generate intersection points
+        segment_add_points = self._generate_intersection_points(new_exterior)
+
+        # oversample points around intersections
+        if self.oversampling is not None and self.oversampling > 0:
+            segment_add_points = self._oversample_intersection_points(
+                new_exterior, segment_add_points)
+
+        # integrate new points into exterior
+        new_exterior_inter = self._insert_intersection_points(
+            new_exterior, segment_add_points)
+
+        # find best fit polygon, starting from convext polygon
+        new_exterior_concave_ids = self._fit_best_valid_polygon(new_exterior_inter, rss[2])
+        new_exterior_concave = [new_exterior_inter[idx] for idx in new_exterior_concave_ids]
+
+        # TODO return new_exterior_concave here instead of polygon, leave it to
+        #      caller to decide what to do with it
+        return old_polygon.deepcopy(exterior=new_exterior_concave)
+
+    def _remove_consecutive_duplicate_points(self, points):
+        result = []
+        for point in points:
+            if result:
+                dist = np.linalg.norm(np.float32(point) - np.float32(result[-1]))
+                is_same = (dist < self.threshold_duplicate_points)
+                if not is_same:
+                    result.append(point)
+            else:
+                result.append(point)
+        if len(result) >= 2:
+            dist = np.linalg.norm(np.float32(result[0]) - np.float32(result[-1]))
+            is_same = (dist < self.threshold_duplicate_points)
+            result = result[0:-1] if is_same else result
+        return result
+
+    # fix polygons for which all points are on a line
+    def _fix_polygon_is_line(self, exterior, random_state):
+        assert len(exterior) >= 3
+        noise_strength = self.noise_strength
+        while self._is_polygon_line(exterior):
+            noise = random_state.uniform(
+                -noise_strength, noise_strength, size=(len(exterior), 2)
+            ).astype(np.float32)
+            exterior = [(point[0] + noise_i[0], point[1] + noise_i[1])
+                        for point, noise_i in zip(exterior, noise)]
+            noise_strength = noise_strength * 10
+            assert noise_strength > 0
+        return exterior
+
+    @classmethod
+    def _is_polygon_line(cls, exterior):
+        vec_down = np.float32([0, 1])
+        p1 = exterior[0]
+        angles = set()
+        for p2 in exterior[1:]:
+            vec = np.float32(p2) - np.float32(p1)
+            angle = angle_between_vectors(vec_down, vec)
+            angles.add(int(angle * 1000))
+        return len(angles) <= 1
+
+    def _jitter_duplicate_points(self, exterior, random_state):
+        def _find_duplicates(exterior_with_duplicates):
+            points_map = collections.defaultdict(list)
+
+            for i, point in enumerate(exterior_with_duplicates):
+                # we use 10/x here to be a bit more lenient, the precise
+                # distance test is further below
+                x = int(np.round(point[0] * ((1/10) / self.threshold_duplicate_points)))
+                y = int(np.round(point[1] * ((1/10) / self.threshold_duplicate_points)))
+                for d0 in [-1, 0, 1]:
+                    for d1 in [-1, 0, 1]:
+                        points_map[(x+d0, y+d1)].append(i)
+
+            duplicates = [False] * len(exterior_with_duplicates)
+            for key in points_map:
+                candidates = points_map[key]
+                for i in range(len(candidates)):
+                    p0_idx = candidates[i]
+                    p0 = exterior_with_duplicates[p0_idx]
+                    if duplicates[p0_idx]:
+                        continue
+
+                    for j in range(i+1, len(candidates)):
+                        p1_idx = candidates[j]
+                        p1 = exterior_with_duplicates[p1_idx]
+                        if duplicates[p1_idx]:
+                            continue
+
+                        dist = np.sqrt((p0[0] - p1[0])**2 + (p0[1] - p1[1])**2)
+                        if dist < self.threshold_duplicate_points:
+                            duplicates[p1_idx] = True
+
+            return duplicates
+
+        noise_strength = self.noise_strength
+        assert noise_strength > 0
+        exterior = exterior[:]
+        converged = False
+        while not converged:
+            duplicates = _find_duplicates(exterior)
+            if any(duplicates):
+                noise = random_state.uniform(
+                    -self.noise_strength, self.noise_strength, size=(len(exterior), 2)
+                ).astype(np.float32)
+                for i, is_duplicate in enumerate(duplicates):
+                    if is_duplicate:
+                        exterior[i] = (exterior[i][0] + noise[i][0], exterior[i][1] + noise[i][1])
+
+                noise_strength *= 10
+            else:
+                converged = True
+
+        return exterior
+
+    # TODO remove?
+    @classmethod
+    def _calculate_circumference(cls, points):
+        assert len(points) >= 3
+        points = np.array(points, dtype=np.float32)
+        points_matrix = np.zeros((len(points), 4), dtype=np.float32)
+        points_matrix[:, 0:2] = points
+        points_matrix[0:-1, 2:4] = points_matrix[1:, 0:2]
+        points_matrix[-1, 2:4] = points_matrix[0, 0:2]
+        distances = np.linalg.norm(
+            points_matrix[:, 0:2] - points_matrix[:, 2:4], axis=1)
+        return np.sum(distances)
+
+    def _generate_intersection_points(self, exterior, one_point_per_intersection=True):
+        assert isinstance(exterior, list)
+        assert all([len(point) == 2 for point in exterior])
+        if len(exterior) <= 0:
+            return []
+
+        # use (*[i][0], *[i][1]) formulation here imnstead of just *[i],
+        # because this way we convert numpy arrays to tuples of floats, which
+        # is required by isect_segments_include_segments
+        segments = [
+            (
+                (exterior[i][0], exterior[i][1]),
+                (exterior[(i + 1) % len(exterior)][0], exterior[(i + 1) % len(exterior)][1])
+            )
+            for i in range(len(exterior))
+        ]
+
+        # returns [(point, [(segment_p0, segment_p1), ..]), ...]
+        from imgaug.external.poly_point_isect_py2py3 import isect_segments_include_segments
+        intersections = isect_segments_include_segments(segments)
+
+        # estimate to which segment the found intersection points belong
+        segments_add_points = [[] for _ in range(len(segments))]
+        for point, associated_segments in intersections:
+            # the intersection point may be associated with multiple segments,
+            # but we only want to add it once, so pick the first segment
+            if one_point_per_intersection:
+                associated_segments = [associated_segments[0]]
+
+            for seg_inter_p0, seg_inter_p1 in associated_segments:
+                diffs = []
+                dists = []
+                for seg_p0, seg_p1 in segments:
+                    dist_p0p0 = np.linalg.norm(seg_p0 - np.array(seg_inter_p0))
+                    dist_p1p1 = np.linalg.norm(seg_p1 - np.array(seg_inter_p1))
+                    dist_p0p1 = np.linalg.norm(seg_p0 - np.array(seg_inter_p1))
+                    dist_p1p0 = np.linalg.norm(seg_p1 - np.array(seg_inter_p0))
+                    diff = min(dist_p0p0 + dist_p1p1, dist_p0p1 + dist_p1p0)
+                    diffs.append(diff)
+                    dists.append(np.linalg.norm(
+                        (seg_p0[0] - point[0], seg_p0[1] - point[1])
+                    ))
+
+                min_diff = np.min(diffs)
+                if min_diff < self.max_segment_difference:
+                    idx = int(np.argmin(diffs))
+                    segments_add_points[idx].append((point, dists[idx]))
+                else:
+                    warnings.warn(
+                        "Couldn't find fitting segment in "
+                        "_generate_intersection_points(). Ignoring intersection "
+                        "point.")
+
+        # sort intersection points by their distance to point 0 in each segment
+        # (clockwise ordering, this does something only for segments with
+        # >=2 intersection points)
+        segment_add_points_sorted = []
+        for idx in range(len(segments_add_points)):
+            points = [t[0] for t in segments_add_points[idx]]
+            dists = [t[1] for t in segments_add_points[idx]]
+            if len(points) < 2:
+                segment_add_points_sorted.append(points)
+            else:
+                both = sorted(zip(points, dists), key=lambda t: t[1])
+                # keep points, drop distances
+                segment_add_points_sorted.append([a for a, _b in both])
+        return segment_add_points_sorted
+
+    def _oversample_intersection_points(self, exterior, segment_add_points):
+        # segment_add_points must be sorted
+
+        if self.oversampling is None or self.oversampling <= 0:
+            return segment_add_points
+
+        segment_add_points_sorted_overs = [[] for _ in range(len(segment_add_points))]
+
+        n_points = len(exterior)
+        for i in range(len(exterior)):
+            last = exterior[i]
+            for j, p_inter in enumerate(segment_add_points[i]):
+                direction = (p_inter[0] - last[0], p_inter[1] - last[1])
+
+                if j == 0:
+                    # previous point was non-intersection, place 1 new point
+                    oversample = [1.0 - self.oversampling]
+                else:
+                    # previous point was intersection, place 2 new points
+                    oversample = [self.oversampling, 1.0 - self.oversampling]
+
+                for dist in oversample:
+                    point_over = (last[0] + dist * direction[0],
+                                  last[1] + dist * direction[1])
+                    segment_add_points_sorted_overs[i].append(point_over)
+                segment_add_points_sorted_overs[i].append(p_inter)
+                last = p_inter
+
+                is_last_in_group = (j == len(segment_add_points[i]) - 1)
+                if is_last_in_group:
+                    # previous point was oversampled, next point is
+                    # non-intersection, place 1 new point between the two
+                    exterior_point = exterior[(i + 1) % len(exterior)]
+                    direction = (exterior_point[0] - last[0],
+                                 exterior_point[1] - last[1])
+                    segment_add_points_sorted_overs[i].append(
+                        (last[0] + self.oversampling * direction[0],
+                         last[1] + self.oversampling * direction[1])
+                    )
+                    last = segment_add_points_sorted_overs[i][-1]
+
+                n_points += len(segment_add_points_sorted_overs[i])
+                if n_points > self.oversample_up_to_n_points_max:
+                    return segment_add_points_sorted_overs
+
+        return segment_add_points_sorted_overs
+
+    @classmethod
+    def _insert_intersection_points(cls, exterior, segment_add_points):
+        # segment_add_points must be sorted
+
+        assert len(exterior) == len(segment_add_points)
+        exterior_interp = []
+        for i in range(len(exterior)):
+            p0 = exterior[i]
+            exterior_interp.append(p0)
+            for j, p_inter in enumerate(segment_add_points[i]):
+                exterior_interp.append(p_inter)
+        return exterior_interp
+
+    def _fit_best_valid_polygon(self, points, random_state):
+        if len(points) < 2:
+            return None
+
+        def _compute_distance_point_to_line(point, line_start, line_end):
+            x_diff = line_end[0] - line_start[0]
+            y_diff = line_end[1] - line_start[1]
+            num = abs(
+                y_diff*point[0] - x_diff*point[1]
+                + line_end[0]*line_start[1] - line_end[1]*line_start[0]
+            )
+            den = np.sqrt(y_diff**2 + x_diff**2)
+            if den == 0:
+                return np.sqrt((point[0] - line_start[0])**2 + (point[1] - line_start[1])**2)
+            return num / den
+
+        poly = Polygon(points)
+        if poly.is_valid:
+            return sm.xrange(len(points))
+
+        hull = scipy.spatial.ConvexHull(points)
+        points_kept = list(hull.vertices)
+        points_left = [i for i in range(len(points)) if i not in hull.vertices]
+
+        iteration = 0
+        n_changes = 0
+        converged = False
+        while not converged:
+            candidates = []
+
+            # estimate distance metrics for points-segment pairs:
+            #  (1) distance (in vertices) between point and segment-start-point
+            #      in original input point chain
+            #  (2) euclidean distance between point and segment/line
+            # TODO this can be done more efficiently by caching the values and
+            #      only computing distances to segments that have changed in
+            #      the last iteration
+            # TODO these distances are not really the best metrics here. Something
+            #      like IoU between new and old (invalid) polygon would be
+            #      better, but can probably only be computed for pairs of valid
+            #      polygons. Maybe something based on pointwise distances,
+            #      where the points are sampled on the edges (not edge vertices
+            #      themselves). Maybe something based on drawing the perimeter
+            #      on images or based on distance maps.
+            point_kept_idx_to_pos = {point_idx: i for i, point_idx in enumerate(points_kept)}
+
+            # generate all possible combinations from <points_kept> and <points_left>
+            combos = np.transpose([np.tile(np.int32(points_left), len(np.int32(points_kept))),
+                                   np.repeat(np.int32(points_kept), len(np.int32(points_left)))])
+            combos = np.concatenate(
+                (combos, np.zeros((combos.shape[0], 3), dtype=np.int32)),
+                axis=1)
+
+            # copy columns 0, 1 into 2, 3 so that 2 is always the lower value
+            mask = combos[:, 0] < combos[:, 1]
+            combos[:, 2:4] = combos[:, 0:2]
+            combos[mask, 2] = combos[mask, 1]
+            combos[mask, 3] = combos[mask, 0]
+
+            # distance (in indices) between each pair of <point_kept> and <point_left>
+            combos[:, 4] = np.minimum(
+                combos[:, 3] - combos[:, 2],
+                len(points) - combos[:, 3] + combos[:, 2]
+            )
+
+            # limit candidates
+            max_dist = self.fit_max_dist_other_iters
+            if iteration > 0:
+                max_dist = self.fit_max_dist_first_iter
+            candidate_rows = combos[combos[:, 4] <= max_dist]
+            if self.fit_n_candidates_before_sort_max is not None \
+                    and len(candidate_rows) > self.fit_n_candidates_before_sort_max:
+                random_state.shuffle(candidate_rows)
+                candidate_rows = candidate_rows[0:self.fit_n_candidates_before_sort_max]
+
+            for row in candidate_rows:
+                point_left_idx = row[0]
+                point_kept_idx = row[1]
+                in_points_kept_pos = point_kept_idx_to_pos[point_kept_idx]
+                segment_start_idx = point_kept_idx
+                segment_end_idx = points_kept[(in_points_kept_pos+1) % len(points_kept)]
+                segment_start = points[segment_start_idx]
+                segment_end = points[segment_end_idx]
+                if iteration == 0:
+                    dist_eucl = 0
+                else:
+                    dist_eucl = _compute_distance_point_to_line(
+                        points[point_left_idx], segment_start, segment_end)
+                candidates.append((point_left_idx, point_kept_idx, row[4], dist_eucl))
+
+            # Sort computed distances first by minimal vertex-distance (see
+            # above, metric 1) (ASC), then by euclidean distance
+            # (metric 2) (ASC).
+            candidate_ids = np.arange(len(candidates))
+            candidate_ids = sorted(candidate_ids, key=lambda idx: (candidates[idx][2], candidates[idx][3]))
+            if self.fit_n_changes_max is not None:
+                candidate_ids = candidate_ids[:self.fit_n_changes_max]
+
+            # Iterate over point-segment pairs in sorted order. For each such
+            # candidate: Add the point to the already collected points,
+            # create a polygon from that and check if the polygon is valid.
+            # If it is, add the point to the output list and recalculate
+            # distance metrics. If it isn't valid, proceed with the next
+            # candidate until no more candidates are left.
+            #
+            # small change: this now no longer breaks upon the first found point
+            # that leads to a valid polygon, but checks all candidates instead
+            is_valid = False
+            done = set()
+            for candidate_idx in candidate_ids:
+                point_left_idx = candidates[candidate_idx][0]
+                point_kept_idx = candidates[candidate_idx][1]
+                if (point_left_idx, point_kept_idx) not in done:
+                    in_points_kept_idx = [i for i, point_idx in enumerate(points_kept) if point_idx == point_kept_idx][0]
+                    points_kept_hypothesis = points_kept[:]
+                    points_kept_hypothesis.insert(in_points_kept_idx+1, point_left_idx)
+                    poly_hypothesis = Polygon([points[idx] for idx in points_kept_hypothesis])
+                    if poly_hypothesis.is_valid:
+                        is_valid = True
+                        points_kept = points_kept_hypothesis
+                        points_left = [point_idx for point_idx in points_left if point_idx != point_left_idx]
+                        n_changes += 1
+                        if n_changes >= self.fit_n_changes_max:
+                            return points_kept
+                    done.add((point_left_idx, point_kept_idx))
+                    done.add((point_kept_idx, point_left_idx))
+
+            # none of the left points could be used to create a valid polygon?
+            # (this automatically covers the case of no points being left)
+            if not is_valid and iteration > 0:
+                converged = True
+
+            iteration += 1
+            if self.fit_n_iters_max is not None and iteration > self.fit_n_iters_max:
+                break
+
+        return points_kept
 
 
 class MultiPolygon(object):
@@ -5700,12 +6622,8 @@ class SegmentationMapOnImage(object):
             do_assert(len(class_indices) == heatmaps.arr_0to1.shape[2])
             arr_0to1 = heatmaps.arr_0to1
             arr_0to1_full = np.zeros((arr_0to1.shape[0], arr_0to1.shape[1], nb_classes), dtype=np.float32)
-            class_indices_set = set(class_indices)
-            heatmap_channel = 0
-            for c in sm.xrange(nb_classes):
-                if c in class_indices_set:
-                    arr_0to1_full[:, :, c] = arr_0to1[:, :, heatmap_channel]
-                    heatmap_channel += 1
+            for heatmap_channel, mapped_channel in enumerate(class_indices):
+                arr_0to1_full[:, :, mapped_channel] = arr_0to1[:, :, heatmap_channel]
             return SegmentationMapOnImage(arr_0to1_full, shape=heatmaps.shape)
 
     def copy(self):
@@ -5756,6 +6674,9 @@ class Batch(object):
     bounding_boxes : None or list of BoundingBoxesOnImage
         The bounding boxes to augment.
 
+    polygons : None or list of PolygonsOnImage
+        The polygons to augment.
+
     data
         Additional data that is saved in the batch and may be read out
         after augmentation. This could e.g. contain filepaths to each image
@@ -5764,7 +6685,8 @@ class Batch(object):
         not be returned in the original order, making this information useful.
 
     """
-    def __init__(self, images=None, heatmaps=None, segmentation_maps=None, keypoints=None, bounding_boxes=None,
+    def __init__(self, images=None, heatmaps=None, segmentation_maps=None,
+                 keypoints=None, bounding_boxes=None, polygons=None,
                  data=None):
         self.images_unaug = images
         self.images_aug = None
@@ -5776,6 +6698,8 @@ class Batch(object):
         self.keypoints_aug = None
         self.bounding_boxes_unaug = bounding_boxes
         self.bounding_boxes_aug = None
+        self.polygons_unaug = polygons
+        self.polygons_aug = None
         self.data = data
 
     @property
@@ -5843,6 +6767,7 @@ class Batch(object):
             segmentation_maps=_copy_augmentable_objects(self.segmentation_maps_unaug, SegmentationMapOnImage),
             keypoints=_copy_augmentable_objects(self.keypoints_unaug, KeypointsOnImage),
             bounding_boxes=_copy_augmentable_objects(self.bounding_boxes_unaug, BoundingBoxesOnImage),
+            polygons=_copy_augmentable_objects(self.polygons_unaug, PolygonsOnImage),
             data=copy.deepcopy(self.data)
         )
         batch.images_aug = _copy_images(self.images_aug)
@@ -5850,6 +6775,7 @@ class Batch(object):
         batch.segmentation_maps_aug = _copy_augmentable_objects(self.segmentation_maps_aug, SegmentationMapOnImage)
         batch.keypoints_aug = _copy_augmentable_objects(self.keypoints_aug, KeypointsOnImage)
         batch.bounding_boxes_aug = _copy_augmentable_objects(self.bounding_boxes_aug, BoundingBoxesOnImage)
+        batch.polygons_aug = _copy_augmentable_objects(self.polygons_aug, PolygonsOnImage)
 
         return batch
 
