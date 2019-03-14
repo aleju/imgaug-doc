@@ -17,3 +17,4 @@ Example nbviewer links:
   * [B05 - Augment Segmentation Maps](https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B05%20-%20Augment%20Segmentation%20Maps.ipynb)
   * [C01 - Using Probability Distributions as Parameters](https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/C01%20-%20Using%20Probability%20Distributions%20as%20Parameters.ipynb)
   * [C02 - Using imgaug with more Control Flow](https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/C02%20-%20Using%20imgaug%20with%20more%20Control%20Flow.ipynb)
+  * [C03 - Copying Random States and Using Multiple Augmentation Sequences](https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/C03%20-%20Copying%20Random%20States%20and%20Using%20Multiple%20Augmentation%20Sequences.ipynb>)
