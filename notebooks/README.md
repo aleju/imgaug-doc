@@ -16,3 +16,4 @@ Example nbviewer links:
   * [B04 - Augment Heatmaps](https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B04%20-%20Augment%20Heatmaps.ipynb)
   * [B05 - Augment Segmentation Maps](https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B05%20-%20Augment%20Segmentation%20Maps.ipynb)
   * [C01 - Using Probability Distributions as Parameters](https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/C01%20-%20Using%20Probability%20Distributions%20as%20Parameters.ipynb)
+  * [C02 - Using imgaug with more Control Flow](https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/C02%20-%20Using%20imgaug%20with%20more%20Control%20Flow.ipynb)
