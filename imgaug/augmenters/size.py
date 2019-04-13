@@ -32,7 +32,7 @@ import numpy as np
 import six.moves as sm
 
 from . import meta
-from .. import imgaug as ia
+import imgaug as ia
 from .. import parameters as iap
 
 
@@ -161,10 +161,9 @@ def _handle_position_parameter(position):
         )
 
 
+@ia.deprecated(alt_func="Resize",
+               comment="Resize has the exactly same interface as Scale.")
 def Scale(*args, **kwargs):
-    import warnings
-    warnings.warn(DeprecationWarning("'Scale' is deprecated. Use 'Resize' instead. It has the exactly same interface "
-                                     "(simple renaming)."))
     return Resize(*args, **kwargs)
 
 

@@ -35,7 +35,8 @@ import six.moves as sm
 
 from . import meta
 from . import blur as blur_lib
-from .. import imgaug as ia
+import imgaug as ia
+from imgaug.augmentables.polys import _ConcavePolygonRecoverer
 from .. import parameters as iap
 from .. import dtypes as iadt
 
@@ -713,12 +714,19 @@ class Affine(meta.Augmenter):
             cval_samples, mode_samples, order_samples = self._draw_samples(nb_heatmaps, random_state)
         cval_samples = np.zeros((cval_samples.shape[0], 1), dtype=np.float32)
         mode_samples = ["constant"] * len(mode_samples)
+        order_samples = [3] * len(order_samples)
 
         arrs = [heatmaps_i.arr_0to1 for heatmaps_i in heatmaps]
         arrs_aug, matrices = self._augment_images_by_samples(arrs, scale_samples, translate_samples, rotate_samples,
                                                              shear_samples, cval_samples, mode_samples, order_samples,
                                                              return_matrices=True)
-        for heatmaps_i, arr_aug, matrix in zip(heatmaps, arrs_aug, matrices):
+        for heatmaps_i, arr_aug, matrix, order in zip(heatmaps, arrs_aug, matrices, order_samples):
+            # order=3 matches cubic interpolation and can cause values to go outside of the range [0.0, 1.0]
+            # not clear whether 4+ also do that
+            # TODO add test for this
+            if order >= 3:
+                arr_aug = np.clip(arr_aug, 0.0, 1.0, out=arr_aug)
+
             heatmaps_i.arr_0to1 = arr_aug
             if self.fit_output:
                 _, output_shape_i = self._tf_to_fit_output(heatmaps_i.shape, matrix)
@@ -768,7 +776,7 @@ class Affine(meta.Augmenter):
                 if len(keypoints_on_image.keypoints) == 0:
                     result.append(keypoints_on_image.deepcopy(shape=output_shape))
                 else:
-                    coords = keypoints_on_image.get_coords_array()
+                    coords = keypoints_on_image.to_xy_array()
                     coords_aug = tf.matrix_transform(coords, matrix.params)
                     kps_new = [kp.deepcopy(x=coords[0], y=coords[1])
                                for kp, coords
@@ -1497,7 +1505,7 @@ class AffineCv2(meta.Augmenter):
                 matrix_to_center = tf.SimilarityTransform(translation=[shift_x, shift_y])
                 matrix = (matrix_to_topleft + matrix_transforms + matrix_to_center)
 
-                coords = keypoints_on_image.get_coords_array()
+                coords = keypoints_on_image.to_xy_array()
                 coords_aug = tf.matrix_transform(coords, matrix.params)
                 kps_new = [kp.deepcopy(x=coords[0], y=coords[1])
                            for kp, coords
@@ -1635,6 +1643,16 @@ class PiecewiseAffine(meta.Augmenter):
     absolute_scale : bool, optional
         Take `scale` as an absolute value rather than a relative value.
 
+    polygon_recoverer : 'auto' or None or
+                        imgaug.imgaug._ConcavePolygonRecoverer, optional
+        The class to use to repair invalid polygons.
+        If ``"auto"``, a new instance of ``imgaug._ConcavePolygonRecoverer``
+        will be created.
+        If ``None``, no polygon recoverer will be used.
+        If an object, then that object will be used and must provide a
+        ``recover_from()`` method, similar to
+        ``imgaug.imgaug._ConcavePolygonRecoverer``.
+
     name : None or str, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
@@ -1728,8 +1746,8 @@ class PiecewiseAffine(meta.Augmenter):
 
         self.absolute_scale = absolute_scale
         self.polygon_recoverer = polygon_recoverer
-        if polygon_recoverer is None:
-            self.polygon_recoverer = ia._ConcavePolygonRecoverer()
+        if polygon_recoverer == "auto":
+            self.polygon_recoverer = _ConcavePolygonRecoverer()
 
     def _augment_images(self, images, random_state, parents, hooks):
         iadt.gate_dtypes(images,
@@ -1792,11 +1810,10 @@ class PiecewiseAffine(meta.Augmenter):
         result = heatmaps
         nb_images = len(heatmaps)
 
-        rss = ia.derive_random_states(random_state, nb_images+3)
+        rss = ia.derive_random_states(random_state, nb_images+2)
 
-        nb_rows_samples = self.nb_rows.draw_samples((nb_images,), random_state=rss[-3])
-        nb_cols_samples = self.nb_cols.draw_samples((nb_images,), random_state=rss[-2])
-        order_samples = self.order.draw_samples((nb_images,), random_state=rss[-1])
+        nb_rows_samples = self.nb_rows.draw_samples((nb_images,), random_state=rss[-2])
+        nb_cols_samples = self.nb_cols.draw_samples((nb_images,), random_state=rss[-1])
 
         for i in sm.xrange(nb_images):
             heatmaps_i = heatmaps[i]
@@ -1810,7 +1827,7 @@ class PiecewiseAffine(meta.Augmenter):
                 arr_0to1_warped = tf.warp(
                     arr_0to1,
                     transformer,
-                    order=order_samples[i],
+                    order=3,
                     mode="constant",
                     cval=0,
                     preserve_range=True,
@@ -1819,6 +1836,12 @@ class PiecewiseAffine(meta.Augmenter):
 
                 # skimage converts to float64
                 arr_0to1_warped = arr_0to1_warped.astype(np.float32)
+
+                # TODO not entirely clear whether this breaks the value range -- Affine does
+                # TODO add test for this
+                # order=3 matches cubic interpolation and can cause values to go outside of the range [0.0, 1.0]
+                # not clear whether 4+ also do that
+                arr_0to1_warped = np.clip(arr_0to1_warped, 0.0, 1.0, out=arr_0to1_warped)
 
                 heatmaps_i.arr_0to1 = arr_0to1_warped
 
@@ -2170,7 +2193,7 @@ class PerspectiveTransform(meta.Augmenter):
             if not keypoints_on_image.keypoints:
                 warped_kps = keypoints_on_image.deepcopy(shape=new_shape)
             else:
-                kps_arr = keypoints_on_image.get_coords_array()
+                kps_arr = keypoints_on_image.to_xy_array()
                 warped = cv2.perspectiveTransform(np.array([kps_arr], dtype=np.float32), M)
                 warped = warped[0]
                 warped_kps = [kp.deepcopy(x=coords[0], y=coords[1])
@@ -2430,6 +2453,16 @@ class ElasticTransformation(meta.Augmenter):
               parameter per image, i.e. it must return only the above mentioned
               strings.
 
+    polygon_recoverer : 'auto' or None or
+                        imgaug.imgaug._ConcavePolygonRecoverer, optional
+        The class to use to repair invalid polygons.
+        If ``"auto"``, a new instance of ``imgaug._ConcavePolygonRecoverer``
+        will be created.
+        If ``None``, no polygon recoverer will be used.
+        If an object, then that object will be used and must provide a
+        ``recover_from()`` method, similar to
+        ``imgaug.imgaug._ConcavePolygonRecoverer``.
+
     name : None or str, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
@@ -2479,7 +2512,7 @@ class ElasticTransformation(meta.Augmenter):
     }
 
     def __init__(self, alpha=0, sigma=0, order=3, cval=0, mode="constant",
-                 polygon_recoverer=None, name=None, deterministic=False,
+                 polygon_recoverer="auto", name=None, deterministic=False,
                  random_state=None):
         super(ElasticTransformation, self).__init__(name=name, deterministic=deterministic, random_state=random_state)
 
@@ -2515,8 +2548,8 @@ class ElasticTransformation(meta.Augmenter):
                             + "got %s." % (type(mode),))
 
         self.polygon_recoverer = polygon_recoverer
-        if polygon_recoverer is None:
-            self.polygon_recoverer = ia._ConcavePolygonRecoverer()
+        if polygon_recoverer == "auto":
+            self.polygon_recoverer = _ConcavePolygonRecoverer()
 
     def _draw_samples(self, nb_images, random_state):
         # seeds = ia.copy_random_state(random_state).randint(0, 10**6, (nb_images+1,))
@@ -2573,7 +2606,7 @@ class ElasticTransformation(meta.Augmenter):
 
     def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
         nb_heatmaps = len(heatmaps)
-        rss, alphas, sigmas, orders, _cvals, _modes = self._draw_samples(nb_heatmaps, random_state)
+        rss, alphas, sigmas, _orders, _cvals, _modes = self._draw_samples(nb_heatmaps, random_state)
         for i in sm.xrange(nb_heatmaps):
             heatmaps_i = heatmaps[i]
             if heatmaps_i.arr_0to1.shape[0:2] == heatmaps_i.shape[0:2]:
@@ -2588,7 +2621,7 @@ class ElasticTransformation(meta.Augmenter):
                     heatmaps_i.arr_0to1,
                     dx,
                     dy,
-                    order=orders[i],
+                    order=3,
                     cval=0,
                     mode="constant"
                 )
@@ -2621,7 +2654,7 @@ class ElasticTransformation(meta.Augmenter):
                     arr_0to1,
                     dx,
                     dy,
-                    order=orders[i],
+                    order=3,
                     cval=0,
                     mode="constant"
                 )
