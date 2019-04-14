@@ -13,6 +13,7 @@ List of Notebooks:
   * `B01 - Augment Keypoints (aka Landmarks) <https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B01%20-%20Augment%20Keypoints.ipynb>`_
   * `B02 - Augment Bounding Boxes <https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B02%20-%20Augment%20Bounding%20Boxes.ipynb>`_
   * `B03 - Augment Polygons <https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B03%20-%20Polygons.ipynb>`_
+  * `B06 - Augment Line Strings <https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B06%20-%20Augment%20Line%20Strings.ipynb>`_
   * `B04 - Augment Heatmaps <https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B04%20-%20Augment%20Heatmaps.ipynb>`_
   * `B05 - Augment Segmentation Maps <https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/B05%20-%20Augment%20Segmentation%20Maps.ipynb>`_
   * `C01 - Using Probability Distributions as Parameters <https://nbviewer.jupyter.org/github/aleju/imgaug-doc/blob/master/notebooks/C01%20-%20Using%20Probability%20Distributions%20as%20Parameters.ipynb>`_
