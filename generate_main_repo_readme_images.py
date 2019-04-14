@@ -66,11 +66,11 @@ def draw_small_overview():
         image_aug_heatmap = result.heatmaps_aug[0].draw(cmap=None)[0]
         image_aug_segmap = result.segmentation_maps_aug[0].draw_on_image(image_aug, alpha=0.8)
         image_aug_kps = result.keypoints_aug[0].draw_on_image(image_aug, color=[0, 255, 0], size=7)
-        image_aug_bbs = result.bounding_boxes_aug[0].clip_out_of_image().draw_on_image(image_aug, thickness=3)
+        image_aug_bbs = result.bounding_boxes_aug[0].clip_out_of_image().draw_on_image(image_aug, size=3)
         # add polys for now to BBs image to save (screen) space
         image_aug_bbs = result.polygons_aug[0].clip_out_of_image().draw_on_image(
             image_aug_bbs, color=[0, 128, 0], color_points=[0, 128, 0], alpha=0.0,
-            alpha_points=1.0, alpha_perimeter=0.5)
+            alpha_points=1.0, alpha_lines=0.5)
         imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_image.jpg" % (name,)), image_aug, quality=90)
         imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_heatmap.jpg" % (name,)), image_aug_heatmap, quality=90)
         imageio.imwrite(os.path.join(IMAGES_DIR, "small_overview", "%s_segmap.jpg" % (name,)), image_aug_segmap, quality=90)
@@ -440,10 +440,10 @@ def draw_per_augmenter_videos():
                             bbs_aug.draw_on_image(
                                 kps_aug.draw_on_image(image_aug, size=5)
                             ),
-                            color_perimeter=(0, 128, 0),
+                            color_lines=(0, 128, 0),
                             color_points=(0, 128, 0),
                             alpha=0,
-                            alpha_perimeter=0.5,
+                            alpha_lines=0.5,
                             alpha_points=1.0
                         ),
                         "IMG, KPs, BBs, Polys"
