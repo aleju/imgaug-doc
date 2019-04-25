@@ -156,8 +156,12 @@ def chapter_examples_basics():
 
 
 def chapter_examples_basics_simple():
+    import numpy as np
     import imgaug as ia
-    from imgaug import augmenters as iaa
+    import imgaug.augmenters as iaa
+
+
+    ia.seed(1)
 
     # Example batch of images.
     # The array has shape (32, 64, 64, 3) and dtype uint8.
@@ -196,8 +200,7 @@ def chapter_examples_basics_simple():
         )
     ], random_order=True) # apply augmenters in random order
 
-    ia.seed(1)
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
@@ -209,9 +212,12 @@ def chapter_examples_basics_simple():
 
 
 def chapter_examples_basics_heavy():
-    import imgaug as ia
-    from imgaug import augmenters as iaa
     import numpy as np
+    import imgaug as ia
+    import imgaug.augmenters as iaa
+
+
+    ia.seed(1)
 
     # Example batch of images.
     # The array has shape (32, 64, 64, 3) and dtype uint8.
@@ -326,7 +332,7 @@ def chapter_examples_basics_heavy():
                         ),
                     ]),
 
-                    # Invert each image's chanell with 5% probability.
+                    # Invert each image's channel with 5% probability.
                     # This sets each pixel value v to 255-v.
                     iaa.Invert(0.05, per_channel=True), # invert color channels
 
@@ -361,8 +367,7 @@ def chapter_examples_basics_heavy():
         random_order=True
     )
 
-    ia.seed(1)
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
