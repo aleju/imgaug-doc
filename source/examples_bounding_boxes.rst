@@ -21,7 +21,7 @@ Notebook
 
 A jupyter notebook for bounding box augmentation is available at
 :ref:`page_jupyter_notebooks`. The notebooks are usually more up to date
-than the ReadTheDocs documentation.
+and contain more examples than the ReadTheDocs documentation.
 
 
 A simple example
