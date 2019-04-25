@@ -1,3 +1,5 @@
+.. _page_jupyter_notebooks:
+
 ==========================
 Jupyter Notebooks
 ==========================
