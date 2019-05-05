@@ -17,19 +17,44 @@ will also be rotated by 45°.
 
 Features of the library's segmentation map support:
 
-    * Represent segmentation maps as objects (`imgaug.SegmentationMapOnImage`).
+    * Represent segmentation maps as objects (`imgaug.augmentables.segmaps.SegmentationMapOnImage`).
     * Support integer maps (integer dtypes, usually int32), boolean masks (`np.bool_`) and float32
       maps (these are essentially identical to heatmaps).
     * Augment segmentation maps (only geometry-affecting augmentations,
       e.g. affine transformations, cropping, ...).
     * Use different resolutions for segmentation maps than for images (e.g. 32x32 segmentation
       maps for 256x256 images).
-    * Draw segmentation maps -- on their own or on images (`imgaug.SegmentationMapOnImage.draw()`,
-      `imgaug.SegmentationMapOnImage.draw_on_image()`).
-    * Resize segmentation maps (`imgaug.SegmentationMapOnImage.scale()`).
+    * Draw segmentation maps -- on their own or on images (`SegmentationMapOnImage.draw()`,
+      `SegmentationMapOnImage.draw_on_image()`).
+    * Resize segmentation maps (`SegmentationMapOnImage.scale()`).
     * Pad segmentation maps by pixel amounts or to desired aspect ratios
-      (`imgaug.SegmentationMapOnImage.pad()`,
-      `imgaug.SegmentationMapOnImage.pad_to_aspect_ratio()`).
+      (`SegmentationMapOnImage.pad()`,
+      `SegmentationMapOnImage.pad_to_aspect_ratio()`).
+
+
+Notebook
+--------
+
+A jupyter notebook for segmentation map augmentation is available at
+:ref:`page_jupyter_notebooks`. The notebooks are usually more up to date
+and contain more examples than the ReadTheDocs documentation.
+
+
+Upcoming Changes
+----------------
+
+Segmentation maps are currently implemented internally as a wrapper around
+heatmaps and as such use float-based arrays for their internal representation.
+This will be changed to integer-based arrays in 0.3.0. The arguments
+`nb_classes`, `background_class_id` and `background_threshold`
+will be removed or deprecated. The method `get_arr_int()` will be removed
+or deprecated. Resizing via cubic interpolation will no longer be recommended
+and the default resizing method will change to nearest neighbour interpolation.
+The class will be renamed from `SegmentationMapOnImage` to
+`SegmentationMapsOnImage` and get an optional channel-axis to represent multiple
+segmentation maps on the same image (e.g. multiple object classes with each
+having one instance segmentation map).
+
 
 
 A simple example
@@ -41,10 +66,12 @@ are visualized.
 
 ::
 
-    import imgaug as ia
-    from imgaug import augmenters as iaa
     import imageio
     import numpy as np
+    import imgaug as ia
+    import imgaug.augmenters as iaa
+    from imgaug.augmentables.segmaps import SegmentationMapOnImage
+
 
     ia.seed(1)
 
@@ -60,33 +87,30 @@ are visualized.
     segmap[10:25, 70:85] = 3
     segmap[10:110, 5:10] = 4
     segmap[118:123, 10:110] = 5
-    segmap = ia.SegmentationMapOnImage(segmap, shape=image.shape, nb_classes=1+5)
+    segmap = SegmentationMapOnImage(segmap, shape=image.shape, nb_classes=1+5)
 
     # Define our augmentation pipeline.
     seq = iaa.Sequential([
         iaa.Dropout([0.05, 0.2]),      # drop 5% or 20% of all pixels
         iaa.Sharpen((0.0, 1.0)),       # sharpen the image
-        iaa.Affine(rotate=(-45, 45)),  # rotate by -45 to 45 degrees (affects heatmaps)
-        iaa.ElasticTransformation(alpha=50, sigma=5)  # apply water effect (affects heatmaps)
+        iaa.Affine(rotate=(-45, 45)),  # rotate by -45 to 45 degrees (affects segmaps)
+        iaa.ElasticTransformation(alpha=50, sigma=5)  # apply water effect (affects segmaps)
     ], random_order=True)
 
-    # Augment images and heatmaps.
+    # Augment images and segmaps.
     images_aug = []
     segmaps_aug = []
     for _ in range(5):
-        seq_det = seq.to_deterministic()
-        images_aug.append(seq_det.augment_image(image))
-        segmaps_aug.append(seq_det.augment_segmentation_maps([segmap])[0])
+        images_aug_i, segmaps_aug_i = seq(image=image, segmentation_maps=segmap)
+        images_aug.append(images_aug_i)
+        segmaps_aug.append(segmaps_aug_i)
 
-    # We want to generate an image of original input images and heatmaps before/after augmentation.
-    # It is supposed to have five columns: (1) original image, (2) augmented image,
-    # (3) augmented heatmap on top of augmented image, (4) augmented heatmap on its own in jet
-    # color map, (5) augmented heatmap on its own in intensity colormap,
+    # We want to generate an image of original input images and segmaps
+    # before/after augmentation.
+    # It is supposed to have five columns: (1) original image, (2) original
+    # image with segmap, (3) augmented image, (4) augmented
+    # segmap on augmented image, (5) augmented segmap on its own in.
     # We now generate the cells of these columns.
-    #
-    # Note that we add a [0] after each heatmap draw command. That's because the heatmaps object
-    # can contain many sub-heatmaps and hence we draw command returns a list of drawn sub-heatmaps.
-    # We only used one sub-heatmap, so our lists always have one entry.
     cells = []
     for image_aug, segmap_aug in zip(images_aug, segmaps_aug):
         cells.append(image)                                      # column 1
@@ -117,9 +141,11 @@ to `np.zeros((128, 128), dtype=bool)`.
 
 ::
 
-    import imgaug as ia
     import imageio
     import numpy as np
+    import imgaug as ia
+    from imgaug.augmentables.segmaps import SegmentationMapOnImage
+
 
     # Load an example image (uint8, 128x128x3).
     image = ia.quokka(size=(128, 128), extract="square")
@@ -128,9 +154,10 @@ to `np.zeros((128, 128), dtype=bool)`.
     # Here, we just randomly place a square on the image.
     segmap = np.zeros((128, 128), dtype=bool)
     segmap[28:71, 35:85] = True
-    segmap = ia.SegmentationMapOnImage(segmap, shape=image.shape)
+    segmap = SegmentationMapOnImage(segmap, shape=image.shape)
 
-    # Draw three columns: (1) original image, (2) original image with mask on top, (3) only mask
+    # Draw three columns: (1) original image,
+    # (2) original image with mask on top, (3) only mask
     cells = [
         image,
         segmap.draw_on_image(image),
@@ -161,9 +188,11 @@ The below code shows an example that accesses and changes the array.
 
 ::
 
-    import imgaug as ia
     import imageio
     import numpy as np
+    import imgaug as ia
+    from imgaug.augmentables.segmaps import SegmentationMapOnImage
+
 
     # Load an example image (uint8, 128x128x3).
     image = ia.quokka(size=(128, 128), extract="square")
@@ -177,15 +206,17 @@ The below code shows an example that accesses and changes the array.
     segmap[10:25, 70:85] = 3
     segmap[10:110, 5:10] = 4
     segmap[118:123, 10:110] = 5
-    segmap1 = ia.SegmentationMapOnImage(segmap, shape=image.shape, nb_classes=1+5)
+    segmap1 = SegmentationMapOnImage(segmap, shape=image.shape, nb_classes=1+5)
 
-    # Read out the segmentation map's array, change it and create a new segmentation map
+    # Read out the segmentation map's array, change it and create a new
+    # segmentation map
     arr = segmap1.get_arr_int()
     arr[10:110, 5:10] = 5
     segmap2 = ia.SegmentationMapOnImage(arr, shape=image.shape, nb_classes=1+5)
 
-    # Draw three columns: (1) original image, (2) original image with unaltered segmentation
-    # map on top, (3) original image with altered segmentation map on top
+    # Draw three columns: (1) original image, (2) original image with
+    # unaltered segmentation map on top, (3) original image with altered
+    # segmentation map on top
     cells = [
         image,
         segmap1.draw_on_image(image),

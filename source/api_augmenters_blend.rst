@@ -1,7 +1,7 @@
-imgaug.augmenters\.overlay
+imgaug.augmenters\.blend
 ==========================
 
-.. automodule:: imgaug.augmenters.overlay
+.. automodule:: imgaug.augmenters.blend
     :members:
     :undoc-members:
     :show-inheritance:

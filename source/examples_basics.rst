@@ -25,8 +25,9 @@ before being used for training. ::
         # All images must have numpy's dtype uint8. Values are expected to be in
         # range 0-255.
         images = load_batch(batch_idx)
-        images_aug = seq.augment_images(images)
+        images_aug = seq(images=images)
         train_on_images(images_aug)
+
 
 A simple and common augmentation sequence
 -----------------------------------------
@@ -36,9 +37,10 @@ for many common experiments. It applies crops and affine transformations
 to images, flips some of the images horizontally, adds a bit of noise and blur
 and also changes the contrast as well as brightness. ::
 
-    import imgaug as ia
-    from imgaug import augmenters as iaa
     import numpy as np
+    import imgaug as ia
+    import imgaug.augmenters as iaa
+
 
     ia.seed(1)
 
@@ -79,7 +81,7 @@ and also changes the contrast as well as brightness. ::
         )
     ], random_order=True) # apply augmenters in random order
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
 .. figure:: ../images/examples_basics/simple.jpg
     :alt: Simple augmentations
@@ -98,9 +100,10 @@ or decrease the probability of some augmenters to be applied by decreasing in
 ``sometimes = lambda aug: iaa.Sometimes(0.5, aug)`` the value ``0.5`` to e.g.
 ``0.3``. ::
 
-    import imgaug as ia
-    from imgaug import augmenters as iaa
     import numpy as np
+    import imgaug as ia
+    import imgaug.augmenters as iaa
+
 
     ia.seed(1)
 
@@ -217,7 +220,7 @@ or decrease the probability of some augmenters to be applied by decreasing in
                         ),
                     ]),
 
-                    # Invert each image's chanell with 5% probability.
+                    # Invert each image's channel with 5% probability.
                     # This sets each pixel value v to 255-v.
                     iaa.Invert(0.05, per_channel=True), # invert color channels
 
@@ -252,7 +255,7 @@ or decrease the probability of some augmenters to be applied by decreasing in
         random_order=True
     )
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
 .. figure:: ../images/examples_basics/heavy.jpg
     :alt: Heavy augmentations
