@@ -208,9 +208,9 @@ a width of exactly 64 and either 1 or 3 channels::
         iaa.Fliplr(0.5)
     ])
 
------
+------
 Resize
------
+------
 Augmenter that resizes images to specified heights and widths.
 
 Resize each image to height=32 and width=64::
