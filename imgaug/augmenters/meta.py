@@ -1536,15 +1536,22 @@ class Augmenter(object):  # pylint: disable=locally-disabled, unused-variable, l
         a tuple of augmentables. It will return the same types of augmentables
         (only augmented) as input into the method. This behaviour
         is partly specific to the python version:
-          * In _python 3.6+_ (if ``return_batch=False``):
+
+        * In **python 3.6+** (if ``return_batch=False``):
+
             * Three or more augmentables may be used as input.
+            * None of the provided named arguments has to be `image` or
+              `images`.
             * The return order matches the order of the named arguments, e.g.
-              ``B, D, C = augment(B=x, D=y, C=z)``.
-            * None of the provided named arguments has to be `image` or `images`.
-          * In _python <3.6_  (if ``return_batch=False``):
-            * One or two augmentables may be used as input, not more than that.
-            * At least one the augmentables has to be `image` or `images`.
-            * The augmented images are always returned first.
+              ``b, d, c = augment(b=b, d=d, c=c)``.
+
+        * In **python <3.6** (if ``return_batch=False``):
+
+            * One or two augmentables may be used as input arguments, not more
+              than that.
+            * One the input arguments has to be `image` or `images`.
+            * The augmented images are *always** returned first, independent of
+              the input argument order. E.g. ``a, b = augment(b=b, images=a)``.
 
         If `return_batch` was not set to ``False``, an instance of
         ``UnnormalizedBatch`` will be returned. The output is the same for
