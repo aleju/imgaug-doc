@@ -236,6 +236,6 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'imgaug', u'imgaug Documentation',
-     author, 'imgaug', 'One line description of project.',
+     author, 'imgaug', 'Image Augmentation for Deep Learning.',
      'Miscellaneous'),
 ]
