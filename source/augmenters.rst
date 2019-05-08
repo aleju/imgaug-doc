@@ -324,6 +324,10 @@ Flip/mirror input images horizontally.
 Flip 50% of all images horizontally::
 
     aug = iaa.Fliplr(0.5)
+    
+NOTE: the default probability is 0, so to flip all images, do::
+
+    aug = iaa.Fliplr(1)
 
 .. figure:: ../images/overview_of_augmenters/fliplr.jpg
     :alt: Horizontal flip
@@ -336,6 +340,10 @@ Flip/mirror input images vertically.
 Flip 50% of all images vertically::
 
     aug = iaa.Flipud(0.5)
+    
+NOTE: the default probability is 0, so to flip all images, do::
+
+    aug = iaa.Flipud(1)
 
 .. figure:: ../images/overview_of_augmenters/flipud.jpg
     :alt: Vertical flip
