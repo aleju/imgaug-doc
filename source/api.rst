@@ -24,6 +24,7 @@ API
    api_augmenters_color
    api_augmenters_contrast
    api_augmenters_convolutional
+   api_augmenters_edges
    api_augmenters_flip
    api_augmenters_geometric
    api_augmenters_segmentation
