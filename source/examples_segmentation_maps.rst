@@ -7,13 +7,10 @@ instance segmentation maps or ordinary masks. Segmentation maps can be augmented
 to images. E.g. if an image is rotated by 45°, the corresponding segmentation map for that image
 will also be rotated by 45°.
 
-**Note**:
-
-    * Segmentation map support is currently in a Beta phase. Unittests are not yet finished.
-    * All augmentation functions for segmentation map are implemented under the assumption of
-      augmenting **ground truth** data. As such, heatmaps will be affected by augmentations that
-      change the geometry of images (e.g. affine transformations, cropping, resizing), but not by
-      other augmentations (e.g. gaussian noise, saturation changes, grayscaling, dropout, ...).
+**Note**: All augmentation functions for segmentation map are implemented under the assumption of
+augmenting **ground truth** data. As such, heatmaps will be affected by augmentations that
+change the geometry of images (e.g. affine transformations, cropping, resizing), but not by
+other augmentations (e.g. gaussian noise, saturation changes, grayscaling, dropout, ...).
 
 Features of the library's segmentation map support:
 
