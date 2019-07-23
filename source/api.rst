@@ -27,6 +27,7 @@ API
    api_augmenters_edges
    api_augmenters_flip
    api_augmenters_geometric
+   api_augmenters_pooling
    api_augmenters_segmentation
    api_augmenters_size
    api_augmenters_weather
