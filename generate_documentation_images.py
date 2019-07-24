@@ -760,7 +760,6 @@ def chapter_examples_heatmaps_simple():
     import imgaug.augmenters as iaa
     from imgaug.augmentables.heatmaps import HeatmapsOnImage
 
-
     ia.seed(1)
 
     # Load an example image (uint8, 128x128x3).
@@ -774,15 +773,16 @@ def chapter_examples_heatmaps_simple():
     depth = np.linspace(0, 50, 128).astype(np.float32)  # 128 values from 0.0 to 50.0
     depth = np.tile(depth.reshape(1, 128), (128, 1))    # change to a horizontal gradient
 
-    # We add a cross to the center of the depth map, so that we can more easily see the
-    # effects of augmentations.
+    # We add a cross to the center of the depth map, so that we can more
+    # easily see the effects of augmentations.
     depth[64-2:64+2, 16:128-16] = 0.75 * 50.0  # line from left to right
     depth[16:128-16, 64-2:64+2] = 1.0 * 50.0   # line from top to bottom
 
     # Convert our numpy array depth map to a heatmap object.
     # We have to add the shape of the underlying image, as that is necessary
     # for some augmentations.
-    depth = HeatmapsOnImage(depth, shape=image.shape, min_value=0.0, max_value=50.0)
+    depth = HeatmapsOnImage(
+        depth, shape=image.shape, min_value=0.0, max_value=50.0)
 
     # To save some computation time, we want our models to perform downscaling
     # and hence need the ground truth depth maps to be at a resolution of
@@ -808,10 +808,13 @@ def chapter_examples_heatmaps_simple():
 
     # We want to generate an image of original input images and heatmaps
     # before/after augmentation.
-    # It is supposed to have five columns: (1) original image, (2) augmented
-    # image, (3) augmented heatmap on top of augmented image, (4) augmented
-    # heatmap on its own in jet color map, (5) augmented heatmap on its own in
-    # intensity colormap. We now generate the cells of these columns.
+    # It is supposed to have five columns:
+    # (1) original image,
+    # (2) augmented image,
+    # (3) augmented heatmap on top of augmented image,
+    # (4) augmented heatmap on its own in jet color map,
+    # (5) augmented heatmap on its own in intensity colormap.
+    # We now generate the cells of these columns.
     #
     # Note that we add a [0] after each heatmap draw command. That's because
     # the heatmaps object can contain many sub-heatmaps and hence we draw
@@ -819,11 +822,11 @@ def chapter_examples_heatmaps_simple():
     # We only used one sub-heatmap, so our lists always have one entry.
     cells = []
     for image_aug, heatmap_aug in zip(images_aug, heatmaps_aug):
-        cells.append(image)                                                    # column 1
-        cells.append(image_aug)                                                # column 2
-        cells.append(heatmap_aug.draw_on_image(image_aug)[0])                  # column 3
-        cells.append(heatmap_aug.draw(size=image_aug.shape[:2])[0])            # column 4
-        cells.append(heatmap_aug.draw(size=image_aug.shape[:2], cmap=None)[0]) # column 5
+        cells.append(image)                                                     # column 1
+        cells.append(image_aug)                                                 # column 2
+        cells.append(heatmap_aug.draw_on_image(image_aug)[0])                   # column 3
+        cells.append(heatmap_aug.draw(size=image_aug.shape[:2])[0])             # column 4
+        cells.append(heatmap_aug.draw(size=image_aug.shape[:2], cmap=None)[0])  # column 5
 
     # Convert cells to grid image and save.
     grid_image = ia.draw_grid(cells, cols=5)
@@ -905,7 +908,6 @@ def chapter_examples_heatmaps_multiple_small():
     import numpy as np
     import imgaug as ia
     from imgaug.augmentables.heatmaps import HeatmapsOnImage
-
 
     # Load an image and generate a heatmap array with three sub-heatmaps.
     # Each sub-heatmap contains just three horizontal lines, with one of them
@@ -1003,22 +1005,25 @@ def chapter_examples_heatmaps_arr_small():
     import imgaug as ia
     from imgaug.augmentables.heatmaps import HeatmapsOnImage
 
-
     # Load an image and generate a heatmap array containing one horizontal line.
     image = ia.quokka(size=(128, 128), extract="square")
     heatmap = np.zeros((128, 128, 1), dtype=np.float32)
     heatmap[64-4:64+4, 10:-10, 0] = 1.0
     heatmap1 = HeatmapsOnImage(heatmap, shape=image.shape)
 
-    # Extract the heatmap array from the heatmap object, change it and create a second heatmap.
+    # Extract the heatmap array from the heatmap object, change it and create
+    # a second heatmap.
     arr = heatmap1.get_arr()
     arr[10:-10, 64-4:64+4] = 0.5
     heatmap2 = HeatmapsOnImage(arr, shape=image.shape)
 
     # Draw image and heatmaps before/after changing the array.
-    # We draw three columns: (1) original image, (2) heatmap drawn on image, (3) heatmap drawn
-    # on image with some changes made to the heatmap array.
-    cells = [image, heatmap1.draw_on_image(image)[0],
+    # We draw three columns:
+    # (1) original image,
+    # (2) heatmap drawn on image,
+    # (3) heatmap drawn on image, with some changes made to the heatmap array.
+    cells = [image,
+             heatmap1.draw_on_image(image)[0],
              heatmap2.draw_on_image(image)[0]]
     grid_image = np.hstack(cells)  # Horizontally stack the images
     # imageio.imwrite("example_heatmaps_arr.jpg", grid_image)
@@ -1097,7 +1102,6 @@ def chapter_examples_heatmaps_padding():
     import numpy as np
     import imgaug as ia
     from imgaug.augmentables.heatmaps import HeatmapsOnImage
-
 
     # Load example image and generate example heatmap with one horizontal line
     image = ia.quokka((128, 128), extract="square")
