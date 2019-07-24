@@ -245,13 +245,15 @@ The functions for resizing and padding are:
     Resizes to ``sizes`` given as a tuple ``(height, width)``. Interpolation
     can be ``nearest``, ``linear``, ``cubic`` and ``area``, but only
     ``nearest`` is actually recommended.
-  * ``SegmentationMapsOnImage.pad(top=0, right=0, bottom=0, left=0, mode="constant", cval=0)``:
+  * ``SegmentationMapsOnImage.pad(top=0, right=0, bottom=0, left=0, mode="constant",
+    cval=0)``:
     Pads the segmentation map by given pixel amounts. Uses by default constant
     value padding with value ``0``, i.e. zero-padding. Possible padding modes
     are the same as for ``numpy.pad()``, i.e. ``constant``, ``edge``,
     ``linear_ramp``, ``maximum``, ``mean``, ``median``, ``minimum``,
     ``reflect``, ``symmetric`` and ``wrap``.
-  * ``SegmentationMapsOnImage.pad_to_aspect_ratio(aspect_ratio, mode="constant", cval=0, return_pad_amounts=False)``:
+  * ``SegmentationMapsOnImage.pad_to_aspect_ratio(aspect_ratio, mode="constant", cval=0,``
+    ``return_pad_amounts=False)``:
     Same as ``pad()``, but pads an image towards a desired aspect ratio
     (``ratio = width / height``). E.g. use ``1.0`` for squared segmentation
     maps or ``2.0`` for maps that are twice as wide as they are high.
