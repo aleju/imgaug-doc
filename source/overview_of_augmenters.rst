@@ -120,23 +120,6 @@ rotations and sharpening to the other 50%. ::
     :alt: Sometimes if else
 
 
-WithColorspace
---------------
-
-Apply child augmenters within a specific colorspace.
-
-Convert images to HSV, then increase each pixels H-value by 10 to 50::
-
-    aug = iaa.WithColorspace(
-        to_colorspace="HSV",
-        from_colorspace="RGB",
-        children=iaa.WithChannels(0, iaa.Add((10, 50)))
-    )
-
-.. figure:: ../images/overview_of_augmenters/withcolorspace.jpg
-    :alt: WithColorspace
-
-
 WithChannels
 ------------
 
@@ -221,6 +204,129 @@ a width of exactly 64 and either 1 or 3 channels::
         iaa.Fliplr(0.5)
     ])
 
+
+ChannelShuffle
+-----------
+
+TODO
+
+
+****************
+augmenters.blend
+****************
+
+Alpha
+-----
+
+TODO
+
+
+AlphaElementwise
+----------------
+
+TODO
+
+
+SimplexNoiseAlpha
+-----------------
+
+TODO
+
+
+FrequencyNoiseAlpha
+-------------------
+
+TODO
+
+
+*******************
+augmenters.contrast
+*******************
+
+GammaContrast
+-------------
+
+TODO
+
+
+SigmoidContrast
+---------------
+
+TODO
+
+
+LogContrast
+-----------
+
+TODO
+
+
+LinearContrast
+--------------
+
+TODO
+
+
+AllChannelsCLAHE
+----------------
+
+TODO
+
+
+CLAHE
+-----
+
+TODO
+
+
+AllChannelsHistogramEqualization
+--------------------------------
+
+TODO
+
+
+HistogramEqualization
+---------------------
+
+TODO
+
+
+****************
+augmenters.edges
+****************
+
+Canny
+-----
+
+TODO
+
+
+******************
+augmenters.pooling
+******************
+
+AveragePooling
+--------------
+
+TODO
+
+
+MaxPooling
+----------
+
+TODO
+
+
+MinPooling
+----------
+
+TODO
+
+
+MedianPooling
+-------------
+
+TODO
 
 
 ***************
@@ -339,9 +445,79 @@ This is a proxy for ``CropAndPad``. It only accepts positive
 pixel/percent values and transfers them as negative values to ``CropAndPad``.
 
 
+PadToFixedSize
+--------------
+
+TODO
+
+
+CropToFixedSize
+---------------
+
+TODO
+
+
+KeepSizeByResize
+----------------
+
+TODO
+
+
+******************
+augmenters.weather
+******************
+
+FastSnowyLandscape
+------------------
+
+TODO
+
+
+Clouds
+------
+
+TODO
+
+
+Fog
+---
+
+TODO
+
+
+CloudLayer
+----------
+
+TODO
+
+
+Snowflakes
+----------
+
+TODO
+
+
+SnowflakesLayer
+---------------
+
+TODO
+
+
 ***************
 augmenters.flip
 ***************
+
+HorizontalFlip
+--------------
+
+Alias for ``Fliplr``.
+
+
+VericalFlip
+--------------
+
+Alias for ``Flipud``.
+
 
 Fliplr
 ------
@@ -416,9 +592,91 @@ increasing ``n_segments`` from 1\*16 to 9\*16=144:
     :alt: Superpixels varying n
 
 
+Voronoi
+-------
+
+TODO
+
+
+UniformVoronoi
+--------------
+
+TODO
+
+
+RegularGridVoronoi
+------------------
+
+TODO
+
+
+RelativeRegularGridVoronoi
+--------------------------
+
+
 ****************
 augmenters.color
 ****************
+
+WithColorspace
+--------------
+
+Apply child augmenters within a specific colorspace.
+
+Convert images to HSV, then increase each pixels H-value by 10 to 50::
+
+    aug = iaa.WithColorspace(
+        to_colorspace="HSV",
+        from_colorspace="RGB",
+        children=iaa.WithChannels(0, iaa.Add((10, 50)))
+    )
+
+.. figure:: ../images/overview_of_augmenters/withcolorspace.jpg
+    :alt: WithColorspace
+
+
+WithHueAndSaturation
+--------------------
+
+TODO
+
+
+MultiplyHueAndSaturation
+------------------------
+
+TODO
+
+
+MultiplyHue
+-----------
+
+TODO
+
+
+MultiplySaturation
+------------------
+
+TODO
+
+
+
+AddToHueAndSaturation
+---------------------
+
+TODO
+
+
+AddToHue
+--------
+
+TODO
+
+
+AddToSaturation
+---------------
+
+TODO
+
 
 ChangeColorspace
 ----------------
@@ -456,6 +714,18 @@ Visualization of increasing ``alpha`` from 0.0 to 1.0 in 8 steps:
 
 .. figure:: ../images/overview_of_augmenters/grayscale_vary_alpha.jpg
     :alt: Grayscale vary alpha
+
+
+KMeansColorQuantization
+-----------------------
+
+TODO
+
+
+UniformColorQuantization
+------------------------
+
+TODO
 
 
 ***************
@@ -509,6 +779,18 @@ between 3x3 and 11x11::
 
 .. figure:: ../images/overview_of_augmenters/medianblur.jpg
     :alt: MedianBlur
+
+
+BilateralBlur
+-------------
+
+TODO
+
+
+MotionBlur
+----------
+
+TODO
 
 
 ************************
@@ -733,6 +1015,18 @@ distribution ``N(0, 0.05*255)`` for 50% of all images and sampled three times
     :alt: AdditiveGaussianNoise per channel
 
 
+AdditiveLaplaceNoise
+---------------------
+
+TODO
+
+
+AdditivePoissonNoise
+---------------------
+
+TODO
+
+
 Multiply
 --------
 
@@ -837,6 +1131,54 @@ to 0 while others remain untouched::
     :alt: CoarseDropout per channel
 
 
+ReplaceElementwise
+------------------
+
+TODO
+
+
+ImpulseNoise
+------------
+
+TODO
+
+
+SaltAndPepper
+-------------
+
+TODO
+
+
+CoarseSaltAndPepper
+-------------------
+
+TODO
+
+
+Salt
+----
+
+TODO
+
+
+CoarseSalt
+----------
+
+TODO
+
+
+Pepper
+------
+
+TODO
+
+
+CoarsePepper
+------------
+
+TODO
+
+
 Invert
 ------
 
@@ -878,6 +1220,12 @@ and for 50% of all images also independently per channel::
 
 .. figure:: ../images/overview_of_augmenters/contrastnormalization_per_channel.jpg
     :alt: ContrastNormalization per channel
+
+
+JpegCompression
+---------------
+
+TODO
 
 
 ********************
@@ -979,6 +1327,12 @@ in 8 steps:
     :alt: PiecewiseAffine varying grid
 
 
+PerspectiveTransform
+--------------------
+
+TODO
+
+
 ElasticTransformation
 ---------------------
 
@@ -1005,3 +1359,9 @@ in 8 steps:
 
 .. figure:: ../images/overview_of_augmenters/elastictransformations_vary_sigmas.jpg
     :alt: ElasticTransformation varying sigma
+
+
+Rot90
+-----
+
+TODO
