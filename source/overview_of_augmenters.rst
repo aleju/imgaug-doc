@@ -2,9 +2,13 @@
 Overview of Augmenters
 ======================
 
-----------
+***************
+augmenters.meta
+***************
+
 Sequential
 ----------
+
 List augmenter that may contain other augmenters to apply in sequence
 or random order.
 
@@ -29,9 +33,10 @@ the same for all images within the batch)::
 .. figure:: ../images/overview_of_augmenters/sequential_random_order.jpg
     :alt: Sequential with random order
 
-------
+
 SomeOf
 ------
+
 List augmenter that applies only some of its children to images.
 
 Apply two of four given augmenters::
@@ -71,9 +76,10 @@ Pick two of four given augmenters and apply them in random order::
 .. figure:: ../images/overview_of_augmenters/someof_random_order.jpg
     :alt: SomeOf random order
 
------
+
 OneOf
 -----
+
 Augmenter that always executes exactly one of its children.
 
 Apply one of four augmenters to each image::
@@ -88,9 +94,10 @@ Apply one of four augmenters to each image::
 .. figure:: ../images/overview_of_augmenters/oneof.jpg
     :alt: OneOf
 
----------
+
 Sometimes
 ---------
+
 Augment only p percent of all images with one or more augmenters.
 
 Apply gaussian blur to about 50% of all images::
@@ -112,9 +119,10 @@ rotations and sharpening to the other 50%. ::
 .. figure:: ../images/overview_of_augmenters/sometimes_if_else.jpg
     :alt: Sometimes if else
 
---------------
+
 WithColorspace
 --------------
+
 Apply child augmenters within a specific colorspace.
 
 Convert images to HSV, then increase each pixels H-value by 10 to 50::
@@ -128,9 +136,10 @@ Convert images to HSV, then increase each pixels H-value by 10 to 50::
 .. figure:: ../images/overview_of_augmenters/withcolorspace.jpg
     :alt: WithColorspace
 
-------------
+
 WithChannels
 ------------
+
 Apply child augmenters to specific channels.
 
 Increase each pixel's R-value (redness) by 10 to 100::
@@ -147,9 +156,10 @@ Rotate each image's red channel by 0 to 45 degrees::
 .. figure:: ../images/overview_of_augmenters/withchannels_affine.jpg
     :alt: WithChannels + Affine
 
-----
+
 Noop
 ----
+
 Augmenter that never changes input images ("no operation"). ::
 
     aug = iaa.Noop()
@@ -158,9 +168,10 @@ Augmenter that never changes input images ("no operation"). ::
     :alt: Noop
 
 
-------
+
 Lambda
 ------
+
 Augmenter that calls a lambda function for each batch of input image.
 
 Replace in every image each fourth row with black pixels::
@@ -178,17 +189,19 @@ Replace in every image each fourth row with black pixels::
 .. figure:: ../images/overview_of_augmenters/lambda.jpg
     :alt: Lambda
 
-------------
+
 AssertLambda
 ------------
+
 Augmenter that runs an assert on each batch of input images
 using a lambda function as condition.
 
 TODO examples
 
------------
+
 AssertShape
 -----------
+
 Augmenter to make assumptions about the shape of input image(s)
 and keypoints.
 
@@ -208,9 +221,15 @@ a width of exactly 64 and either 1 or 3 channels::
         iaa.Fliplr(0.5)
     ])
 
-------
+
+
+***************
+augmenters.size
+***************
+
 Resize
 ------
+
 Augmenter that resizes images to specified heights and widths.
 
 Resize each image to height=32 and width=64::
@@ -242,9 +261,10 @@ either 16px or 32px or 64px::
 .. figure:: ../images/overview_of_augmenters/resize_h_uniform_w_choice.jpg
     :alt: Resize with uniform distribution and choice
 
-----------
+
 CropAndPad
 ----------
+
 Augmenter that crops/pads images by defined amounts in pixels or
 percent (relative to input image size).
 
@@ -300,25 +320,32 @@ rows/colums). ::
 .. figure:: ../images/overview_of_augmenters/cropandpad_correlated.jpg
     :alt: Same value for all sides
 
----
+
 Pad
 ---
+
 Augmenter that pads images, i.e. adds columns/rows to them.
 
-This is a proxy for `CropAndPad`. It only accepts positive
+This is a proxy for ``CropAndPad``. It only accepts positive
 pixel/percent values.
 
-----
+
 Crop
 ----
+
 Augmenter that crops/cuts away pixels at the sides of the image.
 
-This is a proxy for `CropAndPad`. It only accepts positive
-pixel/percent values and transfers them as negative values to `CropAndPad`.
+This is a proxy for ``CropAndPad``. It only accepts positive
+pixel/percent values and transfers them as negative values to ``CropAndPad``.
 
-------
+
+***************
+augmenters.flip
+***************
+
 Fliplr
 ------
+
 Flip/mirror input images horizontally.
 
 Flip 50% of all images horizontally::
@@ -332,9 +359,10 @@ NOTE: the default probability is 0, so to flip all images, do::
 .. figure:: ../images/overview_of_augmenters/fliplr.jpg
     :alt: Horizontal flip
 
-------
+
 Flipud
 ------
+
 Flip/mirror input images vertically.
 
 Flip 50% of all images vertically::
@@ -348,9 +376,14 @@ NOTE: the default probability is 0, so to flip all images, do::
 .. figure:: ../images/overview_of_augmenters/flipud.jpg
     :alt: Vertical flip
 
------------
+
+***********************
+augmenters.segmentation
+***********************
+
 Superpixels
 -----------
+
 Completely or partially transform images to their superpixel representation.
 
 Generate about 64 superpixels per image. Replace each one with a probability
@@ -383,9 +416,13 @@ increasing ``n_segments`` from 1\*16 to 9\*16=144:
     :alt: Superpixels varying n
 
 
-----------------
+****************
+augmenters.color
+****************
+
 ChangeColorspace
 ----------------
+
 Augmenter to change the colorspace of images.
 
 The following example shows how to change the colorspace from RGB to HSV,
@@ -401,9 +438,10 @@ This increases the hue value of each image. ::
 .. figure:: ../images/overview_of_augmenters/changecolorspace.jpg
     :alt: Change colorspace
 
----------
+
 Grayscale
 ---------
+
 Augmenter to convert images to their grayscale versions.
 
 Change images to grayscale and overlay them with the original image by varying
@@ -419,9 +457,14 @@ Visualization of increasing ``alpha`` from 0.0 to 1.0 in 8 steps:
 .. figure:: ../images/overview_of_augmenters/grayscale_vary_alpha.jpg
     :alt: Grayscale vary alpha
 
-------------
+
+***************
+augmenters.blur
+***************
+
 GaussianBlur
 ------------
+
 Augmenter to blur images using gaussian kernels.
 
 Blur each image with a gaussian kernel with a sigma of ``3.0``::
@@ -431,9 +474,10 @@ Blur each image with a gaussian kernel with a sigma of ``3.0``::
 .. figure:: ../images/overview_of_augmenters/gaussianblur.jpg
     :alt: GaussianBlur
 
------------
+
 AverageBlur
 -----------
+
 Blur an image by computing simple means over neighbourhoods.
 
 Blur each image using a mean over neihbourhoods that have a random size
@@ -452,9 +496,10 @@ which can vary between 5 and 11 in height and 1 and 3 in width::
 .. figure:: ../images/overview_of_augmenters/averageblur_mixed.jpg
     :alt: AverageBlur varying height/width
 
-----------
+
 MedianBlur
 ----------
+
 Blur an image by computing median values over neighbourhoods.
 
 Blur each image using a median over neihbourhoods that have a random size
@@ -465,9 +510,15 @@ between 3x3 and 11x11::
 .. figure:: ../images/overview_of_augmenters/medianblur.jpg
     :alt: MedianBlur
 
---------
+
+************************
+augmenters.convolutional
+************************
+
+
 Convolve
 --------
+
 Apply a Convolution to input images.
 
 Convolve each image with a 3x3 kernel::
@@ -499,9 +550,10 @@ image::
 .. figure:: ../images/overview_of_augmenters/convolve_callable.jpg
     :alt: Convolve per callable
 
--------
+
 Sharpen
 -------
+
 Augmenter that sharpens images and overlays the result with the original
 image.
 
@@ -525,9 +577,10 @@ Effects of keeping ``alpha`` fixed at 1.0 and then varying ``lightness`` between
 .. figure:: ../images/overview_of_augmenters/sharpen_vary_lightness.jpg
     :alt: Sharpen varying lightness
 
-------
+
 Emboss
 ------
+
 Augmenter that embosses images and overlays the result with the original
 image.
 
@@ -551,9 +604,10 @@ Effects of keeping ``alpha`` fixed at 1.0 and then varying ``strength`` between
 .. figure:: ../images/overview_of_augmenters/emboss_vary_strength.jpg
     :alt: Emboss varying strength
 
-----------
+
 EdgeDetect
 ----------
+
 Augmenter that detects all edges in images, marks them in
 a black and white image and then overlays the result with the original
 image.
@@ -568,9 +622,10 @@ Effect of increasing ``alpha`` from 0.0 to 1.0 in 8 steps:
 .. figure:: ../images/overview_of_augmenters/edgedetect_vary_alpha.jpg
     :alt: EdgeDetect vary alpha
 
-------------------
+
 DirectedEdgeDetect
 ------------------
+
 Augmenter that detects edges that have certain directions and marks them
 in a black and white image and then overlays the result with the original
 image.
@@ -593,9 +648,15 @@ to 1.0 (0 to 360 degrees) in 8 steps:
 .. figure:: ../images/overview_of_augmenters/directededgedetect_vary_direction.jpg
     :alt: DirectedEdgeDetect vary direction
 
----
+
+*********************
+augmenters.arithmetic
+*********************
+
+
 Add
 ---
+
 Add a value to all pixels in an image.
 
 Add random values between -40 and 40 to images, with each value being sampled
@@ -615,9 +676,10 @@ the value is the same for all channels::
 .. figure:: ../images/overview_of_augmenters/add_per_channel.jpg
     :alt: Add per channel
 
---------------
+
 AddElementwise
 --------------
+
 Add values to the pixels of images with possibly different values
 for neighbouring pixels.
 
@@ -638,9 +700,10 @@ In the other 50% of all images the value is the same for all channels per pixel:
 .. figure:: ../images/overview_of_augmenters/addelementwise_per_channel.jpg
     :alt: AddElementwise per channel
 
----------------------
+
 AdditiveGaussianNoise
 ---------------------
+
 Add gaussian noise (aka white noise) to images.
 
 Add gaussian noise to an image, sampled once per pixel from a normal
@@ -669,9 +732,10 @@ distribution ``N(0, 0.05*255)`` for 50% of all images and sampled three times
 .. figure:: ../images/overview_of_augmenters/additivegaussiannoise_per_channel.jpg
     :alt: AdditiveGaussianNoise per channel
 
---------
+
 Multiply
 --------
+
 Multiply all pixels in an image with a specific value, thereby making the
 image darker or brighter.
 
@@ -691,9 +755,10 @@ independently per channel::
 .. figure:: ../images/overview_of_augmenters/multiply_per_channel.jpg
     :alt: Multiply per channel
 
--------------------
+
 MultiplyElementwise
 -------------------
+
 Multiply values of pixels with possibly different values for neighbouring
 pixels, making each pixel darker or brighter.
 
@@ -713,9 +778,10 @@ sample one multiplier independently per channel and pixel::
 .. figure:: ../images/overview_of_augmenters/multiplyelementwise_per_channel.jpg
     :alt: MultiplyElementwise per channel
 
--------
+
 Dropout
 -------
+
 Augmenter that sets a certain fraction of pixels in images to zero.
 
 Sample per image a value p from the range 0<=p<=0.2 and then drop p percent
@@ -735,9 +801,10 @@ do this independently per channel in 50% of all images::
 .. figure:: ../images/overview_of_augmenters/dropout_per_channel.jpg
     :alt: Dropout per channel
 
--------------
+
 CoarseDropout
 -------------
+
 Augmenter that sets rectangular areas within images to zero.
 
 Drop 2% of all pixels by converting them to black pixels, but do
@@ -769,9 +836,10 @@ to 0 while others remain untouched::
 .. figure:: ../images/overview_of_augmenters/coarsedropout_per_channel.jpg
     :alt: CoarseDropout per channel
 
-------
+
 Invert
 ------
+
 Augmenter that inverts all values in images, i.e. sets a pixel from value
 ``v`` to ``255-v``.
 
@@ -790,9 +858,10 @@ For 50% of all images, invert all pixels in these images with 25% probability
 .. figure:: ../images/overview_of_augmenters/invert_per_channel.jpg
     :alt: Invert per channel
 
----------------------
+
 ContrastNormalization
 ---------------------
+
 Augmenter that changes the contrast of images.
 
 Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image::
@@ -810,9 +879,15 @@ and for 50% of all images also independently per channel::
 .. figure:: ../images/overview_of_augmenters/contrastnormalization_per_channel.jpg
     :alt: ContrastNormalization per channel
 
-------
+
+********************
+augmenters.geometric
+********************
+
+
 Affine
 ------
+
 Augmenter to apply affine transformations to images.
 
 Scale images to a value of 50 to 150% of their original size::
@@ -862,7 +937,7 @@ When applying affine transformations, new pixels are often generated, e.g. when
 translating to the left, pixels are generated on the right. Various modes
 exist to set how these pixels are ought to be filled. Below code shows an
 example that uses all modes, sampled randomly per image. If the mode is
-`constant` (fill all with one constant value), then a random brightness
+``constant`` (fill all with one constant value), then a random brightness
 between 0 and 255 is used::
 
     aug = iaa.Affine(translate_percent={"x": -0.20}, mode=ia.ALL, cval=(0, 255))
@@ -870,9 +945,10 @@ between 0 and 255 is used::
 .. figure:: ../images/overview_of_augmenters/affine_fill.jpg
     :alt: Affine fill modes
 
----------------
+
 PiecewiseAffine
 ---------------
+
 Augmenter that places a regular grid of points on an image and randomly
 moves the neighbourhood of these point around via affine transformations.
 This leads to local distortions.
@@ -902,9 +978,10 @@ in 8 steps:
 .. figure:: ../images/overview_of_augmenters/piecewiseaffine_vary_grid.jpg
     :alt: PiecewiseAffine varying grid
 
----------------------
+
 ElasticTransformation
 ---------------------
+
 Augmenter to transform images by moving pixels locally around using
 displacement fields.
 
