@@ -36,6 +36,10 @@ increasing ``n_segments`` from 1\*16 to 9\*16=144:
 .. figure:: ../../images/overview_of_augmenters/segmentation/superpixels_vary_n.jpg
     :alt: Superpixels varying n
 
+.. note::
+
+    This augmenter is fairly slow. See :ref:`performance`.
+
 
 Voronoi
 -------

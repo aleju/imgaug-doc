@@ -96,6 +96,19 @@ in 8 steps:
 .. figure:: ../../images/overview_of_augmenters/geometric/piecewiseaffine_vary_grid.jpg
     :alt: PiecewiseAffine varying grid
 
+.. note::
+
+    This augmenter is very slow. See :ref:`performance`.
+    Try to use ``ElasticTransformation`` instead, which is at least 10x
+    faster.
+
+.. note::
+
+    For coordinate-based inputs (keypoints, bounding boxes, polygons,
+    ...), this augmenter still has to perform an image-based augmentation,
+    which will make it significantly slower for such inputs than other
+    augmenters. See :ref:`performance`.
+
 
 PerspectiveTransform
 --------------------
@@ -129,6 +142,13 @@ in 8 steps:
 
 .. figure:: ../../images/overview_of_augmenters/geometric/elastictransformations_vary_sigmas.jpg
     :alt: ElasticTransformation varying sigma
+
+.. note::
+
+    For coordinate-based inputs (keypoints, bounding boxes, polygons,
+    ...), this augmenter still has to perform an image-based augmentation,
+    which will make it significantly slower for such inputs than other
+    augmenters. See :ref:`performance`.
 
 
 Rot90
