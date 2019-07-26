@@ -13,7 +13,7 @@ but also keypoints/landmarks, bounding boxes, heatmaps and segmentation maps.
     Example augmentations of a single input image.
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
    :caption: Contents:
 
    source/installation
@@ -24,7 +24,7 @@ but also keypoints/landmarks, bounding boxes, heatmaps and segmentation maps.
    source/examples_segmentation_maps
    source/parameters
    source/alpha
-   source/augmenters
+   source/overview_of_augmenters
    source/performance
    source/dtype_support
    source/jupyter_notebooks

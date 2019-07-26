@@ -1,0 +1,133 @@
+***************
+augmenters.size
+***************
+
+Resize
+------
+
+Augmenter that resizes images to specified heights and widths.
+
+Resize each image to height=32 and width=64::
+
+    aug = iaa.Resize({"height": 32, "width": 64})
+
+.. figure:: ../../images/overview_of_augmenters/size/resize_32x64.jpg
+    :alt: Resize to 32x64
+
+Resize each image to height=32 and keep the aspect ratio for width the same::
+
+    aug = iaa.Resize({"height": 32, "width": "keep-aspect-ratio"})
+
+.. figure:: ../../images/overview_of_augmenters/size/resize_32xkar.jpg
+    :alt: Resize to 32xKAR
+
+Resize each image to something between 50 and 100% of its original size::
+
+    aug = iaa.Resize((0.5, 1.0))
+
+.. figure:: ../../images/overview_of_augmenters/size/resize_50_to_100_percent.jpg
+    :alt: Resize to 50 to 100 percent
+
+Resize each image's height to 50-75% of its original size and width to
+either 16px or 32px or 64px::
+
+    aug = iaa.Resize({"height": (0.5, 0.75), "width": [16, 32, 64]})
+
+.. figure:: ../../images/overview_of_augmenters/size/resize_h_uniform_w_choice.jpg
+    :alt: Resize with uniform distribution and choice
+
+
+CropAndPad
+----------
+
+Augmenter that crops/pads images by defined amounts in pixels or
+percent (relative to input image size).
+
+NOTE: This augmenter automatically resizes images back to their original size
+after it has augmented them. To deactivate this, add the
+parameter ``keep_size=False``.
+
+Crop or pad each side by up to 10 percent relative to its original size
+(negative values result in cropping, positive in padding)::
+
+    aug = iaa.CropAndPad(percent=(-0.25, 0.25))
+
+.. figure:: ../../images/overview_of_augmenters/size/cropandpad_percent.jpg
+    :alt: Crop/Pad by -10 to 10 percent
+
+Pad each side by 0 to 20 percent. This adds new pixels to the sides. These
+pixels will either be filled with a constant value (mode=constant) or filled
+with the value on the closest edge (mode=edge). If a constant value is used,
+it will be a random value between 0 and 128 (sampled per image). ::
+
+    aug = iaa.CropAndPad(
+        percent=(0, 0.2),
+        pad_mode=["constant", "edge"],
+        pad_cval=(0, 128)
+    )
+
+.. figure:: ../../images/overview_of_augmenters/size/cropandpad_mode_cval.jpg
+    :alt: Pad by up to 20 percent
+
+Pad the top side of each image by 0 to 30 pixels, the right side by 0-10px,
+bottom side by 0-30px and left side by 0-10px. Use any of the available modes
+to fill new pixels and if the mode is `constant` then use a constant value
+between 0 and 128. ::
+
+    aug = iaa.CropAndPad(
+        px=((0, 30), (0, 10), (0, 30), (0, 10)),
+        pad_mode=ia.ALL,
+        pad_cval=(0, 128)
+    )
+
+.. figure:: ../../images/overview_of_augmenters/size/cropandpad_pad_complex.jpg
+    :alt: Distributions per side
+
+Crop/pad each side by up to 10px. The value will be sampled once per image
+and used for all sides (i.e. all sides gain/lose the same number of
+rows/colums). ::
+
+    aug = iaa.CropAndPad(
+        px=(-10, 10),
+        sample_independently=False
+    )
+
+.. figure:: ../../images/overview_of_augmenters/size/cropandpad_correlated.jpg
+    :alt: Same value for all sides
+
+
+Pad
+---
+
+Augmenter that pads images, i.e. adds columns/rows to them.
+
+This is a proxy for ``CropAndPad``. It only accepts positive
+pixel/percent values.
+
+
+Crop
+----
+
+Augmenter that crops/cuts away pixels at the sides of the image.
+
+This is a proxy for ``CropAndPad``. It only accepts positive
+pixel/percent values and transfers them as negative values to ``CropAndPad``.
+
+
+PadToFixedSize
+--------------
+
+TODO
+
+
+CropToFixedSize
+---------------
+
+TODO
+
+
+KeepSizeByResize
+----------------
+
+TODO
+
