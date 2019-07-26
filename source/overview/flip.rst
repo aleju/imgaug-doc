@@ -23,12 +23,12 @@ Flip 50% of all images horizontally::
 
     aug = iaa.Fliplr(0.5)
 
+.. figure:: ../../images/overview_of_augmenters/flip/fliplr.jpg
+    :alt: Horizontal flip
+
 NOTE: the default probability is 0, so to flip all images, do::
 
     aug = iaa.Fliplr(1)
-
-.. figure:: ../../images/overview_of_augmenters/flip/fliplr.jpg
-    :alt: Horizontal flip
 
 
 Flipud
@@ -40,10 +40,10 @@ Flip 50% of all images vertically::
 
     aug = iaa.Flipud(0.5)
 
+.. figure:: ../../images/overview_of_augmenters/flip/flipud.jpg
+    :alt: Vertical flip
+
 NOTE: the default probability is 0, so to flip all images, do::
 
     aug = iaa.Flipud(1)
-
-.. figure:: ../../images/overview_of_augmenters/flip/flipud.jpg
-    :alt: Vertical flip
 
