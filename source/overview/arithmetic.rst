@@ -53,13 +53,13 @@ In the other 50% of all images the value is the same for all channels per pixel:
 AdditiveGaussianNoise
 ---------------------
 
-Add gaussian noise (aka white noise) to images.
+Add noise sampled from gaussian distributions elementwise to images.
 
 Add gaussian noise to an image, sampled once per pixel from a normal
 distribution ``N(0, s)``, where ``s`` is sampled per image and varies between
 0 and 0.05\*255::
 
-    aug = iaa.AdditiveGaussianNoise(scale=(0, 0.05*255))
+    aug = iaa.AdditiveGaussianNoise(scale=(0, 0.2*255))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise.jpg
     :alt: AdditiveGaussianNoise
@@ -67,7 +67,7 @@ distribution ``N(0, s)``, where ``s`` is sampled per image and varies between
 Add gaussian noise to an image, sampled once per pixel from a normal
 distribution ``N(0, 0.05*255)``::
 
-    aug = iaa.AdditiveGaussianNoise(scale=0.05*255)
+    aug = iaa.AdditiveGaussianNoise(scale=0.2*255)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise_large.jpg
     :alt: AdditiveGaussianNoise large
@@ -77,7 +77,7 @@ a single value is sampled for each pixel and re-used for all three channels
 of that pixel. For the other 50% of all images, three values are sampled
 per pixel (i.e. channelwise sampling).::
 
-    aug = iaa.AdditiveGaussianNoise(scale=0.05*255, per_channel=0.5)
+    aug = iaa.AdditiveGaussianNoise(scale=0.2*255, per_channel=0.5)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise_per_channel.jpg
     :alt: AdditiveGaussianNoise per channel

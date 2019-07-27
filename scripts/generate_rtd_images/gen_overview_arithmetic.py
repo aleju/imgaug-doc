@@ -53,21 +53,21 @@ def chapter_augmenters_additivegaussiannoise():
     run_and_save_augseq(
         "arithmetic/additivegaussiannoise.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
-        quality=90
+        quality=95
     )
 
     aug = iaa.AdditiveGaussianNoise(scale=0.2*255)
     run_and_save_augseq(
         "arithmetic/additivegaussiannoise_large.jpg", aug,
         [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1,
-        quality=90
+        quality=95
     )
 
     aug = iaa.AdditiveGaussianNoise(scale=0.2*255, per_channel=True)
     run_and_save_augseq(
         "arithmetic/additivegaussiannoise_per_channel.jpg", aug,
         [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1,
-        quality=90
+        quality=95
     )
 
 
