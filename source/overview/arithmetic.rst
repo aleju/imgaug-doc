@@ -123,7 +123,39 @@ per pixel (i.e. channelwise sampling).::
 AdditivePoissonNoise
 ---------------------
 
-TODO
+Add noise sampled from poisson distributions elementwise to images.
+
+Poisson noise is comparable to gaussian noise, as e.g. generated via
+``AdditiveGaussianNoise``. As poisson distributions produce only positive
+numbers, the sign of the sampled values are here randomly flipped.
+
+Values of around ``20.0`` for `lam` lead to visible noise (for ``uint8``).
+Values of around ``40.0`` for `lam` lead to very visible noise (for ``uint8``).
+It is recommended to usually set `per_channel` to ``True``.
+
+Add poisson noise with `lam` varying from ``0`` to ``40``::
+
+    aug = iaa.AdditivePoissonNoise(scale=(0, 40))
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise.jpg
+    :alt: AdditivePoissonNoise
+
+Add poisson noise to an image, sampled once per pixel from ``Poisson(40)``::
+
+    aug = iaa.AdditivePoissonNoise(40)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise_large.jpg
+    :alt: AdditivePoissonNoise large
+
+Add poisson noise from ``Poisson(40)`` to an image. For 50% of all images,
+a single value is sampled for each pixel and re-used for all three channels
+of that pixel. For the other 50% of all images, three values are sampled
+per pixel (i.e. channelwise sampling).::
+
+    aug = iaa.AdditivePoissonNoise(scale=40, per_channel=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise_per_channel.jpg
+    :alt: AdditivePoissonNoise per channel
 
 
 Multiply
