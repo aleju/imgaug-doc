@@ -339,7 +339,17 @@ the image size, resulting in coarse areas being replaced by gaussian noise. ::
 ImpulseNoise
 ------------
 
-TODO
+Apply impulse noise to images.
+
+This is identical to ``SaltAndPepper``, except that ``per_channel`` is
+always set to ``True``.
+
+Replace ``10%`` of all pixels with impulse noise::
+
+    aug = iaa.ImpulseNoise(0.1)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/impulsenoise.jpg
+    :alt: ImpulseNoise
 
 
 SaltAndPepper
