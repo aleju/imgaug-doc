@@ -22,16 +22,13 @@ def chapter_augmenters_add():
     aug = iaa.Add((-40, 40))
     run_and_save_augseq(
         "arithmetic/add.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
-        quality=75
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
     )
 
     aug = iaa.Add((-40, 40), per_channel=0.5)
     run_and_save_augseq(
         "arithmetic/add_per_channel.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
-        quality=75
-    )
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2)
 
 
 def chapter_augmenters_addelementwise():
@@ -107,31 +104,24 @@ def chapter_augmenters_dropout():
     aug = iaa.Dropout(p=(0, 0.2))
     run_and_save_augseq(
         "arithmetic/dropout.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
-        quality=75
-    )
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2)
 
     aug = iaa.Dropout(p=(0, 0.2), per_channel=0.5)
     run_and_save_augseq(
         "arithmetic/dropout_per_channel.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
-        quality=75
-    )
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2)
 
 
 def chapter_augmenters_coarsedropout():
     aug = iaa.CoarseDropout(0.02, size_percent=0.5)
     run_and_save_augseq(
         "arithmetic/coarsedropout.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
-        quality=75
-    )
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2)
 
     aug = iaa.CoarseDropout((0.0, 0.05), size_percent=(0.02, 0.25))
     run_and_save_augseq(
         "arithmetic/coarsedropout_both_uniform.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
-        quality=75,
         seed=2
     )
 
@@ -139,7 +129,6 @@ def chapter_augmenters_coarsedropout():
     run_and_save_augseq(
         "arithmetic/coarsedropout_per_channel.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
-        quality=75,
         seed=2
     )
 

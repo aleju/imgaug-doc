@@ -254,8 +254,7 @@ def chapter_examples_heatmaps_arr_full():
     save(
         "examples_heatmaps",
         "arr_full.jpg",
-        grid_image,
-        quality=75
+        grid_image
     )
 
 

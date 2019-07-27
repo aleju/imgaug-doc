@@ -59,8 +59,8 @@ def arrdiff(arr1, arr2):
     return d_avg
 
 
-def compress_to_jpg(image, quality=75):
-    quality = quality if quality is not None else 75
+def compress_to_jpg(image, quality=90):
+    quality = quality if quality is not None else 90
     im = PIL.Image.fromarray(image)
     out = BytesIO()
     im.save(out, format="JPEG", quality=quality)

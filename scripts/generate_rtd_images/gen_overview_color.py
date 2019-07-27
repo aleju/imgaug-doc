@@ -49,8 +49,7 @@ def chapter_augmenters_grayscale():
     run_and_save_augseq(
         "color/grayscale_vary_alpha.jpg",
         [iaa.Grayscale(alpha=alpha) for alpha in alphas],
-        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1,
-        quality=75
+        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1
     )
 
 

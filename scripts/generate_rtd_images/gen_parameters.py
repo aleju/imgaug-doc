@@ -6,7 +6,6 @@ from imgaug import parameters as iap
 from .utils import save, grid
 
 PARAMETERS_DEFAULT_SIZE = (350, 350)
-PARAMETER_DEFAULT_QUALITY = 25
 
 
 def main():
@@ -58,8 +57,7 @@ def chapter_parameters_introduction():
     save(
         "parameters",
         "introduction.jpg",
-        grid(images_aug, cols=4, rows=4),
-        quality=25
+        grid(images_aug, cols=4, rows=4)
     )
 
 
@@ -80,8 +78,7 @@ def chapter_parameters_continuous():
     save(
         "parameters",
         "continuous_normal.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
+        gridarr
     )
 
     # -----------------------
@@ -98,8 +95,7 @@ def chapter_parameters_continuous():
     save(
         "parameters",
         "continuous_laplace.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
+        gridarr
     )
 
     # -----------------------
@@ -116,8 +112,7 @@ def chapter_parameters_continuous():
     save(
         "parameters",
         "continuous_chisquare.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
+        gridarr
     )
 
     # -----------------------
@@ -134,8 +129,7 @@ def chapter_parameters_continuous():
     save(
         "parameters",
         "continuous_weibull.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
+        gridarr
     )
 
     # -----------------------
@@ -152,9 +146,7 @@ def chapter_parameters_continuous():
     save(
         "parameters",
         "continuous_uniform.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # Beta
@@ -170,9 +162,7 @@ def chapter_parameters_continuous():
     save(
         "parameters",
         "continuous_beta.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
 
 def chapter_parameters_discrete():
@@ -190,9 +180,7 @@ def chapter_parameters_discrete():
     save(
         "parameters",
         "continuous_binomial.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # DiscreteUniform
@@ -208,9 +196,7 @@ def chapter_parameters_discrete():
     save(
         "parameters",
         "continuous_discreteuniform.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # Poisson
@@ -226,9 +212,7 @@ def chapter_parameters_discrete():
     save(
         "parameters",
         "continuous_poisson.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
 
 def chapter_parameters_arithmetic():
@@ -257,9 +241,7 @@ def chapter_parameters_arithmetic():
     save(
         "parameters",
         "arithmetic_add.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # Multiply
@@ -284,9 +266,7 @@ def chapter_parameters_arithmetic():
     save(
         "parameters",
         "arithmetic_multiply.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # Divide
@@ -311,9 +291,7 @@ def chapter_parameters_arithmetic():
     save(
         "parameters",
         "arithmetic_divide.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # Power
@@ -330,9 +308,7 @@ def chapter_parameters_arithmetic():
     save(
         "parameters",
         "arithmetic_power.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
 
 def chapter_parameters_special():
@@ -352,9 +328,7 @@ def chapter_parameters_special():
     save(
         "parameters",
         "special_choice.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # Clip
@@ -368,9 +342,7 @@ def chapter_parameters_special():
     save(
         "parameters",
         "special_clip.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # Discretize
@@ -384,9 +356,7 @@ def chapter_parameters_special():
     save(
         "parameters",
         "special_discretize.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # Absolute
@@ -400,9 +370,7 @@ def chapter_parameters_special():
     save(
         "parameters",
         "special_absolute.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # RandomSign
@@ -418,9 +386,7 @@ def chapter_parameters_special():
     save(
         "parameters",
         "special_randomsign.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
     # -----------------------
     # ForceSign
@@ -436,9 +402,7 @@ def chapter_parameters_special():
     save(
         "parameters",
         "special_forcesign.jpg",
-        gridarr,
-        quality=PARAMETER_DEFAULT_QUALITY
-    )
+        gridarr)
 
 
 if __name__ == "__main__":

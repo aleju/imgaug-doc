@@ -30,16 +30,14 @@ def chapter_augmenters_superpixels():
     run_and_save_augseq(
         "segmentation/superpixels_vary_p.jpg",
         [iaa.Superpixels(p_replace=p, n_segments=64) for p in ps],
-        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1,
-        quality=75
+        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1
     )
 
     ns = [16*i for i in range(1, 9)]
     run_and_save_augseq(
         "segmentation/superpixels_vary_n.jpg",
         [iaa.Superpixels(p_replace=1.0, n_segments=n) for n in ns],
-        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1,
-        quality=75
+        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1
     )
 
 
