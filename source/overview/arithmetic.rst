@@ -291,7 +291,49 @@ to 0 while others remain untouched::
 ReplaceElementwise
 ------------------
 
-TODO
+Replace pixels in an image with new values.
+
+Replace ``10%`` of all pixels with either the value ``0`` or the value
+``255``::
+
+    aug = ReplaceElementwise(0.1, [0, 255])
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/replaceelementwise.jpg
+    :alt: ReplaceElementwise
+
+For ``50%`` of all images, replace ``10%`` of all pixels with either the value
+``0`` or the value ``255`` (same as in the previous example). For the other
+``50%`` of all images, replace *channelwise* ``10%`` of all pixels with either
+the value ``0`` or the value ``255``. So, it will be very rare for each pixel
+to have all channels replaced by ``255`` or ``0``. ::
+
+    aug = ReplaceElementwise(0.1, [0, 255], per_channel=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/replaceelementwise_per_channel_050.jpg
+    :alt: ReplaceElementwise per channel at 50%
+
+Replace ``10%`` of all pixels by gaussian noise centered around ``128``. Both
+the replacement mask and the gaussian noise are sampled for ``50%`` of all
+images. ::
+
+    import imgaug.parameters as iap
+    aug = ReplaceElementwise(0.1, iap.Normal(128, 0.4*128), per_channel=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/replaceelementwise_gaussian_noise.jpg
+    :alt: ReplaceElementwise with gaussian noise
+
+Replace ``10%`` of all pixels by gaussian noise centered around ``128``. Sample
+the replacement mask at a lower resolution (``8x8`` pixels) and upscale it to
+the image size, resulting in coarse areas being replaced by gaussian noise. ::
+
+    import imgaug.parameters as iap
+    aug = ReplaceElementwise(
+        iap.FromLowerResolution(iap.Binomial(0.1), size_px=8),
+        iap.Normal(128, 0.4*128),
+        per_channel=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/replaceelementwise_gaussian_noise_coarse.jpg
+    :alt: ReplaceElementwise with gaussian noise in coarse areas
 
 
 ImpulseNoise

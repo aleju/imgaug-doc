@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import imgaug as ia
 import imgaug.augmenters as iaa
+import imgaug.parameters as iap
 
 from .utils import run_and_save_augseq
 
@@ -12,6 +13,7 @@ def main():
     chapter_augmenters_additivegaussiannoise()
     chapter_augmenters_additivelaplacenoise()
     chapter_augmenters_additivepoissonnoise()
+    chapter_augmenters_replaceelementwise()
     chapter_augmenters_multiply()
     chapter_augmenters_multiplyelementwise()
     chapter_augmenters_dropout()
@@ -121,6 +123,46 @@ def chapter_augmenters_additivepoissonnoise():
         fn_start + "_per_channel.jpg", aug,
         [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1,
         quality=95
+    )
+
+
+def chapter_augmenters_replaceelementwise():
+    aug_cls = iaa.ReplaceElementwise
+    fn_start = "arithmetic/replaceelementwise"
+
+    aug = aug_cls(0.05, [0, 255])
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95,
+        seed=2
+    )
+
+    aug = aug_cls(0.05, [0, 255], per_channel=0.5)
+    run_and_save_augseq(
+        fn_start + "_per_channel_050.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95,
+        seed=2
+    )
+
+    aug = aug_cls(0.1, iap.Normal(128, 0.4*128), per_channel=0.5)
+    run_and_save_augseq(
+        fn_start + "_gaussian_noise.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95,
+        seed=2
+    )
+
+    aug = aug_cls(
+        iap.FromLowerResolution(iap.Binomial(0.1), size_px=8),
+        iap.Normal(128, 0.4*128),
+        per_channel=0.5)
+    run_and_save_augseq(
+        fn_start + "_gaussian_noise_coarse.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95,
+        seed=2
     )
 
 
