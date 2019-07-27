@@ -339,7 +339,7 @@ the image size, resulting in coarse areas being replaced by gaussian noise. ::
 ImpulseNoise
 ------------
 
-Apply impulse noise to images.
+Add impulse noise to images.
 
 This is identical to ``SaltAndPepper``, except that ``per_channel`` is
 always set to ``True``.
@@ -355,7 +355,22 @@ Replace ``10%`` of all pixels with impulse noise::
 SaltAndPepper
 -------------
 
-TODO
+Replace pixels in images with salt/pepper noise (white/black-ish colors).
+
+Replace ``5%`` of all pixels with salt and pepper noise::
+
+    aug = iaa.SaltAndPepper(0.05)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/saltandpepper.jpg
+    :alt: SaltAndPepper
+
+Replace *channelwise* ``5%`` of all pixels with salt and pepper
+noise::
+
+    aug = iaa.SaltAndPepper(0.05, per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/saltandpepper_per_channel.jpg
+    :alt: SaltAndPepper
 
 
 CoarseSaltAndPepper

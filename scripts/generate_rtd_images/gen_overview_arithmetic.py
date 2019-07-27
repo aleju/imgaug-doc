@@ -15,6 +15,7 @@ def main():
     chapter_augmenters_additivepoissonnoise()
     chapter_augmenters_replaceelementwise()
     chapter_augmenters_impulsenoise()
+    chapter_augmenters_saltandpepper()
     chapter_augmenters_multiply()
     chapter_augmenters_multiplyelementwise()
     chapter_augmenters_dropout()
@@ -173,6 +174,24 @@ def chapter_augmenters_impulsenoise():
     aug = iaa.ImpulseNoise(0.1)
     run_and_save_augseq(
         fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95
+    )
+
+
+def chapter_augmenters_saltandpepper():
+    fn_start = "arithmetic/saltandpepper"
+
+    aug = iaa.SaltAndPepper(0.1)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95
+    )
+
+    aug = iaa.SaltAndPepper(0.1, per_channel=True)
+    run_and_save_augseq(
+        fn_start + "_per_channel.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
         quality=95
     )
