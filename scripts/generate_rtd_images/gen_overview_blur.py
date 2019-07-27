@@ -11,6 +11,7 @@ def main():
     chapter_augmenters_averageblur()
     chapter_augmenters_medianblur()
     chapter_augmenters_bilateralblur()
+    chapter_augmenters_motionblur()
 
 
 def chapter_augmenters_gaussianblur():
@@ -54,6 +55,20 @@ def chapter_augmenters_bilateralblur():
         d=(3, 10), sigma_color=(10, 250), sigma_space=(10, 250))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(16)], cols=4, rows=4)
+
+
+def chapter_augmenters_motionblur():
+    fn_start = "blur/motionblur"
+
+    aug = iaa.MotionBlur(k=15)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(16)], cols=4, rows=4)
+
+    aug = iaa.MotionBlur(k=15, angle=[-45, 45])
+    run_and_save_augseq(
+        fn_start + "_angle.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(16)], cols=4, rows=4)
 
 

@@ -73,5 +73,20 @@ and `sigma_space`::
 MotionBlur
 ----------
 
-TODO
+Blur images in a way that fakes camera or object movements.
+
+Apply motion blur with a kernel size of ``15x15`` pixels to images::
+
+    aug = iaa.MotionBlur(k=15)
+
+.. figure:: ../../images/overview_of_augmenters/blur/motionblur.jpg
+    :alt: MotionBlur
+
+Apply motion blur with a kernel size of ``15x15`` pixels and a blur angle
+of either ``-45`` or ``45`` degrees (randomly picked per image)::
+
+    aug = iaa.MotionBlur(k=15, angle=[-45, 45])
+
+.. figure:: ../../images/overview_of_augmenters/blur/motionblur_angle.jpg
+    :alt: MotionBlur with choice of angles
 
