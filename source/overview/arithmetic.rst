@@ -72,9 +72,10 @@ distribution ``N(0, 0.05*255)``::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise_large.jpg
     :alt: AdditiveGaussianNoise large
 
-Add gaussian noise to an image, sampled once per pixel from a normal
-distribution ``N(0, 0.05*255)`` for 50% of all images and sampled three times
-(channel-wise) for the other 50% from the same normal distribution::
+Add gaussian noise from ``N(0, 0.05*255)`` to an image. For 50% of all images,
+a single value is sampled for each pixel and re-used for all three channels
+of that pixel. For the other 50% of all images, three values are sampled
+per pixel (i.e. channelwise sampling).::
 
     aug = iaa.AdditiveGaussianNoise(scale=0.05*255, per_channel=0.5)
 
@@ -85,7 +86,38 @@ distribution ``N(0, 0.05*255)`` for 50% of all images and sampled three times
 AdditiveLaplaceNoise
 ---------------------
 
-TODO
+Add noise sampled from laplace distributions elementwise to images.
+
+The laplace distribution is similar to the gaussian distribution, but
+puts more weight on the long tail. Hence, this noise will add more
+outliers (very high/low values). It is somewhere between gaussian noise and
+salt and pepper noise.
+
+Add laplace noise with ``loc=0`` and varying ``scale`` from ``0`` to
+``0.5*255``::
+
+    aug = iaa.AdditiveLaplaceNoise(scale=(0, 0.2*255))
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise.jpg
+    :alt: AdditiveLaplaceNoise
+
+Add gaussian noise to an image, sampled once per pixel from a laplace
+distribution ``Laplace(0, 0.05*255)``::
+
+    aug = iaa.AdditiveLaplaceNoise(scale=0.2*255)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise_large.jpg
+    :alt: AdditiveLaplaceNoise large
+
+Add laplace noise from ``N(0, 0.05*255)`` to an image. For 50% of all images,
+a single value is sampled for each pixel and re-used for all three channels
+of that pixel. For the other 50% of all images, three values are sampled
+per pixel (i.e. channelwise sampling).::
+
+    aug = iaa.AdditiveLaplaceNoise(scale=0.2*255, per_channel=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise_per_channel.jpg
+    :alt: AdditiveLaplaceNoise per channel
 
 
 AdditivePoissonNoise

@@ -10,6 +10,7 @@ def main():
     chapter_augmenters_add()
     chapter_augmenters_addelementwise()
     chapter_augmenters_additivegaussiannoise()
+    chapter_augmenters_additivelaplacenoise()
     chapter_augmenters_multiply()
     chapter_augmenters_multiplyelementwise()
     chapter_augmenters_dropout()
@@ -67,6 +68,32 @@ def chapter_augmenters_additivegaussiannoise():
         "arithmetic/additivegaussiannoise_per_channel.jpg", aug,
         [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1,
         quality=90
+    )
+
+
+def chapter_augmenters_additivelaplacenoise():
+    aug_cls = iaa.AdditiveLaplaceNoise
+    fn_start = "arithmetic/additivelaplacenoise"
+
+    aug = aug_cls(scale=(0, 0.2*255))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95
+    )
+
+    aug = aug_cls(scale=0.2*255)
+    run_and_save_augseq(
+        fn_start + "_large.jpg", aug,
+        [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1,
+        quality=95
+    )
+
+    aug = aug_cls(scale=0.2*255, per_channel=True)
+    run_and_save_augseq(
+        fn_start + "_per_channel.jpg", aug,
+        [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1,
+        quality=95
     )
 
 
