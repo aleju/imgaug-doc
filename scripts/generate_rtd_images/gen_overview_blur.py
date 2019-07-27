@@ -10,6 +10,7 @@ def main():
     chapter_augmenters_gaussianblur()
     chapter_augmenters_averageblur()
     chapter_augmenters_medianblur()
+    chapter_augmenters_bilateralblur()
 
 
 def chapter_augmenters_gaussianblur():
@@ -44,6 +45,16 @@ def chapter_augmenters_medianblur():
     #    [ia.quokka(size=(64, 64)) for _ in range(16)], cols=8, rows=2,
     #    quality=75
     #)
+
+
+def chapter_augmenters_bilateralblur():
+    fn_start = "blur/bilateralblur"
+
+    aug = iaa.BilateralBlur(
+        d=(3, 10), sigma_color=(10, 250), sigma_space=(10, 250))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(16)], cols=4, rows=4)
 
 
 if __name__ == "__main__":

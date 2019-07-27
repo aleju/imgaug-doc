@@ -54,7 +54,20 @@ between 3x3 and 11x11::
 BilateralBlur
 -------------
 
-TODO
+Blur/Denoise an image using a bilateral filter.
+
+Bilateral filters blur homogenous and textured areas, while trying to
+preserve edges.
+
+Blur all images using a bilateral filter with a `max distance` sampled
+uniformly from the interval ``[3, 10]`` and wide ranges for `sigma_color`
+and `sigma_space`::
+
+    aug = iaa.BilateralBlur(
+        d=(3, 10), sigma_color=(10, 250), sigma_space=(10, 250))
+
+.. figure:: ../../images/overview_of_augmenters/blur/bilateralblur.jpg
+    :alt: BilateralBlur
 
 
 MotionBlur
