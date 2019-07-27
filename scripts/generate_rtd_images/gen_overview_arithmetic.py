@@ -27,6 +27,7 @@ def main():
     chapter_augmenters_coarsedropout()
     chapter_augmenters_invert()
     chapter_augmenters_contrastnormalization()
+    chapter_augmenters_jpegcompression()
 
 
 def chapter_augmenters_add():
@@ -360,6 +361,17 @@ def chapter_augmenters_contrastnormalization():
     run_and_save_augseq(
         "arithmetic/contrastnormalization_per_channel.jpg", aug,
         [ia.quokka(size=(64, 64)) for _ in range(16)], cols=8, rows=2
+    )
+
+
+def chapter_augmenters_jpegcompression():
+    fn_start = "arithmetic/jpegcompression"
+
+    aug = iaa.JpegCompression(compression=(70, 99))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(20)], cols=4, rows=5,
+        quality=100
     )
 
 

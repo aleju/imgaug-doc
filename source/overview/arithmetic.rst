@@ -541,5 +541,14 @@ and for 50% of all images also independently per channel::
 JpegCompression
 ---------------
 
-TODO
+Degrade the quality of images by JPEG-compressing them.
 
+Remove high frequency components in images via JPEG compression with
+a *compression strength* between ``80`` and ``95`` (randomly and
+uniformly sampled per image). This corresponds to a (very low) *quality*
+setting of ``5`` to ``20``. ::
+
+    aug = iaa.JpegCompression(compression=(70, 99))
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/jpegcompression.jpg
+    :alt: JpegCompression
