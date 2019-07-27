@@ -57,7 +57,7 @@ Add noise sampled from gaussian distributions elementwise to images.
 
 Add gaussian noise to an image, sampled once per pixel from a normal
 distribution ``N(0, s)``, where ``s`` is sampled per image and varies between
-0 and 0.05\*255::
+``0`` and ``0.2*255``::
 
     aug = iaa.AdditiveGaussianNoise(scale=(0, 0.2*255))
 
@@ -72,15 +72,23 @@ distribution ``N(0, 0.05*255)``::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise_large.jpg
     :alt: AdditiveGaussianNoise large
 
-Add gaussian noise from ``N(0, 0.05*255)`` to an image. For 50% of all images,
-a single value is sampled for each pixel and re-used for all three channels
-of that pixel. For the other 50% of all images, three values are sampled
-per pixel (i.e. channelwise sampling).::
+Add laplace noise to an image, sampled channelwise from
+``N(0, 0.2*255)`` (i.e. three independent samples per pixel)::
 
-    aug = iaa.AdditiveGaussianNoise(scale=0.2*255, per_channel=0.5)
+    aug = iaa.AdditiveGaussianNoise(scale=0.2*255, per_channel=True)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise_per_channel.jpg
     :alt: AdditiveGaussianNoise per channel
+
+.. Add gaussian noise from ``N(0, 0.05*255)`` to an image. For 50% of all images,
+    a single value is sampled for each pixel and re-used for all three channels
+    of that pixel. For the other 50% of all images, three values are sampled
+    per pixel (i.e. channelwise sampling).::
+
+        aug = iaa.AdditiveGaussianNoise(scale=0.2*255, per_channel=0.5)
+
+    .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise_per_channel.jpg
+        :alt: AdditiveGaussianNoise per channel
 
 
 AdditiveLaplaceNoise
@@ -93,31 +101,39 @@ puts more weight on the long tail. Hence, this noise will add more
 outliers (very high/low values). It is somewhere between gaussian noise and
 salt and pepper noise.
 
-Add laplace noise with ``loc=0`` and varying ``scale`` from ``0`` to
-``0.5*255``::
+Add laplace noise to an image, sampled once per pixel from ``Laplace(0, s)``,
+where ``s`` is sampled per image and varies between ``0`` and ``0.2*255``::
 
     aug = iaa.AdditiveLaplaceNoise(scale=(0, 0.2*255))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise.jpg
     :alt: AdditiveLaplaceNoise
 
-Add gaussian noise to an image, sampled once per pixel from a laplace
-distribution ``Laplace(0, 0.05*255)``::
+Add laplace noise to an image, sampled once per pixel from
+``Laplace(0, 0.2*255)``::
 
     aug = iaa.AdditiveLaplaceNoise(scale=0.2*255)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise_large.jpg
     :alt: AdditiveLaplaceNoise large
 
-Add laplace noise from ``N(0, 0.05*255)`` to an image. For 50% of all images,
-a single value is sampled for each pixel and re-used for all three channels
-of that pixel. For the other 50% of all images, three values are sampled
-per pixel (i.e. channelwise sampling).::
+Add laplace noise to an image, sampled channelwise from
+``Laplace(0, 0.2*255)`` (i.e. three independent samples per pixel)::
 
-    aug = iaa.AdditiveLaplaceNoise(scale=0.2*255, per_channel=0.5)
+    aug = iaa.AdditiveLaplaceNoise(scale=0.2*255, per_channel=True)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise_per_channel.jpg
     :alt: AdditiveLaplaceNoise per channel
+
+.. Add laplace noise from ``N(0, 0.05*255)`` to an image. For 50% of all images,
+    a single value is sampled for each pixel and re-used for all three channels
+    of that pixel. For the other 50% of all images, three values are sampled
+    per pixel (i.e. channelwise sampling).::
+
+        aug = iaa.AdditiveLaplaceNoise(scale=0.2*255, per_channel=0.5)
+
+    .. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise_per_channel.jpg
+        :alt: AdditiveLaplaceNoise per channel
 
 
 AdditivePoissonNoise
@@ -129,11 +145,13 @@ Poisson noise is comparable to gaussian noise, as e.g. generated via
 ``AdditiveGaussianNoise``. As poisson distributions produce only positive
 numbers, the sign of the sampled values are here randomly flipped.
 
-Values of around ``20.0`` for `lam` lead to visible noise (for ``uint8``).
-Values of around ``40.0`` for `lam` lead to very visible noise (for ``uint8``).
-It is recommended to usually set `per_channel` to ``True``.
+Values of around ``20.0`` for ``lam`` lead to visible noise (for ``uint8``).
+Values of around ``40.0`` for ``lam`` lead to very visible noise (for
+``uint8``).
+It is recommended to usually set ``per_channel`` to ``True``.
 
-Add poisson noise with `lam` varying from ``0`` to ``40``::
+Add poisson noise to an image, sampled once per pixel from ``Poisson(lam)``,
+where ``lam`` is sampled per image and varies between ``0`` and ``40``::
 
     aug = iaa.AdditivePoissonNoise(scale=(0, 40))
 
@@ -147,15 +165,23 @@ Add poisson noise to an image, sampled once per pixel from ``Poisson(40)``::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise_large.jpg
     :alt: AdditivePoissonNoise large
 
-Add poisson noise from ``Poisson(40)`` to an image. For 50% of all images,
-a single value is sampled for each pixel and re-used for all three channels
-of that pixel. For the other 50% of all images, three values are sampled
-per pixel (i.e. channelwise sampling).::
+Add poisson noise to an image, sampled channelwise from
+``Poisson(40)`` (i.e. three independent samples per pixel)::
 
-    aug = iaa.AdditivePoissonNoise(scale=40, per_channel=0.5)
+    aug = iaa.AdditivePoissonNoise(scale=40, per_channel=True)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise_per_channel.jpg
     :alt: AdditivePoissonNoise per channel
+
+.. Add poisson noise from ``Poisson(40)`` to an image. For 50% of all images,
+    a single value is sampled for each pixel and re-used for all three channels
+    of that pixel. For the other 50% of all images, three values are sampled
+    per pixel (i.e. channelwise sampling).::
+
+        aug = iaa.AdditivePoissonNoise(scale=40, per_channel=0.5)
+
+    .. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise_per_channel.jpg
+        :alt: AdditivePoissonNoise per channel
 
 
 Multiply
