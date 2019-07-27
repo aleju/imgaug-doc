@@ -357,17 +357,17 @@ SaltAndPepper
 
 Replace pixels in images with salt/pepper noise (white/black-ish colors).
 
-Replace ``5%`` of all pixels with salt and pepper noise::
+Replace ``10%`` of all pixels with salt and pepper noise::
 
-    aug = iaa.SaltAndPepper(0.05)
+    aug = iaa.SaltAndPepper(0.1)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/saltandpepper.jpg
     :alt: SaltAndPepper
 
-Replace *channelwise* ``5%`` of all pixels with salt and pepper
+Replace *channelwise* ``10%`` of all pixels with salt and pepper
 noise::
 
-    aug = iaa.SaltAndPepper(0.05, per_channel=True)
+    aug = iaa.SaltAndPepper(0.1, per_channel=True)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/saltandpepper_per_channel.jpg
     :alt: SaltAndPepper per channel
@@ -378,7 +378,7 @@ CoarseSaltAndPepper
 
 Replace rectangular areas in images with white/black-ish pixel noise.
 
-Marks ``5%`` of all pixels in a mask to be replaced by salt/pepper
+Mark ``5%`` of all pixels in a mask to be replaced by salt/pepper
 noise. The mask has ``1%`` to ``10%`` the size of the input image.
 The mask is then upscaled to the input image size, leading to large
 rectangular areas being marked as to be replaced. These areas are then
@@ -411,25 +411,88 @@ independently per image channel. ::
 Salt
 ----
 
-TODO
+Replace pixels in images with salt noise, i.e. white-ish pixels.
+
+This augmenter is similar to ``SaltAndPepper``, but adds no pepper noise to
+images.
+
+Replace ``10%`` of all pixels with salt noise (white-ish colors)::
+
+    aug = iaa.Salt(0.1)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/salt.jpg
+    :alt: Salt
+
+Similar to ``SaltAndPepper``, this augmenter also supports the ``per_channel``
+argument, which is skipped here for brevity.
 
 
 CoarseSalt
 ----------
 
-TODO
+Replace rectangular areas in images with white-ish pixel noise.
+
+This augmenter is similar to ``CoarseSaltAndPepper``, but adds no pepper noise
+to images.
+
+Mark ``5%`` of all pixels in a mask to be replaced by salt
+noise. The mask has ``1%`` to ``10%`` the size of the input image.
+The mask is then upscaled to the input image size, leading to large
+rectangular areas being marked as to be replaced. These areas are then
+replaced in the input image by salt noise. ::
+
+    aug = iaa.CoarseSalt(0.05, size_percent=(0.01, 0.1))
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/coarsesalt.jpg
+    :alt: CoarseSalt
+
+Similar to ``CoarseSaltAndPepper``, this augmenter also supports the
+``per_channel`` argument, which is skipped here for brevity
 
 
 Pepper
 ------
 
-TODO
+Replace pixels in images with pepper noise, i.e. black-ish pixels.
+
+This augmenter is similar to ``SaltAndPepper``, but adds no salt noise to
+images.
+
+This augmenter is similar to ``Dropout``, but slower and the black pixels are
+not uniformly black.
+
+Replace ``10%`` of all pixels with pepper noise (black-ish colors)::
+
+    aug = iaa.Pepper(0.1)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/pepper.jpg
+    :alt: Pepper
+
+Similar to ``SaltAndPepper``, this augmenter also supports the ``per_channel``
+argument, which is skipped here for brevity.
 
 
 CoarsePepper
 ------------
 
-TODO
+Replace rectangular areas in images with black-ish pixel noise.
+
+This augmenter is similar to ``CoarseSaltAndPepper``, but adds no salt noise
+to images.
+
+Mark ``5%`` of all pixels in a mask to be replaced by pepper
+noise. The mask has ``1%`` to ``10%`` the size of the input image.
+The mask is then upscaled to the input image size, leading to large
+rectangular areas being marked as to be replaced. These areas are then
+replaced in the input image by pepper noise. ::
+
+    aug = iaa.CoarsePepper(0.05, size_percent=(0.01, 0.1))
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/coarsepepper.jpg
+    :alt: CoarsePepper
+
+Similar to ``CoarseSaltAndPepper``, this augmenter also supports the
+``per_channel`` argument, which is skipped here for brevity
 
 
 Invert

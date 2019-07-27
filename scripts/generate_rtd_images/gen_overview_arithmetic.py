@@ -17,6 +17,10 @@ def main():
     chapter_augmenters_impulsenoise()
     chapter_augmenters_saltandpepper()
     chapter_augmenters_coarsesaltandpepper()
+    chapter_augmenters_salt()
+    chapter_augmenters_coarsesalt()
+    chapter_augmenters_pepper()
+    chapter_augmenters_coarsepepper()
     chapter_augmenters_multiply()
     chapter_augmenters_multiplyelementwise()
     chapter_augmenters_dropout()
@@ -219,6 +223,50 @@ def chapter_augmenters_coarsesaltandpepper():
         0.05, size_percent=(0.01, 0.1), per_channel=True)
     run_and_save_augseq(
         fn_start + "_per_channel.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95
+    )
+
+
+def chapter_augmenters_salt():
+    fn_start = "arithmetic/salt"
+
+    aug = iaa.Salt(0.1)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95
+    )
+
+
+def chapter_augmenters_coarsesalt():
+    fn_start = "arithmetic/coarsesalt"
+
+    aug = iaa.CoarseSalt(0.05, size_percent=(0.01, 0.1))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95
+    )
+
+
+def chapter_augmenters_pepper():
+    fn_start = "arithmetic/pepper"
+
+    aug = iaa.Pepper(0.1)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
+        quality=95
+    )
+
+
+def chapter_augmenters_coarsepepper():
+    fn_start = "arithmetic/coarsepepper"
+
+    aug = iaa.CoarsePepper(0.05, size_percent=(0.01, 0.1))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2,
         quality=95
     )
