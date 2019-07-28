@@ -8,6 +8,7 @@ import imageio
 import PIL.Image
 
 import imgaug as ia
+import imgaug.augmenters as iaa
 
 try:
     from cStringIO import StringIO as BytesIO
@@ -128,7 +129,8 @@ def checkerboard(size):
     return ia.imresize_single_image(img3d, size)
 
 
-def run_and_save_augseq(filename, augseq, images, cols, rows, quality=75, seed=1):
+def run_and_save_augseq(filename, augseq, images, cols, rows, quality=75,
+                        seed=1, image_colorspace="RGB"):
     ia.seed(seed)
     # augseq may be a single seq (applied to all images) or a list (one seq per
     # image).
@@ -142,6 +144,11 @@ def run_and_save_augseq(filename, augseq, images, cols, rows, quality=75, seed=1
         # calling N times augment_image() is here critical for random order in
         # Sequential
         images_aug = [augseq.augment_image(images[i]) for i in range(len(images))]
+
+    if image_colorspace != "RGB":
+        images_aug = iaa.ChangeColorspace(from_colorspace=image_colorspace,
+                                          to_colorspace="RGB")(images=images_aug)
+
     save(
         "overview_of_augmenters",
         filename,

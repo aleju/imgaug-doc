@@ -278,7 +278,61 @@ Visualization of increasing ``alpha`` from 0.0 to 1.0 in 8 steps:
 KMeansColorQuantization
 -----------------------
 
-TODO
+Quantize colors using k-Means clustering.
+
+This "collects" the colors from the input image, groups them into
+``k`` clusters using k-Means clustering and replaces the colors in the
+input image using the cluster centroids.
+
+This is slower than ``UniformColorQuantization``, but adapts dynamically
+to the color range in the input image.
+
+Create an augmenter to apply k-Means color quantization to images using a
+random amount of colors, sampled uniformly from the interval ``[2..16]``.
+It assumes the input image colorspace to be ``RGB`` and clusters colors
+randomly in ``RGB`` or ``Lab`` colorspace. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.KMeansColorQuantization()
+
+.. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization.jpg
+    :alt: KMeansColorQuantization
+
+Create an augmenter that quantizes images to (up to) eight colors::
+
+    aug = iaa.KMeansColorQuantization(n_colors=8)
+
+.. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization_with_8_colors.jpg
+    :alt: KMeansColorQuantization with eight colors
+
+Create an augmenter that quantizes images to (up to) ``n`` colors,
+where ``n`` is randomly and uniformly sampled from the discrete interval
+``[4..32]``::
+
+    aug = iaa.KMeansColorQuantization(n_colors=(4, 32))
+
+.. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization_with_random_n_colors.jpg
+    :alt: KMeansColorQuantization with random n_colors
+
+Create an augmenter that quantizes input images that are in
+``BGR`` colorspace. The quantization happens in ``RGB`` or ``Lab``
+colorspace, into which the images are temporarily converted. ::
+
+    aug = iaa.KMeansColorQuantization(
+        from_colorspace=iaa.ChangeColorspace.BGR)
+
+.. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization_from_bgr.jpg
+    :alt: KMeansColorQuantization with input images in BGR colorspace
+
+Create an augmenter that quantizes images by clustering colors randomly
+in either ``RGB`` or ``HSV`` colorspace. The assumed input colorspace
+of images is ``RGB``. ::
+
+    aug = iaa.KMeansColorQuantization(
+        to_colorspace=[iaa.ChangeColorspace.RGB, iaa.ChangeColorspace.HSV])
+
+.. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization_in_rgb_or_hsv.jpg
+    :alt: KMeansColorQuantization with quantization in RGB or HSV
 
 
 UniformColorQuantization

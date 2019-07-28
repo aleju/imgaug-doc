@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import numpy as np
+import cv2
 
 import imgaug as ia
 import imgaug.augmenters as iaa
@@ -17,6 +18,7 @@ def main():
     chapter_augmenters_addtohueandsaturation()
     chapter_augmenters_addtohue()
     chapter_augmenters_addtosaturation()
+    chapter_augmenters_kmeanscolorquantization()
     chapter_augmenters_changecolorspace()
     chapter_augmenters_grayscale()
 
@@ -130,6 +132,44 @@ def chapter_augmenters_addtosaturation():
     aug = iaa.AddToSaturation((-50, 50))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+
+def chapter_augmenters_kmeanscolorquantization():
+    fn_start = "color/kmeanscolorquantization"
+
+    aug = iaa.KMeansColorQuantization()
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+    aug = iaa.KMeansColorQuantization(n_colors=8)
+    run_and_save_augseq(
+        fn_start + "_with_8_colors.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+    aug = iaa.KMeansColorQuantization(n_colors=(4, 32))
+    run_and_save_augseq(
+        fn_start + "_with_random_n_colors.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+    aug = iaa.KMeansColorQuantization(
+        from_colorspace=iaa.ChangeColorspace.BGR)
+    quokka_bgr = cv2.cvtColor(ia.quokka(size=(128, 128)), cv2.COLOR_RGB2BGR)
+    run_and_save_augseq(
+        fn_start + "_from_bgr.jpg", aug,
+        [quokka_bgr for _ in range(8)], cols=4, rows=2,
+        image_colorspace="BGR"
+    )
+
+    aug = iaa.KMeansColorQuantization(
+        to_colorspace=[iaa.ChangeColorspace.RGB, iaa.ChangeColorspace.HSV])
+    run_and_save_augseq(
+        fn_start + "_in_rgb_or_hsv.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
     )
 
