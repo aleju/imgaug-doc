@@ -18,12 +18,16 @@ def chapter_augmenters_withcolorspace():
     aug = iaa.WithColorspace(
         to_colorspace="HSV",
         from_colorspace="RGB",
-        children=iaa.WithChannels(0, iaa.Add((10, 50)))
+        children=iaa.WithChannels(
+            0,
+            iaa.Add((0, 50))
+        )
     )
     run_and_save_augseq(
         "color/withcolorspace.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
     )
+
 
 def chapter_augmenters_changecolorspace():
     aug = iaa.Sequential([

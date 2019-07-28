@@ -7,12 +7,23 @@ WithColorspace
 
 Apply child augmenters within a specific colorspace.
 
-Convert images to HSV, then increase each pixels H-value by 10 to 50::
+This augumenter takes a source colorspace A and a target colorspace B
+as well as children C. It changes images from A to B, then applies the
+child augmenters C and finally changes the colorspace back from B to A.
+See also ChangeColorspace() for more.
 
+Convert to ``HSV`` colorspace, add a value between ``0`` and ``50``
+(uniformly sampled per image) to the Hue channel, then convert back to the
+input colorspace (``RGB``). ::
+
+    import imgaug.augmenters as iaa
     aug = iaa.WithColorspace(
         to_colorspace="HSV",
         from_colorspace="RGB",
-        children=iaa.WithChannels(0, iaa.Add((10, 50)))
+        children=iaa.WithChannels(
+            0,
+            iaa.Add((0, 50))
+        )
     )
 
 .. figure:: ../../images/overview_of_augmenters/color/withcolorspace.jpg
