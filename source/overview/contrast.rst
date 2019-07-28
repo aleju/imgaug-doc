@@ -61,7 +61,28 @@ sampled once per image *and* channel::
 LogContrast
 -----------
 
-TODO
+Adjust image contrast by scaling pixels to ``255*gain*log_2(1+v/255)``.
+
+This augmenter is fairly similar to
+``imgaug.augmenters.arithmetic.Multiply``.
+
+Modify the contrast of images according to ``255*gain*log_2(1+v/255)``,
+where ``v`` is a pixel value and ``gain`` is sampled uniformly from the
+interval ``[0.6, 1.4]`` (once per image)::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.LogContrast(gain=(0.6, 1.4))
+
+.. figure:: ../../images/overview_of_augmenters/contrast/logcontrast.jpg
+    :alt: LogContrast
+
+Same as in the previous example, but ``gain`` is sampled once per image
+*and* channel::
+
+    aug = iaa.LogContrast(gain=(0.6, 1.4), per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/contrast/logcontrast_per_channel.jpg
+    :alt: LogContrast per_channel
 
 
 LinearContrast
