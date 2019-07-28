@@ -10,6 +10,7 @@ def main():
     chapter_augmenters_gammacontrast()
     chapter_augmenters_sigmoidcontrast()
     chapter_augmenters_logcontrast()
+    chapter_augmenters_linearcontrast()
 
 
 def chapter_augmenters_gammacontrast():
@@ -44,12 +45,26 @@ def chapter_augmenters_sigmoidcontrast():
 def chapter_augmenters_logcontrast():
     fn_start = "contrast/logcontrast"
 
-    aug = iaa.LogContrast(gain=(0.6, 1.4))
+    aug = iaa.LogContrast(gain=(0.4, 1.6))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
-    aug = iaa.LogContrast(gain=(0.6, 1.4), per_channel=True)
+    aug = iaa.LogContrast(gain=(0.4, 1.6), per_channel=True)
+    run_and_save_augseq(
+        fn_start + "_per_channel.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+
+def chapter_augmenters_linearcontrast():
+    fn_start = "contrast/linearcontrast"
+
+    aug = iaa.LinearContrast((0.6, 1.4))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.LinearContrast((0.6, 1.4), per_channel=True)
     run_and_save_augseq(
         fn_start + "_per_channel.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)

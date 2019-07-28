@@ -88,7 +88,25 @@ Same as in the previous example, but ``gain`` is sampled once per image
 LinearContrast
 --------------
 
-TODO
+Adjust contrast by scaling each pixel to ``127 + alpha*(v-127)``.
+
+Modify the contrast of images according to `127 + alpha*(v-127)``,
+where ``v`` is a pixel value and ``alpha`` is sampled uniformly from the
+interval ``[0.4, 1.6]`` (once per image)::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.LinearContrast((0.4, 1.6))
+
+.. figure:: ../../images/overview_of_augmenters/contrast/linearcontrast.jpg
+    :alt: LinearContrast
+
+Same as in the previous example, but ``alpha`` is sampled once per image
+*and* channel::
+
+    aug = iaa.LinearContrast((0.4, 1.6), per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/contrast/linearcontrast_per_channel.jpg
+    :alt: LinearContrast per_channel
 
 
 AllChannelsCLAHE
