@@ -12,6 +12,7 @@ def main():
     chapter_augmenters_withcolorspace()
     chapter_augmenters_withhueandsaturation()
     chapter_augmenters_multiplyhueandsaturation()
+    chapter_augmenters_multiplyhue()
     chapter_augmenters_changecolorspace()
     chapter_augmenters_grayscale()
 
@@ -75,6 +76,16 @@ def chapter_augmenters_multiplyhueandsaturation():
     aug = iaa.MultiplyHueAndSaturation(mul_saturation=(0.5, 1.5))
     run_and_save_augseq(
         fn_start + "_mul_saturation.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+
+def chapter_augmenters_multiplyhue():
+    fn_start = "color/multiplyhue"
+
+    aug = iaa.MultiplyHue((0.5, 1.5))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
     )
 
