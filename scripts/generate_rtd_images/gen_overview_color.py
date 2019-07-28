@@ -10,11 +10,14 @@ from .utils import run_and_save_augseq
 
 def main():
     chapter_augmenters_withcolorspace()
+    chapter_augmenters_withhueandsaturation()
     chapter_augmenters_changecolorspace()
     chapter_augmenters_grayscale()
 
 
 def chapter_augmenters_withcolorspace():
+    fn_start = "color/withcolorspace"
+
     aug = iaa.WithColorspace(
         to_colorspace="HSV",
         from_colorspace="RGB",
@@ -24,7 +27,31 @@ def chapter_augmenters_withcolorspace():
         )
     )
     run_and_save_augseq(
-        "color/withcolorspace.jpg", aug,
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+
+def chapter_augmenters_withhueandsaturation():
+    fn_start = "color/withhueandsaturation"
+
+    aug = iaa.WithHueAndSaturation(
+        iaa.WithChannels(0, iaa.Add((0, 50)))
+    )
+    run_and_save_augseq(
+        fn_start + "_add_to_hue.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+    aug = iaa.WithHueAndSaturation([
+        iaa.WithChannels(0, iaa.Add((-30, 10))),
+        iaa.WithChannels(1, [
+            iaa.Multiply((0.5, 1.5)),
+            iaa.LinearContrast((0.75, 1.25))
+        ])
+    ])
+    run_and_save_augseq(
+        fn_start + "_modify_both.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
     )
 
