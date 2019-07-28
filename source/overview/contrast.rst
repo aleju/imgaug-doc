@@ -112,7 +112,43 @@ Same as in the previous example, but ``alpha`` is sampled once per image
 AllChannelsCLAHE
 ----------------
 
-TODO
+Apply CLAHE to all channels of images in their original colorspaces.
+
+CLAHE (Contrast Limited Adaptive Histogram Equalization) performs
+histogram equilization within image patches, i.e. over local
+neighbourhoods.
+
+In contrast to ``imgaug.augmenters.contrast.CLAHE``, this augmenter
+operates directly on all channels of the input images. It does not
+perform any colorspace transformations and does not focus on specific
+channels (e.g. ``L`` in ``Lab`` colorspace).
+
+Create an augmenter that applies CLAHE to all channels of input images::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.AllChannelsCLAHE()
+
+.. figure:: ../../images/overview_of_augmenters/contrast/allchannelsclahe.jpg
+    :alt: AllChannelsCLAHE with default settings
+
+Same as in the previous example, but the `clip_limit` used by CLAHE is
+uniformly sampled per image from the interval ``[1, 10]``. Some images
+will therefore have stronger contrast than others (i.e. higher clip limit
+values). ::
+
+    aug = iaa.AllChannelsCLAHE(clip_limit=(1, 10))
+
+.. figure:: ../../images/overview_of_augmenters/contrast/allchannelsclahe_random_clip_limit.jpg
+    :alt: AllChannelsCLAHE with random clip_limit
+
+Same as in the previous example, but the `clip_limit` is sampled per
+image *and* channel, leading to different levels of contrast for each
+channel::
+
+    aug = iaa.AllChannelsCLAHE(clip_limit=(1, 10), per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/contrast/allchannelsclahe_per_channel.jpg
+    :alt: AllChannelsCLAHE with random clip_limit and per_channel
 
 
 CLAHE

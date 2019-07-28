@@ -11,6 +11,7 @@ def main():
     chapter_augmenters_sigmoidcontrast()
     chapter_augmenters_logcontrast()
     chapter_augmenters_linearcontrast()
+    chapter_augmenters_allchannelsclahe()
 
 
 def chapter_augmenters_gammacontrast():
@@ -65,6 +66,25 @@ def chapter_augmenters_linearcontrast():
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
     aug = iaa.LinearContrast((0.6, 1.4), per_channel=True)
+    run_and_save_augseq(
+        fn_start + "_per_channel.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+
+def chapter_augmenters_allchannelsclahe():
+    fn_start = "contrast/allchannelsclahe"
+
+    aug = iaa.AllChannelsCLAHE()
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.AllChannelsCLAHE(clip_limit=(1, 10))
+    run_and_save_augseq(
+        fn_start + "_random_clip_limit.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.AllChannelsCLAHE(clip_limit=(1, 10), per_channel=True)
     run_and_save_augseq(
         fn_start + "_per_channel.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
