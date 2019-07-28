@@ -19,6 +19,7 @@ def main():
     chapter_augmenters_addtohue()
     chapter_augmenters_addtosaturation()
     chapter_augmenters_kmeanscolorquantization()
+    chapter_augmenters_uniformcolorquantization()
     chapter_augmenters_changecolorspace()
     chapter_augmenters_grayscale()
 
@@ -151,10 +152,10 @@ def chapter_augmenters_kmeanscolorquantization():
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
     )
 
-    aug = iaa.KMeansColorQuantization(n_colors=(4, 32))
+    aug = iaa.KMeansColorQuantization(n_colors=(4, 16))
     run_and_save_augseq(
         fn_start + "_with_random_n_colors.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+        [ia.quokka(size=(128, 128)) for _ in range(4*3)], cols=4, rows=3
     )
 
     aug = iaa.KMeansColorQuantization(
@@ -171,6 +172,39 @@ def chapter_augmenters_kmeanscolorquantization():
     run_and_save_augseq(
         fn_start + "_in_rgb_or_hsv.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+
+def chapter_augmenters_uniformcolorquantization():
+    fn_start = "color/uniformcolorquantization"
+
+    aug = iaa.UniformColorQuantization()
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+    aug = iaa.UniformColorQuantization(n_colors=8)
+    run_and_save_augseq(
+        fn_start + "_with_8_colors.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+    aug = iaa.UniformColorQuantization(n_colors=(4, 16))
+    run_and_save_augseq(
+        fn_start + "_with_random_n_colors.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*3)], cols=4, rows=3,
+        seed=2
+    )
+
+    aug = iaa.UniformColorQuantization(
+        from_colorspace=iaa.ChangeColorspace.BGR,
+        to_colorspace=[iaa.ChangeColorspace.RGB, iaa.ChangeColorspace.HSV])
+    quokka_bgr = cv2.cvtColor(ia.quokka(size=(128, 128)), cv2.COLOR_RGB2BGR)
+    run_and_save_augseq(
+        fn_start + "_in_rgb_or_hsv.jpg", aug,
+        [quokka_bgr for _ in range(8)], cols=4, rows=2,
+        image_colorspace="BGR"
     )
 
 

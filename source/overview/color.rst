@@ -287,6 +287,13 @@ input image using the cluster centroids.
 This is slower than ``UniformColorQuantization``, but adapts dynamically
 to the color range in the input image.
 
+.. note::
+
+    This augmenter expects input images to be either grayscale
+    or to have 3 or 4 channels and use colorspace `from_colorspace`. If
+    images have 4 channels, it is assumed that the 4th channel is an alpha
+    channel and it will not be quantized.
+
 Create an augmenter to apply k-Means color quantization to images using a
 random amount of colors, sampled uniformly from the interval ``[2..16]``.
 It assumes the input image colorspace to be ``RGB`` and clusters colors
@@ -309,7 +316,7 @@ Create an augmenter that quantizes images to (up to) ``n`` colors,
 where ``n`` is randomly and uniformly sampled from the discrete interval
 ``[4..32]``::
 
-    aug = iaa.KMeansColorQuantization(n_colors=(4, 32))
+    aug = iaa.KMeansColorQuantization(n_colors=(4, 16))
 
 .. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization_with_random_n_colors.jpg
     :alt: KMeansColorQuantization with random n_colors
@@ -338,5 +345,58 @@ of images is ``RGB``. ::
 UniformColorQuantization
 ------------------------
 
-TODO
+Quantize colors into N bins with regular distance.
+
+For ``uint8`` images the equation is ``floor(v/q)*q + q/2`` with
+``q = 256/N``, where ``v`` is a pixel intensity value and ``N`` is
+the target number of colors after quantization.
+
+This augmenter is faster than ``KMeansColorQuantization``, but the
+set of possible output colors is constant (i.e. independent of the
+input images). It may produce unsatisfying outputs for input images
+that are made up of very similar colors.
+
+.. note::
+
+    This augmenter expects input images to be either grayscale
+    or to have 3 or 4 channels and use colorspace `from_colorspace`. If
+    images have 4 channels, it is assumed that the 4th channel is an alpha
+    channel and it will not be quantized.
+
+Create an augmenter to apply uniform color quantization to images using a
+random amount of colors, sampled uniformly from the discrete interval
+``[2..16]``::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.UniformColorQuantization()
+
+.. figure:: ../../images/overview_of_augmenters/color/uniformcolorquantization.jpg
+    :alt: UniformColorQuantization
+
+Create an augmenter that quantizes images to (up to) eight colors::
+
+    aug = iaa.UniformColorQuantization(n_colors=8)
+
+.. figure:: ../../images/overview_of_augmenters/color/uniformcolorquantization_with_8_colors.jpg
+    :alt: UniformColorQuantization with eight colors
+
+Create an augmenter that quantizes images to (up to) ``n`` colors,
+where ``n`` is randomly and uniformly sampled from the discrete interval
+``[4..32]``::
+
+    aug = iaa.UniformColorQuantization(n_colors=(4, 16))
+
+.. figure:: ../../images/overview_of_augmenters/color/uniformcolorquantization_with_random_n_colors.jpg
+    :alt: UniformColorQuantization with random n_colors
+
+Create an augmenter that uniformly quantizes images in either ``RGB``
+or ``HSV`` colorspace (randomly picked per image). The input colorspace
+of all images has to be ``BGR``. ::
+
+    aug = iaa.UniformColorQuantization(
+        from_colorspace=iaa.ChangeColorspace.BGR,
+        to_colorspace=[iaa.ChangeColorspace.RGB, iaa.ChangeColorspace.HSV])
+
+.. figure:: ../../images/overview_of_augmenters/color/uniformcolorquantization_in_rgb_or_hsv.jpg
+    :alt: UniformColorQuantization in RGB or HSV colorspace with BGR inputs
 
