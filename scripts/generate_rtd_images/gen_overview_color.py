@@ -11,6 +11,7 @@ from .utils import run_and_save_augseq
 def main():
     chapter_augmenters_withcolorspace()
     chapter_augmenters_withhueandsaturation()
+    chapter_augmenters_multiplyhueandsaturation()
     chapter_augmenters_changecolorspace()
     chapter_augmenters_grayscale()
 
@@ -52,6 +53,28 @@ def chapter_augmenters_withhueandsaturation():
     ])
     run_and_save_augseq(
         fn_start + "_modify_both.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+
+def chapter_augmenters_multiplyhueandsaturation():
+    fn_start = "color/multiplyhueandsaturation"
+
+    aug = iaa.MultiplyHueAndSaturation((0.5, 1.5), per_channel=True)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+    aug = iaa.MultiplyHueAndSaturation(mul_hue=(0.5, 1.5))
+    run_and_save_augseq(
+        fn_start + "_mul_hue.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+    )
+
+    aug = iaa.MultiplyHueAndSaturation(mul_saturation=(0.5, 1.5))
+    run_and_save_augseq(
+        fn_start + "_mul_saturation.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
     )
 

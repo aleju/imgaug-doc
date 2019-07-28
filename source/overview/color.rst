@@ -85,7 +85,40 @@ the ``HSV`` image is converted back to ``RGB``. ::
 MultiplyHueAndSaturation
 ------------------------
 
-TODO
+Multipy hue and saturation by random values.
+
+The augmenter first transforms images to HSV colorspace, then multiplies
+the pixel values in the H and S channels and afterwards converts back to
+RGB.
+
+This augmenter is a wrapper around ``WithHueAndSaturation``.
+
+Multiply hue and saturation by random values between ``0.5`` and ``1.5``
+(independently per channel and the same value for all pixels within
+that channel). The hue will be automatically projected to an angular
+representation. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.MultiplyHueAndSaturation((0.5, 1.5), per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/color/multiplyhueandsaturation.jpg
+    :alt: MultiplyHueAndSaturation
+
+Multiply only the hue by random values between ``0.5`` and ``1.5``. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.MultiplyHueAndSaturation(mul_hue=(0.5, 1.5))
+
+.. figure:: ../../images/overview_of_augmenters/color/multiplyhueandsaturation_mul_hue.jpg
+    :alt: MultiplyHueAndSaturation, only applied to the hue
+
+Multiply only the saturation by random values between ``0.5`` and ``1.5``. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.MultiplyHueAndSaturation(mul_saturation=(0.5, 1.5))
+
+.. figure:: ../../images/overview_of_augmenters/color/multiplyhueandsaturation_mul_saturation.jpg
+    :alt: MultiplyHueAndSaturation, only applied to the saturation
 
 
 MultiplyHue
