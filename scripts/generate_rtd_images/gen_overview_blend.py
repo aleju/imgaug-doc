@@ -11,6 +11,7 @@ def main():
     chapter_augmenters_alpha()
     chapter_augmenters_alphaelementwise()
     chapter_augmenters_simplexnoisealpha()
+    chapter_augmenters_frequencynoisealpha()
 
 
 def chapter_augmenters_alpha():
@@ -109,6 +110,45 @@ def chapter_augmenters_simplexnoisealpha():
 
     aug = iaa.SimplexNoiseAlpha(
         iaa.EdgeDetect(1.0),
+        sigmoid_thresh=iap.Normal(10.0, 5.0))
+    run_and_save_augseq(
+        fn_start + "_sigmoid_thresh_normal.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+
+def chapter_augmenters_frequencynoisealpha():
+    fn_start = "blend/frequencynoisealpha"
+
+    aug = iaa.FrequencyNoiseAlpha(first=iaa.EdgeDetect(1.0))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.FrequencyNoiseAlpha(
+        first=iaa.EdgeDetect(1.0),
+        upscale_method="nearest")
+    run_and_save_augseq(
+        fn_start + "_nearest.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.FrequencyNoiseAlpha(
+        first=iaa.EdgeDetect(1.0),
+        upscale_method="linear")
+    run_and_save_augseq(
+        fn_start + "_linear.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.FrequencyNoiseAlpha(
+        first=iaa.EdgeDetect(1.0),
+        upscale_method="linear",
+        exponent=-2,
+        sigmoid=False)
+    run_and_save_augseq(
+        fn_start + "_clouds.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.FrequencyNoiseAlpha(
+        first=iaa.EdgeDetect(1.0),
         sigmoid_thresh=iap.Normal(10.0, 5.0))
     run_and_save_augseq(
         fn_start + "_sigmoid_thresh_normal.jpg", aug,

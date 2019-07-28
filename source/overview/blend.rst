@@ -168,7 +168,7 @@ SimplexNoiseAlpha
 Alpha-blend two image sources using simplex noise alpha masks.
 
 The alpha masks are sampled using a simplex noise method, roughly creating
-connected blobs of ``1`` surrounded by ``0``. If nearest neighbour
+connected blobs of 1s surrounded by 0s. If nearest neighbour
 upsampling is used, these blobs can be rectangular with sharp edges.
 
 Detect per image all edges, mark them in a black and white image and
@@ -180,9 +180,10 @@ masks. ::
 .. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha.jpg
     :alt: SimplexNoiseAlpha with EdgeDetect
 
-Same as the previous example, but uses only nearest neighbour upscaling to
-scale the simplex noise masks to the final image sizes, i.e. no nearest
-linear upsampling is used. This leads to rectangles with sharp edges. ::
+Same as in the previous example, but using only nearest neighbour
+upscaling to scale the simplex noise masks to the final image sizes, i.e.
+no nearest linear upsampling is used. This leads to rectangles with sharp
+edges. ::
 
     aug = iaa.SimplexNoiseAlpha(
         iaa.EdgeDetect(1.0),
@@ -191,7 +192,7 @@ linear upsampling is used. This leads to rectangles with sharp edges. ::
 .. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_nearest.jpg
     :alt: SimplexNoiseAlpha with EdgeDetect and nearest neighbour upscaling
 
-Same as the previous example, but uses only linear upscaling to
+Same as in the previous example, but using only linear upscaling to
 scale the simplex noise masks to the final image sizes, i.e. no nearest
 neighbour upsampling is used. This leads to rectangles with smooth edges. ::
 
@@ -202,12 +203,12 @@ neighbour upsampling is used. This leads to rectangles with smooth edges. ::
 .. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_linear.jpg
     :alt: SimplexNoiseAlpha with EdgeDetect and linear upscaling
 
-Same as the first example, but uses a threshold for the sigmoid function
-that is further to the right. This is more conservative, i.e. the generated
-noise masks will be mostly black (values around ``0.0``), which means that
-most of the original images (parameter/branch `second`) will be kept,
-rather than using the results of the augmentation (parameter/branch
-`first`). ::
+Same as in the first example, but using a threshold for the sigmoid
+function that is further to the right. This is more conservative, i.e.
+the generated noise masks will be mostly black (values around ``0.0``),
+which means that most of the original images (parameter/branch `second`)
+will be kept, rather than using the results of the augmentation
+(parameter/branch `first`). ::
 
     aug = iaa.SimplexNoiseAlpha(
         iaa.EdgeDetect(1.0),
@@ -220,5 +221,67 @@ rather than using the results of the augmentation (parameter/branch
 FrequencyNoiseAlpha
 -------------------
 
-TODO
+Alpha-blend two image sources using frequency noise masks.
 
+The alpha masks are sampled using frequency noise of varying scales,
+which can sometimes create large connected blobs of 1s surrounded by 0s
+and other times results in smaller patterns. If nearest neighbour
+upsampling is used, these blobs can be rectangular with sharp edges.
+
+Detect per image all edges, mark them in a black and white image and
+then alpha-blend the result with the original image using frequency noise
+masks. ::
+
+    aug = iaa.FrequencyNoiseAlpha(first=iaa.EdgeDetect(1.0))
+
+.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha.jpg
+    :alt: FrequencyNoiseAlpha with EdgeDetect
+
+Same as the first example, but using only linear upscaling to
+scale the frequency noise masks to the final image sizes, i.e. no nearest
+neighbour upsampling is used. This results in smooth edges. ::
+
+    aug = iaa.FrequencyNoiseAlpha(
+        first=iaa.EdgeDetect(1.0),
+        upscale_method="nearest")
+
+.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_nearest.jpg
+    :alt: FrequencyNoiseAlpha with EdgeDetect and nearest neighbour upscaling
+
+Same as the first example, but using only linear upscaling to
+scale the frequency noise masks to the final image sizes, i.e. no nearest
+neighbour upsampling is used. This results in smooth edges. ::
+
+    aug = iaa.FrequencyNoiseAlpha(
+        first=iaa.EdgeDetect(1.0),
+        upscale_method="linear")
+
+.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_linear.jpg
+    :alt: FrequencyNoiseAlpha with EdgeDetect and linear upscaling
+
+Same as in the previous example, but with the exponent set to a constant
+``-2`` and the sigmoid deactivated, resulting in cloud-like patterns
+without sharp edges. ::
+
+    aug = iaa.FrequencyNoiseAlpha(
+        first=iaa.EdgeDetect(1.0),
+        upscale_method="linear",
+        exponent=-2,
+        sigmoid=False)
+
+.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_clouds.jpg
+    :alt: FrequencyNoiseAlpha with EdgeDetect and a cloudy pattern
+
+Same as the first example, but using a threshold for the sigmoid function
+that is further to the right. This is more conservative, i.e. the generated
+noise masks will be mostly black (values around ``0.0``), which means that
+most of the original images (parameter/branch `second`) will be kept,
+rather than using the results of the augmentation (parameter/branch
+`first`). ::
+
+    aug = iaa.FrequencyNoiseAlpha(
+        first=iaa.EdgeDetect(1.0),
+        sigmoid_thresh=iap.Normal(10.0, 5.0))
+
+.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_sigmoid_thresh_normal.jpg
+    :alt: FrequencyNoiseAlpha with EdgeDetect and gaussian-distributed sigmoid threshold
