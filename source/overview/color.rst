@@ -167,7 +167,23 @@ Multiply the saturation channel of images using random values between
 AddToHueAndSaturation
 ---------------------
 
-TODO
+Increases or decreases hue and saturation by random values.
+
+The augmenter first transforms images to HSV colorspace, then adds random
+values to the H and S channels and afterwards converts back to RGB.
+
+This augmenter is faster than using ``WithHueAndSaturation`` in combination
+with ``Add``.
+
+Add random values between ``-50`` and ``50`` to the hue and saturation
+(independently per channel and the same value for all pixels within
+that channel)::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.AddToHueAndSaturation((-50, 50), per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/color/addtohueandsaturation.jpg
+    :alt: AddToHueAndSaturation
 
 
 AddToHue
