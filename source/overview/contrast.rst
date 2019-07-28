@@ -154,7 +154,88 @@ channel::
 CLAHE
 -----
 
-TODO
+Apply CLAHE to L/V/L channels in HLS/HSV/Lab colorspaces.
+
+This augmenter applies CLAHE (Contrast Limited Adaptive Histogram
+Equalization) to images, a form of histogram equalization that normalizes
+within local image patches.
+The augmenter transforms input images to a target colorspace (e.g.
+``Lab``), extracts an intensity-related channel from the converted
+images (e.g. ``L`` for ``Lab``), applies CLAHE to the channel and then
+converts the resulting image back to the original colorspace.
+
+Grayscale images (images without channel axis or with only one channel
+axis) are automatically handled, `from_colorspace` does not have to be
+adjusted for them. For images with four channels (e.g. ``RGBA``), the
+fourth channel is ignored in the colorspace conversion (e.g. from an
+``RGBA`` image, only the ``RGB`` part is converted, normalized, converted
+back and concatenated with the input ``A`` channel). Images with unusual
+channel numbers (2, 5 or more than 5) are normalized channel-by-channel
+(same behaviour as ``AllChannelsCLAHE``, though a warning will be raised).
+
+If you want to apply CLAHE to each channel of the original input image's
+colorspace (without any colorspace conversion), use
+``imgaug.augmenters.contrast.AllChannelsCLAHE`` instead.
+
+
+Create a standard CLAHE augmenter::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CLAHE()
+
+.. figure:: ../../images/overview_of_augmenters/contrast/clahe.jpg
+    :alt: CLAHE
+
+Create a CLAHE augmenter with a clip limit uniformly sampled from
+``[1..10]``, where ``1`` is rather low contrast and ``10`` is rather
+high contrast::
+
+    aug = iaa.CLAHE(clip_limit=(1, 10))
+
+.. figure:: ../../images/overview_of_augmenters/contrast/clahe_clip_limit.jpg
+    :alt: CLAHE with uniformly-distributed clip_limit
+
+Create a CLAHE augmenter with kernel sizes of ``SxS``, where ``S`` is
+uniformly sampled from ``[3..21]``. Sampling happens once per image. ::
+
+    aug = iaa.CLAHE(tile_grid_size_px=(3, 21))
+
+.. figure:: ../../images/overview_of_augmenters/contrast/clahe_grid_sizes_uniform.jpg
+    :alt: CLAHE with uniformly-distributed tile_grid_size_px
+
+Create a CLAHE augmenter with kernel sizes of ``SxS``, where ``S`` is
+sampled from ``N(7, 2)``, but does not go below ``3``::
+
+    aug = iaa.CLAHE(
+        tile_grid_size_px=iap.Discretize(iap.Normal(loc=7, scale=2)),
+        tile_grid_size_px_min=3)
+
+.. figure:: ../../images/overview_of_augmenters/contrast/clahe_grid_sizes_gaussian.jpg
+    :alt: CLAHE with gaussian-distributed tile_grid_size_px
+
+Create a CLAHE augmenter with kernel sizes of ``HxW``, where ``H`` is
+uniformly sampled from ``[3..21]`` and ``W`` is randomly picked from the
+list ``[3, 5, 7]``::
+
+    aug = iaa.CLAHE(tile_grid_size_px=((3, 21), [3, 5, 7]))
+
+.. figure:: ../../images/overview_of_augmenters/contrast/clahe_grid_sizes.jpg
+    :alt: CLAHE with random tile_grid_size_px
+
+Create a CLAHE augmenter that converts images from BGR colorspace to
+HSV colorspace and then applies the local histogram equalization to the
+``V`` channel of the images (before converting back to ``BGR``).
+Alternatively, ``Lab`` (default) or ``HLS`` can be used as the target
+colorspace. Grayscale images (no channels / one channel) are never
+converted and are instead directly normalized (i.e. `from_colorspace`
+does not have to be changed for them). ::
+
+    aug = iaa.CLAHE(
+        from_colorspace=iaa.CLAHE.BGR,
+        to_colorspace=iaa.CLAHE.HSV)
+
+.. figure:: ../../images/overview_of_augmenters/contrast/clahe_bgr_to_hsv.jpg
+    :alt: CLAHE with images in BGR and only HSV as target colorspace
 
 
 AllChannelsHistogramEqualization
