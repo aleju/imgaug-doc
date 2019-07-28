@@ -270,5 +270,56 @@ strengths. This leads to random strengths of the contrast adjustment. ::
 HistogramEqualization
 ---------------------
 
-TODO
+Apply Histogram Eq. to L/V/L channels of images in HLS/HSV/Lab colorspaces.
+
+This augmenter is similar to ``imgaug.augmenters.contrast.CLAHE``.
+
+The augmenter transforms input images to a target colorspace (e.g.
+``Lab``), extracts an intensity-related channel from the converted images
+(e.g. ``L`` for ``Lab``), applies Histogram Equalization to the channel
+and then converts the resulting image back to the original colorspace.
+
+Grayscale images (images without channel axis or with only one channel
+axis) are automatically handled, `from_colorspace` does not have to be
+adjusted for them. For images with four channels (e.g. RGBA), the fourth
+channel is ignored in the colorspace conversion (e.g. from an ``RGBA``
+image, only the ``RGB`` part is converted, normalized, converted back and
+concatenated with the input ``A`` channel). Images with unusual channel
+numbers (2, 5 or more than 5) are normalized channel-by-channel (same
+behaviour as ``AllChannelsHistogramEqualization``, though a warning will
+be raised).
+
+If you want to apply HistogramEqualization to each channel of the original
+input image's colorspace (without any colorspace conversion), use
+``imgaug.augmenters.contrast.AllChannelsHistogramEqualization`` instead.
+
+Create an augmenter that converts images to ``HLS``/``HSV``/``Lab``
+colorspaces, extracts intensity-related channels (i.e. ``L``/``V``/``L``),
+applies histogram equalization to these channels and converts back to the
+input colorspace::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.HistogramEqualization()
+
+.. figure:: ../../images/overview_of_augmenters/contrast/histogramequalization.jpg
+    :alt: HistogramEqualization
+
+Same as in the previous example, but alpha blends the result, leading
+to various strengths of contrast normalization::
+
+    aug = iaa.Alpha((0.0, 1.0), iaa.HistogramEqualization())
+
+.. figure:: ../../images/overview_of_augmenters/contrast/histogramequalization_alpha.jpg
+    :alt: HistogramEqualization combined with Alpha
+
+Same as in the first example, but the colorspace of input images has
+to be ``BGR`` (instead of default ``RGB``) and the histogram equalization
+is applied to the ``V`` channel in ``HSV`` colorspace::
+
+    aug = iaa.HistogramEqualization(
+        from_colorspace=iaa.HistogramEqualization.BGR,
+        to_colorspace=iaa.HistogramEqualization.HSV)
+
+.. figure:: ../../images/overview_of_augmenters/contrast/histogramequalization_bgr_to_hsv.jpg
+    :alt: HistogramEqualization  with images in BGR and only HSV as target colorspace
 
