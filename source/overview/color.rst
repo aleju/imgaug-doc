@@ -145,8 +145,23 @@ and ``1.5``::
 MultiplySaturation
 ------------------
 
-TODO
+Multiply the saturation of images by random values.
 
+The augmenter first transforms images to HSV colorspace, then multiplies
+the pixel values in the H channel and afterwards converts back to
+RGB.
+
+This augmenter is a shortcut for
+``MultiplyHueAndSaturation(mul_saturation=...)``.
+
+Multiply the saturation channel of images using random values between
+``0.5`` and ``1.5``::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.MultiplySaturation((0.5, 1.5))
+
+.. figure:: ../../images/overview_of_augmenters/color/multiplysaturation.jpg
+    :alt: MultiplySaturation
 
 
 AddToHueAndSaturation
