@@ -240,8 +240,31 @@ does not have to be changed for them). ::
 
 AllChannelsHistogramEqualization
 --------------------------------
+Apply Histogram Eq. to all channels of images in their original colorspaces.
 
-TODO
+In contrast to ``imgaug.augmenters.contrast.HistogramEqualization``, this
+augmenter operates directly on all channels of the input images. It does
+not perform any colorspace transformations and does not focus on specific
+channels (e.g. ``L`` in ``Lab`` colorspace).
+
+Create an augmenter that applies histogram equalization to all channels
+of input images in the original colorspaces::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.AllChannelsHistogramEqualization()
+
+.. figure:: ../../images/overview_of_augmenters/contrast/allchannelshistogramequalization.jpg
+    :alt: AllChannelsHistogramEqualization
+
+Same as in the previous example, but alpha-blends the contrast-enhanced
+augmented images with the original input images using random blend
+strengths. This leads to random strengths of the contrast adjustment. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Alpha((0.0, 1.0), iaa.AllChannelsHistogramEqualization())
+
+.. figure:: ../../images/overview_of_augmenters/contrast/allchannelshistogramequalization_alpha.jpg
+    :alt: AllChannelsHistogramEqualization combined with Alpha
 
 
 HistogramEqualization

@@ -16,6 +16,7 @@ def main():
     chapter_augmenters_linearcontrast()
     chapter_augmenters_allchannelsclahe()
     chapter_augmenters_clahe()
+    chapter_augmenters_allchannelshistogramequalization()
 
 
 def chapter_augmenters_gammacontrast():
@@ -132,6 +133,20 @@ def chapter_augmenters_clahe():
         fn_start + "_bgr_to_hsv.jpg", aug,
         [quokka_bgr for _ in range(4*2)], cols=4, rows=2,
         image_colorspace="BGR")
+
+
+def chapter_augmenters_allchannelshistogramequalization():
+    fn_start = "contrast/allchannelshistogramequalization"
+
+    aug = iaa.AllChannelsHistogramEqualization()
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.Alpha((0.0, 1.0), iaa.AllChannelsHistogramEqualization())
+    run_and_save_augseq(
+        fn_start + "_alpha.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*4)], cols=4, rows=4)
 
 
 if __name__ == "__main__":
