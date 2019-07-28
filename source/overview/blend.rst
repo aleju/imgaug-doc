@@ -165,7 +165,56 @@ exactly ``0.75`` (sampled once per pixel). ::
 SimplexNoiseAlpha
 -----------------
 
-TODO
+Alpha-blend two image sources using simplex noise alpha masks.
+
+The alpha masks are sampled using a simplex noise method, roughly creating
+connected blobs of ``1`` surrounded by ``0``. If nearest neighbour
+upsampling is used, these blobs can be rectangular with sharp edges.
+
+Detect per image all edges, mark them in a black and white image and
+then alpha-blend the result with the original image using simplex noise
+masks. ::
+
+    aug = iaa.SimplexNoiseAlpha(iaa.EdgeDetect(1.0))
+
+.. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha.jpg
+    :alt: SimplexNoiseAlpha with EdgeDetect
+
+Same as the previous example, but uses only nearest neighbour upscaling to
+scale the simplex noise masks to the final image sizes, i.e. no nearest
+linear upsampling is used. This leads to rectangles with sharp edges. ::
+
+    aug = iaa.SimplexNoiseAlpha(
+        iaa.EdgeDetect(1.0),
+        upscale_method="nearest")
+
+.. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_nearest.jpg
+    :alt: SimplexNoiseAlpha with EdgeDetect and nearest neighbour upscaling
+
+Same as the previous example, but uses only linear upscaling to
+scale the simplex noise masks to the final image sizes, i.e. no nearest
+neighbour upsampling is used. This leads to rectangles with smooth edges. ::
+
+    aug = iaa.SimplexNoiseAlpha(
+        iaa.EdgeDetect(1.0),
+        upscale_method="linear")
+
+.. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_linear.jpg
+    :alt: SimplexNoiseAlpha with EdgeDetect and linear upscaling
+
+Same as the first example, but uses a threshold for the sigmoid function
+that is further to the right. This is more conservative, i.e. the generated
+noise masks will be mostly black (values around ``0.0``), which means that
+most of the original images (parameter/branch `second`) will be kept,
+rather than using the results of the augmentation (parameter/branch
+`first`). ::
+
+    aug = iaa.SimplexNoiseAlpha(
+        iaa.EdgeDetect(1.0),
+        sigmoid_thresh=iap.Normal(10.0, 5.0))
+
+.. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_sigmoid_thresh_normal.jpg
+    :alt: SimplexNoiseAlpha with EdgeDetect and gaussian-distributed sigmoid threshold
 
 
 FrequencyNoiseAlpha

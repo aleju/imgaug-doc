@@ -2,6 +2,7 @@ from __future__ import print_function, division
 
 import imgaug as ia
 import imgaug.augmenters as iaa
+import imgaug.parameters as iap
 
 from .utils import run_and_save_augseq
 
@@ -9,6 +10,7 @@ from .utils import run_and_save_augseq
 def main():
     chapter_augmenters_alpha()
     chapter_augmenters_alphaelementwise()
+    chapter_augmenters_simplexnoisealpha()
 
 
 def chapter_augmenters_alpha():
@@ -80,6 +82,36 @@ def chapter_augmenters_alphaelementwise():
     aug = aug_cls([0.25, 0.75], iaa.MedianBlur(13))
     run_and_save_augseq(
         fn_start + "_with_choice.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+
+def chapter_augmenters_simplexnoisealpha():
+    fn_start = "blend/simplexnoisealpha"
+
+    aug = iaa.SimplexNoiseAlpha(iaa.EdgeDetect(1.0))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.SimplexNoiseAlpha(
+        iaa.EdgeDetect(1.0),
+        upscale_method="nearest")
+    run_and_save_augseq(
+        fn_start + "_nearest.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.SimplexNoiseAlpha(
+        iaa.EdgeDetect(1.0),
+        upscale_method="linear")
+    run_and_save_augseq(
+        fn_start + "_linear.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.SimplexNoiseAlpha(
+        iaa.EdgeDetect(1.0),
+        sigmoid_thresh=iap.Normal(10.0, 5.0))
+    run_and_save_augseq(
+        fn_start + "_sigmoid_thresh_normal.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
 
