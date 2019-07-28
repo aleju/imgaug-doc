@@ -214,7 +214,27 @@ to the ``H`` channel in ``HSV`` colorspace::
 AddToSaturation
 ---------------
 
-TODO
+Add random values to the saturation of images.
+
+The augmenter first transforms images to HSV colorspace, then adds random
+values to the S channel and afterwards converts back to RGB.
+
+If you want to change both the hue and the saturation, it is recommended
+to use ``AddToHueAndSaturation`` as otherwise the image will be
+converted twice to HSV and back to RGB.
+
+This augmenter is a shortcut for
+``AddToHueAndSaturation(value_saturation=...)``.
+
+Sample random values from the discrete uniform range ``[-50..50]``,
+and add them to the saturation, i.e. to the ``S`` channel in ``HSV``
+colorspace::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.AddToSaturation((-50, 50))
+
+.. figure:: ../../images/overview_of_augmenters/color/addtosaturation.jpg
+    :alt: AddToSaturation
 
 
 ChangeColorspace
