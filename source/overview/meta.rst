@@ -204,5 +204,23 @@ a width of exactly 64 and either 1 or 3 channels::
 ChannelShuffle
 --------------
 
-TODO
+Randomize the order of channels in input images.
+
+Shuffle all channels of 35% of all images::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.ChannelShuffle(0.35)
+
+.. figure:: ../../images/overview_of_augmenters/meta/channelshuffle.jpg
+    :alt: ChannelShuffle
+
+Shuffle only channels ``0`` and ``1`` of 35% of all images. As the new
+channel orders ``0, 1`` and ``1, 0`` are both valid outcomes of the
+shuffling, it means that for ``0.35 * 0.5 = 0.175`` or 17.5% of all images
+the order of channels ``0`` and ``1`` is inverted. ::
+
+    aug = iaa.ChannelShuffle(0.35, channels=[0, 1])
+
+.. figure:: ../../images/overview_of_augmenters/meta/channelshuffle_limited_channels.jpg
+    :alt: ChannelShuffle
 

@@ -16,6 +16,7 @@ def main():
     chapter_augmenters_lambda()
     chapter_augmenters_assertlambda()
     chapter_augmenters_assertshape()
+    chapter_augmenters_channelshuffle()
 
 
 def chapter_augmenters_sequential():
@@ -149,6 +150,22 @@ def chapter_augmenters_assertlambda():
 
 def chapter_augmenters_assertshape():
     pass
+
+
+def chapter_augmenters_channelshuffle():
+    fn_start = "meta/channelshuffle"
+
+    aug = iaa.ChannelShuffle(0.35)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(8*3)], cols=8, rows=3
+    )
+
+    aug = iaa.ChannelShuffle(0.35, channels=[0, 1])
+    run_and_save_augseq(
+        fn_start + "_limited_channels.jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(8*3)], cols=8, rows=3
+    )
 
 
 if __name__ == "__main__":
