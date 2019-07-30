@@ -141,7 +141,7 @@ output images. ::
 .. figure:: ../../images/overview_of_augmenters/geometric/perspectivetransform_keep_size_false.jpg
     :alt: PerspectiveTransform with keep_size=False
 
-    PerspectiveTransform with ``keep_size`` set to ``False``.
+    ``PerspectiveTransform`` with ``keep_size`` set to ``False``.
     Note that the individual images are here padded after augmentation in
     order to align them in a grid (i.e. purely for visualization purposes).
 
@@ -184,5 +184,57 @@ in 8 steps:
 Rot90
 -----
 
-TODO
+Rotate images clockwise by multiples of 90 degrees.
+
+This could also be achieved using ``Affine``, but ``Rot90`` is
+significantly more efficient.
+
+.. figure:: ../../images/overview_of_augmenters/geometric/rot90_base_image.jpg
+    :alt: Input image for Rot90 examples
+
+    The below examples use this input image, which slightly deviates
+    from the examples for other augmenters (i.e. it is not square).
+
+Rotates all images by 90 degrees.
+Resizes all images afterwards to keep the size that they had before
+augmentation.
+This may cause the images to look distorted. ::
+
+    aug = iaa.Rot90(1)
+
+.. figure:: ../../images/overview_of_augmenters/geometric/rot90_k_is_1.jpg
+    :alt: Rot90 with k=1
+
+Rotates all images by 90 or 270 degrees.
+Resizes all images afterwards to keep the size that they had before
+augmentation.
+This may cause the images to look distorted. ::
+
+    aug = iaa.Rot90([1, 3])
+
+.. figure:: ../../images/overview_of_augmenters/geometric/rot90_k_is_1_or_3.jpg
+    :alt: Rot90 with k=1 or k=3
+
+Rotates all images by 90, 180 or 270 degrees.
+Resizes all images afterwards to keep the size that they had before
+augmentation.
+This may cause the images to look distorted. ::
+
+    aug = iaa.Rot90((1, 3))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/rot90_k_is_1_or_2_or_3.jpg
+    :alt: Rot90 with k=1 or k=2 or k=3
+
+Rotates all images by 90, 180 or 270 degrees.
+Does not resize to the original image size afterwards, i.e. each image's
+size may change. ::
+
+    aug = iaa.Rot90((1, 3), keep_size=False)
+
+.. figure:: ../../images/overview_of_augmenters/geometric/rot90_keep_size_false.jpg
+    :alt: Rot90 with keep_size=False
+
+    ``Rot90`` with ``keep_size`` set to ``False``.
+    Note that the individual images are here padded after augmentation in
+    order to align them in a grid (i.e. purely for visualization purposes).
 

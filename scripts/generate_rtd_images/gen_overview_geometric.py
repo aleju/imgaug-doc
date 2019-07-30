@@ -5,7 +5,7 @@ import numpy as np
 import imgaug as ia
 import imgaug.augmenters as iaa
 
-from .utils import run_and_save_augseq, checkerboard
+from .utils import run_and_save_augseq, checkerboard, save
 
 
 def main():
@@ -13,6 +13,7 @@ def main():
     chapter_augmenters_piecewiseaffine()
     chapter_augmenters_perspectivetransform()
     chapter_augmenters_elastictransformation()
+    chapter_augmenters_rot90()
 
 
 def chapter_augmenters_affine():
@@ -114,6 +115,40 @@ def chapter_augmenters_elastictransformation():
         "geometric/elastictransformations_vary_sigmas.jpg",
         [iaa.ElasticTransformation(alpha=2.5, sigma=sigma) for sigma in sigmas],
         [ia.quokka(size=(128, 128)) for _ in range(8)], cols=8, rows=1)
+
+
+def chapter_augmenters_rot90():
+    fn_start = "geometric/rot90"
+
+    image = ia.quokka(size=(128, 128))
+    image = image[:, :-40]
+
+    save(
+        "overview_of_augmenters",
+        fn_start + "_base_image.jpg",
+        image,
+        quality=90
+    )
+
+    aug = iaa.Rot90(1)
+    run_and_save_augseq(
+        fn_start + "_k_is_1.jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.Rot90([1, 3])
+    run_and_save_augseq(
+        fn_start + "_k_is_1_or_3.jpg", aug,
+        [image for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.Rot90((1, 3))
+    run_and_save_augseq(
+        fn_start + "_k_is_1_or_2_or_3.jpg", aug,
+        [image for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.Rot90((1, 3), keep_size=False)
+    run_and_save_augseq(
+        fn_start + "_keep_size_false.jpg", aug,
+        [image for _ in range(4*2)], cols=4, rows=2)
 
 
 if __name__ == "__main__":
