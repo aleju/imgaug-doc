@@ -11,6 +11,7 @@ from .utils import run_and_save_augseq, checkerboard
 def main():
     chapter_augmenters_affine()
     chapter_augmenters_piecewiseaffine()
+    chapter_augmenters_perspectivetransform()
     chapter_augmenters_elastictransformation()
 
 
@@ -80,6 +81,20 @@ def chapter_augmenters_piecewiseaffine():
         "geometric/piecewiseaffine_vary_grid.jpg",
         [iaa.PiecewiseAffine(scale=0.05, nb_rows=g, nb_cols=g) for g in gridvals],
         [checkerboard(size=(128, 128)) for _ in range(8)], cols=8, rows=1)
+
+
+def chapter_augmenters_perspectivetransform():
+    fn_start = "geometric/perspectivetransform"
+
+    aug = iaa.PerspectiveTransform(scale=(0.01, 0.15))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*3)], cols=4, rows=3)
+
+    aug = iaa.PerspectiveTransform(scale=(0.01, 0.15), keep_size=False)
+    run_and_save_augseq(
+        fn_start + "_keep_size_false.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*3)], cols=4, rows=3)
 
 
 def chapter_augmenters_elastictransformation():

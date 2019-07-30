@@ -93,8 +93,8 @@ def grid(images, rows, cols, border=1, border_color=255):
         rows = int(math.ceil(nb_images / cols))
     assert rows * cols >= nb_images
 
-    cell_height = cell_height + 1 * border
-    cell_width = cell_width + 1 * border
+    cell_height = cell_height + 2 * border
+    cell_width = cell_width + 2 * border
 
     width = cell_width * cols
     height = cell_height * rows
@@ -106,10 +106,22 @@ def grid(images, rows, cols, border=1, border_color=255):
                 image = images[cell_idx]
                 border_top = border_right = border_bottom = border_left = border
                 #if row_idx > 1:
-                border_top = 0
+                #border_top = 0
                 #if col_idx > 1:
-                border_left = 0
-                image = np.pad(image, ((border_top, border_bottom), (border_left, border_right), (0, 0)), mode="constant", constant_values=border_color)
+                #border_left = 0
+                #image = np.pad(image, ((border_top, border_bottom), (border_left, border_right), (0, 0)), mode="constant", constant_values=border_color)
+                image = ia.pad(
+                    image,
+                    top=border_top,
+                    right=border_right,
+                    bottom=border_bottom,
+                    left=border_left,
+                    mode="constant",
+                    cval=border_color)
+
+                image = iaa.PadToFixedSize(
+                    height=cell_height, width=cell_width, position="center"
+                )(image=image)
 
                 cell_y1 = cell_height * row_idx
                 cell_y2 = cell_y1 + image.shape[0]
@@ -118,7 +130,7 @@ def grid(images, rows, cols, border=1, border_color=255):
                 grid[cell_y1:cell_y2, cell_x1:cell_x2, :] = image
             cell_idx += 1
 
-    grid = np.pad(grid, ((border, 0), (border, 0), (0, 0)), mode="constant", constant_values=border_color)
+    #grid = np.pad(grid, ((border, 0), (border, 0), (0, 0)), mode="constant", constant_values=border_color)
 
     return grid
 

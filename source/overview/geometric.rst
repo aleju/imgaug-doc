@@ -113,7 +113,37 @@ in 8 steps:
 PerspectiveTransform
 --------------------
 
-TODO
+Apply random four point perspective transformations to images.
+
+Each of the four points is placed on the image using a random distance from
+its respective corner. The distance is sampled from a normal distribution.
+As a result, most transformations don't change the image very much, while
+some "focus" on polygons far inside the image.
+
+The results of this augmenter have some similarity with ``Crop``.
+
+Apply perspective transformations using a random scale between ``0.01``
+and ``0.15`` per image, where the scale is roughly a measure of how far
+the perspective transformation's corner points may be distanced from the
+image's corner points::
+
+    aug = iaa.PerspectiveTransform(scale=(0.01, 0.15))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/perspectivetransform.jpg
+    :alt: PerspectiveTransform
+
+Same as in the previous example, but images are not resized back to
+the input image size after augmentation. This will lead to smaller
+output images. ::
+
+    aug = iaa.PerspectiveTransform(scale=(0.01, 0.15), keep_size=False)
+
+.. figure:: ../../images/overview_of_augmenters/geometric/perspectivetransform_keep_size_false.jpg
+    :alt: PerspectiveTransform with keep_size=False
+
+    PerspectiveTransform with ``keep_size`` set to ``False``.
+    Note that the individual images are here padded after augmentation in
+    order to align them in a grid (i.e. purely for visualization purposes).
 
 
 ElasticTransformation
