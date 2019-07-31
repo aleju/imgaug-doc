@@ -101,7 +101,7 @@ Pad
 
 Augmenter that pads images, i.e. adds columns/rows to them.
 
-This is a proxy for ``CropAndPad``. It only accepts positive
+This is a shortcut for ``CropAndPad``. It only accepts positive
 pixel/percent values.
 
 
@@ -110,20 +110,129 @@ Crop
 
 Augmenter that crops/cuts away pixels at the sides of the image.
 
-This is a proxy for ``CropAndPad``. It only accepts positive
+This is a shortcut for ``CropAndPad``. It only accepts positive
 pixel/percent values and transfers them as negative values to ``CropAndPad``.
 
 
 PadToFixedSize
 --------------
 
-TODO
+Pad images to minimum width/height.
+
+If images are already at the minimum width/height or are larger, they will
+not be padded. Note that this also means that images will not be cropped if
+they exceed the required width/height.
+
+The augmenter randomly decides per image how to distribute the required
+padding amounts over the image axis. E.g. if 2px have to be padded on the
+left or right to reach the required width, the augmenter will sometimes
+add 2px to the left and 0px to the right, sometimes add 2px to the right
+and 0px to the left and sometimes add 1px to both sides. Set `position`
+to ``center`` to prevent that.
+
+For image sides smaller than ``100`` pixels, pad to ``100`` pixels. Do
+nothing for the other edges. The padding is randomly (uniformly)
+distributed over the sides, so that e.g. sometimes most of the required
+padding is applied to the left, sometimes to the right (analogous
+top/bottom).
+The input image here has a size of ``80x80``. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.PadToFixedSize(width=100, height=100)
+
+.. figure:: ../../images/overview_of_augmenters/size/padtofixedsize.jpg
+    :alt: Pad to 100x100 with random division of pad amounts onto the different image sides
+
+For image sides smaller than ``100`` pixels, pad to ``100`` pixels. Do
+nothing for the other image sides. The padding is always equally
+distributed over the left/right and top/bottom sides.
+The input image here has a size of ``80x80``. ::
+
+    aug = iaa.PadToFixedSize(width=100, height=100, position="center")
+
+.. figure:: ../../images/overview_of_augmenters/size/padtofixedsize_center.jpg
+    :alt: Pad to 100x100 with random division of pad amounts onto the different image sides
+
+For image sides smaller than ``100`` pixels, pad to ``100`` pixels and
+use any possible padding mode for that. Do nothing for the other image
+sides. The padding is always equally distributed over the left/right and
+top/bottom sides.
+The input image here has a size of ``80x80``. ::
+
+    aug = iaa.PadToFixedSize(width=100, height=100, pad_mode=ia.ALL)
+
+.. figure:: ../../images/overview_of_augmenters/size/padtofixedsize_pad_mode.jpg
+    :alt: Pad to 100x100 with random padding modes
+
+Pad images smaller than ``100x100`` until they reach ``100x100``.
+Analogously, crop images larger than ``100x100`` until they reach
+``100x100``. The output images therefore have a fixed size of ``100x100``.
+The input image here has a size of ``80x120``, so that the top/bottom sides
+have to be cropped and the left/right sides have to be padded. Note that
+the original image was resized to ``80x120``, leading to a bit of an
+distorted appearance. ::
+
+    aug = iaa.Sequential([
+        iaa.PadToFixedSize(width=100, height=100),
+        iaa.CropToFixedSize(width=100, height=100)
+    ])
+
+.. figure:: ../../images/overview_of_augmenters/size/padtofixedsize_with_croptofixedsize.jpg
+    :alt: Pad and crop to 100x100
 
 
 CropToFixedSize
 ---------------
 
-TODO
+Crop images down to a fixed maximum width/height.
+
+If images are already at the maximum width/height or are smaller, they
+will not be cropped. Note that this also means that images will not be
+padded if they are below the required width/height.
+
+The augmenter randomly decides per image how to distribute the required
+cropping amounts over the image axis. E.g. if 2px have to be cropped on
+the left or right to reach the required width, the augmenter will
+sometimes remove 2px from the left and 0px from the right, sometimes
+remove 2px from the right and 0px from the left and sometimes remove 1px
+from both sides. Set `position` to ``center`` to prevent that.
+
+For image sides larger than ``100`` pixels, crop to ``100`` pixels. Do
+nothing for the other sides. The cropping amounts are randomly (and
+uniformly) distributed over the sides of the image.
+The input image here has a size of ``120x120``. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CropToFixedSize(width=100, height=100)
+
+.. figure:: ../../images/overview_of_augmenters/size/croptofixedsize.jpg
+    :alt: Crop down to 100x100 with random division of crop amounts onto the different image sides
+
+For sides larger than ``100`` pixels, crop to ``100`` pixels. Do nothing
+for the other sides. The cropping amounts are always equally distributed
+over the left/right sides of the image (and analogously for top/bottom).
+The input image here has a size of ``120x120``. ::
+
+    aug = iaa.CropToFixedSize(width=100, height=100, position="center")
+
+.. figure:: ../../images/overview_of_augmenters/size/croptofixedsize_center.jpg
+    :alt: Crop down to 100x100 with random division of crop amounts onto the different image sides
+
+Pad images smaller than ``100x100`` until they reach ``100x100``.
+Analogously, crop images larger than ``100x100`` until they reach
+``100x100``. The output images therefore have a fixed size of ``100x100``.
+The input image here has a size of ``80x120``, so that the top/bottom sides
+have to be cropped and the left/right sides have to be padded. Note that
+the original image was resized to ``80x120``, leading to a bit of an
+distorted appearance. ::
+
+    aug = iaa.Sequential([
+        iaa.PadToFixedSize(width=100, height=100),
+        iaa.CropToFixedSize(width=100, height=100)
+    ])
+
+.. figure:: ../../images/overview_of_augmenters/size/padtofixedsize_with_croptofixedsize.jpg
+    :alt: Pad and crop to 100x100
 
 
 KeepSizeByResize

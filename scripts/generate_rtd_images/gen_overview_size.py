@@ -11,6 +11,8 @@ def main():
     chapter_augmenters_cropandpad()
     chapter_augmenters_pad()
     chapter_augmenters_crop()
+    chapter_augmenters_padtofixedsize()
+    chapter_augmenters_croptofixedsize()
 
 
 def chapter_augmenters_resize():
@@ -82,6 +84,58 @@ def chapter_augmenters_pad():
 
 def chapter_augmenters_crop():
     pass
+
+
+def chapter_augmenters_padtofixedsize():
+    fn_start = "size/padtofixedsize"
+    aug_cls = iaa.PadToFixedSize
+
+    aug = aug_cls(width=100, height=100)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(80, 80)) for _ in range(4*2)], cols=4, rows=2
+    )
+
+    aug = aug_cls(width=100, height=100, position="center")
+    run_and_save_augseq(
+        fn_start + "_center.jpg", aug,
+        [ia.quokka(size=(80, 80)) for _ in range(4*1)], cols=4, rows=1
+    )
+
+    aug = aug_cls(width=100, height=100, pad_mode=ia.ALL)
+    run_and_save_augseq(
+        fn_start + "_pad_mode.jpg", aug,
+        [ia.quokka(size=(80, 80)) for _ in range(4*2)], cols=4, rows=2
+    )
+
+    aug = iaa.Sequential([
+        iaa.PadToFixedSize(width=100, height=100),
+        iaa.CropToFixedSize(width=100, height=100)
+    ])
+    run_and_save_augseq(
+        fn_start + "_with_croptofixedsize.jpg", aug,
+        [ia.quokka(size=(80, 120)) for _ in range(4*2)], cols=4, rows=2
+    )
+
+
+def chapter_augmenters_croptofixedsize():
+    fn_start = "size/croptofixedsize"
+    aug_cls = iaa.CropToFixedSize
+
+    aug = aug_cls(width=100, height=100)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(120, 120)) for _ in range(4*2)], cols=4, rows=2
+    )
+
+    aug = aug_cls(width=100, height=100, position="center")
+    run_and_save_augseq(
+        fn_start + "_center.jpg", aug,
+        [ia.quokka(size=(120, 120)) for _ in range(4*1)], cols=4, rows=1
+    )
+
+    # third example is identical to third example in padtofixedsize
+    # and already generated there
 
 
 if __name__ == "__main__":
