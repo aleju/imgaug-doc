@@ -238,5 +238,51 @@ distorted appearance. ::
 KeepSizeByResize
 ----------------
 
-TODO
+Resize images back to their input sizes after applying child augmenters.
+
+Combining this with e.g. a cropping augmenter as the child will lead to
+images being resized back to the input size after the crop operation was
+applied. Some augmenters have a ``keep_size`` argument that achieves the
+same goal (if set to ``True``), though this augmenter offers control over
+the interpolation mode and which augmentables to resize (images, heatmaps,
+segmentation maps).
+
+Apply random cropping to input images, then resize them back to their
+original input sizes. The resizing is done using this augmenter instead
+of the corresponding internal resizing operation in ``Crop``. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.KeepSizeByResize(
+        iaa.Crop((20, 40), keep_size=False)
+    )
+
+.. figure:: ../../images/overview_of_augmenters/size/keepsizebyresize_crop.jpg
+    :alt: KeepSizeByResize + Crop
+
+Same as in the previous example, but images are now always resized using
+nearest neighbour interpolation. ::
+
+    aug = iaa.KeepSizeByResize(
+        iaa.Crop((20, 40), keep_size=False),
+        interpolation="nearest"
+    )
+
+.. figure:: ../../images/overview_of_augmenters/size/keepsizebyresize_crop_nearest.jpg
+    :alt: KeepSizeByResize with nearest neighbour interpolation + Crop
+
+Similar to the previous example, but images are now sometimes resized
+using linear interpolation and sometimes using nearest neighbour
+interpolation. Heatmaps are resized using the same interpolation as was
+used for the corresponding image. Segmentation maps are not resized and
+will therefore remain at their size after cropping. ::
+
+    aug = iaa.KeepSizeByResize(
+        iaa.Crop((20, 40), keep_size=False),
+        interpolation=["nearest", "cubic"],
+        interpolation_heatmaps=iaa.KeepSizeByResize.SAME_AS_IMAGES,
+        interpolation_segmaps=iaa.KeepSizeByResize.NO_RESIZE
+    )
+
+.. figure:: ../../images/overview_of_augmenters/size/keepsizebyresize_various_augmentables.jpg
+    :alt: KeepSizeByResize for various augmentables
 

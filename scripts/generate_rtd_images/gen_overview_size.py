@@ -13,6 +13,7 @@ def main():
     chapter_augmenters_crop()
     chapter_augmenters_padtofixedsize()
     chapter_augmenters_croptofixedsize()
+    chapter_augmenters_keepsizebyresize()
 
 
 def chapter_augmenters_resize():
@@ -136,6 +137,39 @@ def chapter_augmenters_croptofixedsize():
 
     # third example is identical to third example in padtofixedsize
     # and already generated there
+
+
+def chapter_augmenters_keepsizebyresize():
+    # TODO add example images for heatmaps, segmaps
+    fn_start = "size/keepsizebyresize"
+
+    aug = iaa.KeepSizeByResize(
+        iaa.Crop((20, 40), keep_size=False)
+    )
+    run_and_save_augseq(
+        fn_start + "_crop.jpg", aug,
+        [ia.quokka(size=(120, 120)) for _ in range(4*2)], cols=4, rows=2
+    )
+
+    aug = iaa.KeepSizeByResize(
+        iaa.Crop((20, 40), keep_size=False),
+        interpolation="nearest"
+    )
+    run_and_save_augseq(
+        fn_start + "_crop_nearest.jpg", aug,
+        [ia.quokka(size=(120, 120)) for _ in range(4*2)], cols=4, rows=2
+    )
+
+    aug = iaa.KeepSizeByResize(
+        iaa.Crop((20, 40), keep_size=False),
+        interpolation=["nearest", "cubic"],
+        interpolation_heatmaps=iaa.KeepSizeByResize.SAME_AS_IMAGES,
+        interpolation_segmaps=iaa.KeepSizeByResize.NO_RESIZE
+    )
+    run_and_save_augseq(
+        fn_start + "_various_augmentables.jpg", aug,
+        [ia.quokka(size=(120, 120)) for _ in range(4*4)], cols=4, rows=4
+    )
 
 
 if __name__ == "__main__":
