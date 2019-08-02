@@ -1,5 +1,5 @@
 imgaug.augmenters\.edges
-=======================
+========================
 
 .. automodule:: imgaug.augmenters.edges
     :members:
