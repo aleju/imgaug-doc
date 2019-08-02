@@ -8,6 +8,8 @@ Sequential
 List augmenter that may contain other augmenters to apply in sequence
 or random order.
 
+API link: :class:`~imgaug.augmenters.meta.Sequential`
+
 **Example.**
 Apply in predefined order::
 
@@ -37,6 +39,8 @@ SomeOf
 ------
 
 List augmenter that applies only some of its children to images.
+
+API link: :class:`~imgaug.augmenters.meta.SomeOf`
 
 **Example.**
 Apply two of four given augmenters::
@@ -85,6 +89,8 @@ OneOf
 
 Augmenter that always executes exactly one of its children.
 
+API link: :func:`~imgaug.augmenters.meta.OneOf`
+
 **Example.**
 Apply one of four augmenters to each image::
 
@@ -104,6 +110,8 @@ Sometimes
 ---------
 
 Augment only p percent of all images with one or more augmenters.
+
+API link: :class:`~imgaug.augmenters.meta.Sometimes`
 
 **Example.**
 Apply gaussian blur to about 50% of all images::
@@ -133,6 +141,8 @@ WithChannels
 
 Apply child augmenters to specific channels.
 
+API link: :class:`~imgaug.augmenters.meta.WithChannels`
+
 **Example.**
 Increase each pixel's R-value (redness) by ``10`` to ``100``::
 
@@ -154,7 +164,11 @@ Rotate each image's red channel by ``0`` to ``45`` degrees::
 Noop
 ----
 
-Augmenter that never changes input images ("no operation"). ::
+Augmenter that never changes input images ("no operation").
+
+API link: :class:`~imgaug.augmenters.meta.Noop`
+
+**Example.** Create an augmenter that does nothing::
 
     import imgaug.augmenters as iaa
     aug = iaa.Noop()
@@ -168,6 +182,8 @@ Lambda
 ------
 
 Augmenter that calls a lambda function for each batch of input image.
+
+API link: :class:`~imgaug.augmenters.meta.Lambda`
 
 **Example.**
 Replace in every image each fourth row with black pixels::
@@ -194,6 +210,8 @@ AssertLambda
 Augmenter that runs an assert on each batch of input images
 using a lambda function as condition.
 
+API link: :class:`~imgaug.augmenters.meta.AssertLambda`
+
 TODO examples
 
 
@@ -202,6 +220,8 @@ AssertShape
 
 Augmenter to make assumptions about the shape of input image(s)
 and keypoints.
+
+API link: :class:`~imgaug.augmenters.meta.AssertShape`
 
 **Example.**
 Check if each image in a batch has shape ``32x32x3``, otherwise raise an
@@ -227,6 +247,8 @@ ChannelShuffle
 --------------
 
 Randomize the order of channels in input images.
+
+API link: :class:`~imgaug.augmenters.meta.ChannelShuffle`
 
 **Example.**
 Shuffle all channels of 35% of all images::

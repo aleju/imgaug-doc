@@ -8,6 +8,8 @@ Convolve
 
 Apply a Convolution to input images.
 
+API link: :class:`~imgaug.augmenters.convolutional.Convolve`
+
 **Example.**
 Convolve each image with a 3x3 kernel::
 
@@ -47,6 +49,8 @@ Sharpen
 Augmenter that sharpens images and overlays the result with the original
 image.
 
+API link: :func:`~imgaug.augmenters.convolutional.Sharpen`
+
 **Example.**
 Sharpen an image, then overlay the results with the original using an alpha
 between 0.0 and 1.0::
@@ -77,6 +81,8 @@ Emboss
 
 Augmenter that embosses images and overlays the result with the original
 image.
+
+API link: :func:`~imgaug.augmenters.convolutional.Emboss`
 
 **Example.**
 Emboss an image, then overlay the results with the original using an alpha
@@ -110,6 +116,8 @@ Augmenter that detects all edges in images, marks them in
 a black and white image and then overlays the result with the original
 image.
 
+API link: :func:`~imgaug.augmenters.convolutional.EdgeDetect`
+
 **Example.**
 Detect edges in images, turning them into black and white images and then overlay
 these with the original images using random alphas between 0.0 and 1.0::
@@ -130,6 +138,8 @@ DirectedEdgeDetect
 Augmenter that detects edges that have certain directions and marks them
 in a black and white image and then overlays the result with the original
 image.
+
+API link: :func:`~imgaug.augmenters.convolutional.DirectedEdgeDetect`
 
 **Example.**
 Detect edges having random directions (0 to 360 degrees) in images,

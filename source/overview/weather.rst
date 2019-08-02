@@ -17,6 +17,8 @@ Convert non-snowy landscapes to snowy ones.
 
 This augmenter expects to get an image that roughly shows a landscape.
 
+API link: :class:`~imgaug.augmenters.weather.FastSnowyLandscape`
+
 **Example.**
 Search for all pixels in the image with a lightness value in HLS
 colorspace of less than ``140`` and increase their lightness by a factor
@@ -72,6 +74,8 @@ image, leading to varying densities and frequency patterns of clouds.
 This augmenter seems to be fairly robust w.r.t. the image size. Tested
 with ``96x128``, ``192x256`` and ``960x1280``.
 
+API link: :func:`~imgaug.augmenters.weather.Clouds`
+
 **Example.**
 Create an augmenter that adds clouds to images::
 
@@ -94,6 +98,8 @@ low-frequency patterns.
 This augmenter seems to be fairly robust w.r.t. the image size. Tested
 with ``96x128``, ``192x256`` and ``960x1280``.
 
+API link: :func:`~imgaug.augmenters.weather.Fog`
+
 **Example.**
 Create an augmenter that adds fog to images::
 
@@ -109,6 +115,10 @@ CloudLayer
 
 Add a single layer of clouds to an image.
 
+API link: :class:`~imgaug.augmenters.weather.CloudLayer`
+
+TODO add examples
+
 
 Snowflakes
 ----------
@@ -117,6 +127,8 @@ Add falling snowflakes to images.
 
 This is a wrapper around ``SnowflakesLayer``. It executes 1 to 3 layers
 per image.
+
+API link: :func:`~imgaug.augmenters.weather.Snowflakes`
 
 **Example.**
 Add snowflakes to small images (around ``96x128``)::
@@ -142,4 +154,8 @@ SnowflakesLayer
 ---------------
 
 Add a single layer of falling snowflakes to images.
+
+API link: :class:`~imgaug.augmenters.weather.SnowflakesLayer`
+
+TODO add examples
 

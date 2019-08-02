@@ -8,6 +8,8 @@ Add
 
 Add a value to all pixels in an image.
 
+API link: :class:`~imgaug.augmenters.arithmetic.Add`
+
 **Example.**
 Add random values between -40 and 40 to images, with each value
 being sampled once per image and then being the same for all pixels::
@@ -35,6 +37,7 @@ AddElementwise
 Add values to the pixels of images with possibly different values
 for neighbouring pixels.
 
+API link: :class:`~imgaug.augmenters.arithmetic.AddElementwise`
 
 **Example.**
 Add random values between -40 and 40 to images, with each value being sampled
@@ -61,6 +64,8 @@ AdditiveGaussianNoise
 ---------------------
 
 Add noise sampled from gaussian distributions elementwise to images.
+
+API link: :func:`~imgaug.augmenters.arithmetic.AdditiveGaussianNoise`
 
 **Example.**
 Add gaussian noise to an image, sampled once per pixel from a normal
@@ -111,6 +116,8 @@ The laplace distribution is similar to the gaussian distribution, but
 puts more weight on the long tail. Hence, this noise will add more
 outliers (very high/low values). It is somewhere between gaussian noise and
 salt and pepper noise.
+
+API link: :func:`~imgaug.augmenters.arithmetic.AdditiveLaplaceNoise`
 
 **Example.**
 Add laplace noise to an image, sampled once per pixel from ``Laplace(0, s)``,
@@ -165,6 +172,8 @@ Values of around ``40.0`` for ``lam`` lead to very visible noise (for
 ``uint8``).
 It is recommended to usually set ``per_channel`` to ``True``.
 
+API link: :func:`~imgaug.augmenters.arithmetic.AdditivePoissonNoise`
+
 **Example.**
 Add poisson noise to an image, sampled once per pixel from ``Poisson(lam)``,
 where ``lam`` is sampled per image and varies between ``0`` and ``40``::
@@ -209,6 +218,8 @@ Multiply
 Multiply all pixels in an image with a specific value, thereby making the
 image darker or brighter.
 
+API link: :class:`~imgaug.augmenters.arithmetic.Multiply`
+
 **Example.**
 Multiply each image with a random value between 0.5 and 1.5::
 
@@ -235,6 +246,8 @@ MultiplyElementwise
 Multiply values of pixels with possibly different values for neighbouring
 pixels, making each pixel darker or brighter.
 
+API link: :class:`~imgaug.augmenters.arithmetic.MultiplyElementwise`
+
 **Example.**
 Multiply each pixel with a random value between 0.5 and 1.5::
 
@@ -259,6 +272,8 @@ Dropout
 -------
 
 Augmenter that sets a certain fraction of pixels in images to zero.
+
+API link: :func:`~imgaug.augmenters.arithmetic.Dropout`
 
 **Example.**
 Sample per image a value ``p`` from the range ``0<=p<=0.2`` and then drop
@@ -285,6 +300,8 @@ CoarseDropout
 -------------
 
 Augmenter that sets rectangular areas within images to zero.
+
+API link: :func:`~imgaug.augmenters.arithmetic.CoarseDropout`
 
 **Example.**
 Drop 2% of all pixels by converting them to black pixels, but do
@@ -325,6 +342,8 @@ ReplaceElementwise
 ------------------
 
 Replace pixels in an image with new values.
+
+API link: :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`
 
 **Example.**
 Replace ``10%`` of all pixels with either the value ``0`` or the value
@@ -381,6 +400,8 @@ Add impulse noise to images.
 This is identical to ``SaltAndPepper``, except that ``per_channel`` is
 always set to ``True``.
 
+API link: :func:`~imgaug.augmenters.arithmetic.ImpulseNoise`
+
 **Example.**
 Replace ``10%`` of all pixels with impulse noise::
 
@@ -395,6 +416,8 @@ SaltAndPepper
 -------------
 
 Replace pixels in images with salt/pepper noise (white/black-ish colors).
+
+API link: :func:`~imgaug.augmenters.arithmetic.SaltAndPepper`
 
 **Example.**
 Replace ``10%`` of all pixels with salt and pepper noise::
@@ -419,6 +442,8 @@ CoarseSaltAndPepper
 -------------------
 
 Replace rectangular areas in images with white/black-ish pixel noise.
+
+API link: :func:`~imgaug.augmenters.arithmetic.CoarseSaltAndPepper`
 
 **Example.**
 Mark ``5%`` of all pixels in a mask to be replaced by salt/pepper
@@ -462,6 +487,8 @@ Replace pixels in images with salt noise, i.e. white-ish pixels.
 This augmenter is similar to ``SaltAndPepper``, but adds no pepper noise to
 images.
 
+API link: :func:`~imgaug.augmenters.arithmetic.Salt`
+
 **Example.**
 Replace ``10%`` of all pixels with salt noise (white-ish colors)::
 
@@ -483,6 +510,8 @@ Replace rectangular areas in images with white-ish pixel noise.
 
 This augmenter is similar to ``CoarseSaltAndPepper``, but adds no pepper noise
 to images.
+
+API link: :func:`~imgaug.augmenters.arithmetic.CoarseSalt`
 
 **Example.**
 Mark ``5%`` of all pixels in a mask to be replaced by salt
@@ -512,6 +541,8 @@ images.
 This augmenter is similar to ``Dropout``, but slower and the black pixels are
 not uniformly black.
 
+API link: :func:`~imgaug.augmenters.arithmetic.Pepper`
+
 **Example.**
 Replace ``10%`` of all pixels with pepper noise (black-ish colors)::
 
@@ -532,6 +563,8 @@ Replace rectangular areas in images with black-ish pixel noise.
 
 This augmenter is similar to ``CoarseSaltAndPepper``, but adds no salt noise
 to images.
+
+API link: :func:`~imgaug.augmenters.arithmetic.CoarsePepper`
 
 **Example.**
 Mark ``5%`` of all pixels in a mask to be replaced by pepper
@@ -555,6 +588,8 @@ Invert
 
 Augmenter that inverts all values in images, i.e. sets a pixel from value
 ``v`` to ``255-v``.
+
+API link: :class:`~imgaug.augmenters.arithmetic.Invert`
 
 **Example.**
 Invert in 50% of all images all pixels::
@@ -580,6 +615,8 @@ ContrastNormalization
 
 Augmenter that changes the contrast of images.
 
+API link: :class:`~imgaug.augmenters.arithmetic.ContrastNormalization`
+
 **Example.**
 Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image::
 
@@ -603,6 +640,8 @@ JpegCompression
 ---------------
 
 Degrade the quality of images by JPEG-compressing them.
+
+API link: :class:`~imgaug.augmenters.arithmetic.JpegCompression`
 
 **Example.**
 Remove high frequency components in images via JPEG compression with

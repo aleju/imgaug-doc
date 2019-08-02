@@ -7,11 +7,15 @@ HorizontalFlip
 
 Alias for ``Fliplr``.
 
+API link: :class:`~imgaug.augmenters.flip.HorizontalFlip`
+
 
 VericalFlip
 --------------
 
 Alias for ``Flipud``.
+
+API link: :class:`~imgaug.augmenters.flip.VerticalFlip`
 
 
 Fliplr
@@ -24,6 +28,8 @@ Flip/mirror input images horizontally.
     The default value for the probability is ``0.0``.
     So, to flip *all* input image use ``Fliplr(1.0)`` and *not* just
     ``Fliplr()``.
+
+API link: :class:`~imgaug.augmenters.flip.Fliplr`
 
 **Example.**
 Flip 50% of all images horizontally::
@@ -45,6 +51,8 @@ Flip/mirror input images vertically.
     The default value for the probability is ``0.0``.
     So, to flip *all* input image use ``Flipud(1.0)`` and *not* just
     ``Flipud()``.
+
+API link: :class:`~imgaug.augmenters.flip.Flipud`
 
 **Example.**
 Flip 50% of all images vertically::

@@ -7,6 +7,8 @@ Resize
 
 Augmenter that resizes images to specified heights and widths.
 
+API link: :class:`~imgaug.augmenters.size.Resize`
+
 **Example.**
 Resize each image to height=32 and width=64::
 
@@ -55,6 +57,8 @@ a given full image). Padding adds pixels to the sides (e.g. black pixels).
     This augmenter automatically resizes images back to their original size
     after it has augmented them. To deactivate this, add the
     parameter ``keep_size=False``.
+
+API link: :class:`~imgaug.augmenters.size.CropAndPad`
 
 **Example.**
 Crop or pad each side by up to 10 percent relative to its original size
@@ -118,6 +122,8 @@ Pad images, i.e. adds columns/rows of pixels to them.
 This is a shortcut for ``CropAndPad``. It only accepts positive
 pixel/percent values.
 
+API link: :class:`~imgaug.augmenters.size.Pad`
+
 
 Crop
 ----
@@ -126,6 +132,8 @@ Crop images, i.e. remove columns/rows of pixels at the sides of images.
 
 This is a shortcut for ``CropAndPad``. It only accepts positive
 pixel/percent values and transfers them as negative values to ``CropAndPad``.
+
+API link: :class:`~imgaug.augmenters.size.Crop`
 
 
 PadToFixedSize
@@ -143,6 +151,8 @@ left or right to reach the required width, the augmenter will sometimes
 add 2px to the left and 0px to the right, sometimes add 2px to the right
 and 0px to the left and sometimes add 1px to both sides. Set `position`
 to ``center`` to prevent that.
+
+API link: :class:`~imgaug.augmenters.size.PadToFixedSize`
 
 **Example.**
 For image sides smaller than ``100`` pixels, pad to ``100`` pixels. Do
@@ -215,6 +225,8 @@ sometimes remove 2px from the left and 0px from the right, sometimes
 remove 2px from the right and 0px from the left and sometimes remove 1px
 from both sides. Set `position` to ``center`` to prevent that.
 
+API link: :class:`~imgaug.augmenters.size.CropToFixedSize`
+
 **Example.**
 For image sides larger than ``100`` pixels, crop to ``100`` pixels. Do
 nothing for the other sides. The cropping amounts are randomly (and
@@ -267,6 +279,8 @@ applied. Some augmenters have a ``keep_size`` argument that achieves the
 same goal (if set to ``True``), though this augmenter offers control over
 the interpolation mode and which augmentables to resize (images, heatmaps,
 segmentation maps).
+
+API link: :class:`~imgaug.augmenters.size.KeepSizeByResize`
 
 **Example.**
 Apply random cropping to input images, then resize them back to their

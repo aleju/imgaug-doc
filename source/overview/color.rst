@@ -12,6 +12,8 @@ as well as children C. It changes images from A to B, then applies the
 child augmenters C and finally changes the colorspace back from B to A.
 See also ChangeColorspace() for more.
 
+API link: :class:`~imgaug.augmenters.color.WithColorspace`
+
 **Example.**
 Convert to ``HSV`` colorspace, add a value between ``0`` and ``50``
 (uniformly sampled per image) to the Hue channel, then convert back to the
@@ -48,6 +50,8 @@ range ``[0, 255]``. Before converting back to the source colorspace, the
 saturation channel's values are clipped to ``[0, 255]``. A modulo operation
 is applied to the hue channel's values, followed by a mapping from
 ``[0, 255]`` to ``[0, 180]`` (and finally the colorspace conversion).
+
+API link: :class:`~imgaug.augmenters.color.WithHueAndSaturation`
 
 **Example.**
 Create an augmenter that will add a random value between ``0`` and ``50``
@@ -95,6 +99,8 @@ RGB.
 
 This augmenter is a wrapper around ``WithHueAndSaturation``.
 
+API link: :func:`~imgaug.augmenters.color.MultiplyHueAndSaturation`
+
 **Example.**
 Multiply hue and saturation by random values between ``0.5`` and ``1.5``
 (independently per channel and the same value for all pixels within
@@ -135,6 +141,8 @@ RGB.
 
 This augmenter is a shortcut for ``MultiplyHueAndSaturation(mul_hue=...)``.
 
+API link: :func:`~imgaug.augmenters.color.MultiplyHue`
+
 **Example.**
 Multiply the hue channel of images using random values between ``0.5``
 and ``1.5``::
@@ -158,6 +166,8 @@ RGB.
 This augmenter is a shortcut for
 ``MultiplyHueAndSaturation(mul_saturation=...)``.
 
+API link: :func:`~imgaug.augmenters.color.MultiplySaturation`
+
 **Example.**
 Multiply the saturation channel of images using random values between
 ``0.5`` and ``1.5``::
@@ -179,6 +189,8 @@ values to the H and S channels and afterwards converts back to RGB.
 
 This augmenter is faster than using ``WithHueAndSaturation`` in combination
 with ``Add``.
+
+API link: :class:`~imgaug.augmenters.color.AddToHueAndSaturation`
 
 **Example.**
 Add random values between ``-50`` and ``50`` to the hue and saturation
@@ -205,6 +217,8 @@ to use ``AddToHueAndSaturation`` as otherwise the image will be
 converted twice to HSV and back to RGB.
 
 This augmenter is a shortcut for ``AddToHueAndSaturation(value_hue=...)``.
+
+API link: :func:`~imgaug.augmenters.color.AddToHue`
 
 **Example.**
 Sample random values from the discrete uniform range ``[-50..50]``,
@@ -233,6 +247,8 @@ converted twice to HSV and back to RGB.
 This augmenter is a shortcut for
 ``AddToHueAndSaturation(value_saturation=...)``.
 
+API link: :func:`~imgaug.augmenters.color.AddToSaturation`
+
 **Example.**
 Sample random values from the discrete uniform range ``[-50..50]``,
 and add them to the saturation, i.e. to the ``S`` channel in ``HSV``
@@ -250,6 +266,9 @@ ChangeColorspace
 
 Augmenter to change the colorspace of images.
 
+API link: :class:`~imgaug.augmenters.color.ChangeColorspace`
+
+**Example.**
 The following example shows how to change the colorspace from RGB to HSV,
 then add 50-100 to the first channel, then convert back to RGB.
 This increases the hue value of each image. ::
@@ -269,6 +288,8 @@ Grayscale
 ---------
 
 Augmenter to convert images to their grayscale versions.
+
+API link: :class:`~imgaug.augmenters.color.Grayscale`
 
 **Example.**
 Change images to grayscale and overlay them with the original image by varying
@@ -305,6 +326,8 @@ to the color range in the input image.
     or to have 3 or 4 channels and use colorspace `from_colorspace`. If
     images have 4 channels, it is assumed that the 4th channel is an alpha
     channel and it will not be quantized.
+
+API link: :class:`~imgaug.augmenters.color.KMeansColorQuantization`
 
 **Example.**
 Create an augmenter to apply k-Means color quantization to images using a
@@ -379,6 +402,8 @@ that are made up of very similar colors.
     or to have 3 or 4 channels and use colorspace `from_colorspace`. If
     images have 4 channels, it is assumed that the 4th channel is an alpha
     channel and it will not be quantized.
+
+API link: :class:`~imgaug.augmenters.color.UniformColorQuantization`
 
 **Example.**
 Create an augmenter to apply uniform color quantization to images using a

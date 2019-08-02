@@ -7,6 +7,8 @@ Canny
 
 Apply a canny edge detector to input images.
 
+API link: :class:`~imgaug.augmenters.edges.Canny`
+
 **Example.**
 Create an augmenter that generates random blends between images and
 their canny edge representations::

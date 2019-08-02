@@ -8,6 +8,8 @@ Affine
 
 Augmenter to apply affine transformations to images.
 
+API link: :class:`~imgaug.augmenters.geometric.Affine`
+
 **Example.**
 Scale images to a value of 50 to 150% of their original size::
 
@@ -97,6 +99,8 @@ See also ``Affine`` for a similar technique.
     which will make it significantly slower for such inputs than other
     augmenters. See :ref:`performance`.
 
+API link: :class:`~imgaug.augmenters.geometric.PiecewiseAffine`
+
 **Example.**
 Distort images locally by moving points around, each with a distance v (percent
 relative to image size), where v is sampled per point from ``N(0, z)``
@@ -138,6 +142,8 @@ As a result, most transformations don't change the image very much, while
 some "focus" on polygons far inside the image.
 
 The results of this augmenter have some similarity with ``Crop``.
+
+API link: :class:`~imgaug.augmenters.geometric.PerspectiveTransform`
 
 **Example.**
 Apply perspective transformations using a random scale between ``0.01``
@@ -198,6 +204,8 @@ For a detailed explanation, see ::
     which will make it significantly slower for such inputs than other
     augmenters. See :ref:`performance`.
 
+API link: :class:`~imgaug.augmenters.geometric.ElasticTransformation`
+
 **Example.**
 Distort images locally by moving individual pixels around following
 a distortions field with strength 0.25. The strength of the movement is
@@ -223,6 +231,8 @@ to ``1.0`` in eight steps:
 .. figure:: ../../images/overview_of_augmenters/geometric/elastictransformations_vary_sigmas.jpg
     :alt: ElasticTransformation varying sigma
 
+.. TODO add examples for large sigmas / watery effects
+
 
 Rot90
 -----
@@ -231,6 +241,8 @@ Rotate images clockwise by multiples of 90 degrees.
 
 This could also be achieved using ``Affine``, but ``Rot90`` is
 significantly more efficient.
+
+API link: :class:`~imgaug.augmenters.geometric.Rot90`
 
 .. figure:: ../../images/overview_of_augmenters/geometric/rot90_base_image.jpg
     :alt: Input image for Rot90 examples

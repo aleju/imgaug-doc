@@ -9,6 +9,8 @@ Adjust image contrast by scaling pixel values to ``255*((v/255)**gamma)``.
 
 Values in the range ``gamma=(0.5, 2.0)`` seem to be sensible.
 
+API link: :func:`~imgaug.augmenters.contrast.GammaContrast`
+
 **Example.**
 Modify the contrast of images according to ``255*((v/255)**gamma)``,
 where ``v`` is a pixel value and ``gamma`` is sampled uniformly from
@@ -37,6 +39,8 @@ Adjust image contrast to ``255*1/(1+exp(gain*(cutoff-I_ij/255)))``.
 
 Values in the range ``gain=(5, 20)`` and ``cutoff=(0.25, 0.75)`` seem to
 be sensible.
+
+API link: :func:`~imgaug.augmenters.contrast.SigmoidContrast`
 
 **Example.**
 Modify the contrast of images according to
@@ -70,6 +74,8 @@ Adjust image contrast by scaling pixels to ``255*gain*log_2(1+v/255)``.
 This augmenter is fairly similar to
 ``imgaug.augmenters.arithmetic.Multiply``.
 
+API link: :func:`~imgaug.augmenters.contrast.LogContrast`
+
 **Example.**
 Modify the contrast of images according to ``255*gain*log_2(1+v/255)``,
 where ``v`` is a pixel value and ``gain`` is sampled uniformly from the
@@ -95,6 +101,8 @@ LinearContrast
 --------------
 
 Adjust contrast by scaling each pixel to ``127 + alpha*(v-127)``.
+
+API link: :func:`~imgaug.augmenters.contrast.LinearContrast`
 
 **Example.**
 Modify the contrast of images according to `127 + alpha*(v-127)``,
@@ -130,6 +138,8 @@ In contrast to ``imgaug.augmenters.contrast.CLAHE``, this augmenter
 operates directly on all channels of the input images. It does not
 perform any colorspace transformations and does not focus on specific
 channels (e.g. ``L`` in ``Lab`` colorspace).
+
+API link: :class:`~imgaug.augmenters.contrast.AllChannelsCLAHE`
 
 **Example.**
 Create an augmenter that applies CLAHE to all channels of input images::
@@ -187,6 +197,8 @@ channel numbers (2, 5 or more than 5) are normalized channel-by-channel
 If you want to apply CLAHE to each channel of the original input image's
 colorspace (without any colorspace conversion), use
 ``imgaug.augmenters.contrast.AllChannelsCLAHE`` instead.
+
+API link: :class:`~imgaug.augmenters.contrast.CLAHE`
 
 **Example.**
 Create a standard CLAHE augmenter::
@@ -264,6 +276,8 @@ augmenter operates directly on all channels of the input images. It does
 not perform any colorspace transformations and does not focus on specific
 channels (e.g. ``L`` in ``Lab`` colorspace).
 
+API link: :class:`~imgaug.augmenters.contrast.AllChannelsHistogramEqualization`
+
 **Example.**
 Create an augmenter that applies histogram equalization to all channels
 of input images in the original colorspaces::
@@ -310,6 +324,8 @@ be raised).
 If you want to apply HistogramEqualization to each channel of the original
 input image's colorspace (without any colorspace conversion), use
 ``imgaug.augmenters.contrast.AllChannelsHistogramEqualization`` instead.
+
+API link: :class:`~imgaug.augmenters.contrast.HistogramEqualization`
 
 **Example.**
 Create an augmenter that converts images to ``HLS``/``HSV``/``Lab``

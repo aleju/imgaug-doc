@@ -24,6 +24,8 @@ Currently, if ``factor >= 0.5`` (per image), the results of the first
 branch are used as the new coordinates, otherwise the results of the
 second branch.
 
+API link: :class:`~imgaug.augmenters.blend.Alpha`
+
 **Example.**
 Convert each image to pure grayscale and alpha-blend the result with the
 original image using an alpha of ``50%``, thereby removing about ``50%`` of
@@ -104,6 +106,8 @@ Currently, if ``factor >= 0.5`` (per pixel), the results of the first
 branch are used as the new coordinates, otherwise the results of the
 second branch.
 
+API link: :class:`~imgaug.augmenters.blend.AlphaElementwise`
+
 **Example.**
 Convert each image to pure grayscale and alpha-blend the result with the
 original image using an alpha of ``50%`` for all pixels, thereby removing
@@ -183,6 +187,8 @@ The alpha masks are sampled using a simplex noise method, roughly creating
 connected blobs of 1s surrounded by 0s. If nearest neighbour
 upsampling is used, these blobs can be rectangular with sharp edges.
 
+API link: :class:`~imgaug.augmenters.blend.SimplexNoiseAlpha`
+
 **Example.**
 Detect per image all edges, mark them in a black and white image and
 then alpha-blend the result with the original image using simplex noise
@@ -245,6 +251,8 @@ The alpha masks are sampled using frequency noise of varying scales,
 which can sometimes create large connected blobs of 1s surrounded by 0s
 and other times results in smaller patterns. If nearest neighbour
 upsampling is used, these blobs can be rectangular with sharp edges.
+
+API link: :class:`~imgaug.augmenters.blend.FrequencyNoiseAlpha`
 
 **Example.**
 Detect per image all edges, mark them in a black and white image and

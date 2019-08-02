@@ -11,6 +11,8 @@ Completely or partially transform images to their superpixel representation.
 
     This augmenter is fairly slow. See :ref:`performance`.
 
+API link: :class:`~imgaug.augmenters.segmentation.Superpixels`
+
 **Example.**
 Generate about ``64`` superpixels per image. Replace each one with a
 probability of ``50%`` by its average pixel color. ::
@@ -65,6 +67,8 @@ This augmenter performs the following steps:
        many images. Some images may get more/less cells replaced by
        their average color.)
 
+API link: :class:`~imgaug.augmenters.segmentation.Voronoi`
+
 **Example.**
 Create an augmenter that places a ``20x40`` (``HxW``) grid of cells on
 the image and replaces all pixels within each cell by the cell's average
@@ -115,6 +119,8 @@ This augmenter is a shortcut for the combination of ``Voronoi`` with
 random coordinates of voronoi cells on each image. The cell coordinates
 are sampled uniformly using the image height and width as maxima.
 
+API link: :class:`~imgaug.augmenters.segmentation.UniformVoronoi`
+
 **Example.**
 Sample for each image uniformly the number of voronoi cells ``N`` from the
 interval ``[100, 500]``. Then generates ``N`` coordinates by sampling
@@ -154,6 +160,8 @@ generates a regular grid with ``R`` rows and ``C`` columns of coordinates
 on each image. Then, it drops ``p`` percent of the ``R*C`` coordinates
 to randomize the grid. Each image pixel then belongs to the voronoi
 cell with the closest coordinate.
+
+API link: :class:`~imgaug.augmenters.segmentation.RegularGridVoronoi`
 
 **Example.**
 Place a regular grid of ``10x20`` (``height x width``) coordinates on
@@ -202,6 +210,8 @@ cell with the closest coordinate.
     is always performed at full resolution. This enables the augmenter to
     make most use of the added points for larger images. It does however
     slow down the augmentation process.
+
+API link: :class:`~imgaug.augmenters.segmentation.RelativeRegularGridVoronoi`
 
 **Example.**
 Place a regular grid of ``R x C`` coordinates on each image, where

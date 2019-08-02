@@ -7,6 +7,8 @@ GaussianBlur
 
 Augmenter to blur images using gaussian kernels.
 
+API link: :class:`~imgaug.augmenters.blur.GaussianBlur`
+
 **Example.**
 Blur each image with a gaussian kernel with a sigma of ``3.0``::
 
@@ -21,6 +23,8 @@ AverageBlur
 -----------
 
 Blur an image by computing simple means over neighbourhoods.
+
+API link: :class:`~imgaug.augmenters.blur.AverageBlur`
 
 **Example.**
 Blur each image using a mean over neihbourhoods that have a random size
@@ -47,6 +51,8 @@ MedianBlur
 
 Blur an image by computing median values over neighbourhoods.
 
+API link: :class:`~imgaug.augmenters.blur.MedianBlur`
+
 **Example.**
 Blur each image using a median over neihbourhoods that have a random size
 between 3x3 and 11x11::
@@ -66,6 +72,8 @@ Blur/Denoise an image using a bilateral filter.
 Bilateral filters blur homogenous and textured areas, while trying to
 preserve edges.
 
+API link: :class:`~imgaug.augmenters.blur.BilateralBlur`
+
 **Example.**
 Blur all images using a bilateral filter with a `max distance` sampled
 uniformly from the interval ``[3, 10]`` and wide ranges for `sigma_color`
@@ -83,6 +91,8 @@ MotionBlur
 ----------
 
 Blur images in a way that fakes camera or object movements.
+
+API link: :class:`~imgaug.augmenters.blur.MotionBlur`
 
 **Example.**
 Apply motion blur with a kernel size of ``15x15`` pixels to images::
