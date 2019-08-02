@@ -15,6 +15,7 @@ Completely or partially transform images to their superpixel representation.
 Generate about ``64`` superpixels per image. Replace each one with a
 probability of ``50%`` by its average pixel color. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Superpixels(p_replace=0.5, n_segments=64)
 
 .. figure:: ../../images/overview_of_augmenters/segmentation/superpixels_50_64.jpg

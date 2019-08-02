@@ -71,7 +71,6 @@ by a random factor sampled uniformly from ``[0.5, 1.5]``. It also
 modifies the contrast of the saturation channel. After these steps,
 the ``HSV`` image is converted back to ``RGB``. ::
 
-    import imgaug.augmenters as iaa
     aug = iaa.WithHueAndSaturation([
         iaa.WithChannels(0, iaa.Add((-30, 10))),
         iaa.WithChannels(1, [
@@ -111,7 +110,6 @@ representation. ::
 **Example.**
 Multiply only the hue by random values between ``0.5`` and ``1.5``. ::
 
-    import imgaug.augmenters as iaa
     aug = iaa.MultiplyHueAndSaturation(mul_hue=(0.5, 1.5))
 
 .. figure:: ../../images/overview_of_augmenters/color/multiplyhueandsaturation_mul_hue.jpg
@@ -120,7 +118,6 @@ Multiply only the hue by random values between ``0.5`` and ``1.5``. ::
 **Example.**
 Multiply only the saturation by random values between ``0.5`` and ``1.5``. ::
 
-    import imgaug.augmenters as iaa
     aug = iaa.MultiplyHueAndSaturation(mul_saturation=(0.5, 1.5))
 
 .. figure:: ../../images/overview_of_augmenters/color/multiplyhueandsaturation_mul_saturation.jpg
@@ -257,6 +254,7 @@ The following example shows how to change the colorspace from RGB to HSV,
 then add 50-100 to the first channel, then convert back to RGB.
 This increases the hue value of each image. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Sequential([
         iaa.ChangeColorspace(from_colorspace="RGB", to_colorspace="HSV"),
         iaa.WithChannels(0, iaa.Add((50, 100))),
@@ -276,6 +274,7 @@ Augmenter to convert images to their grayscale versions.
 Change images to grayscale and overlay them with the original image by varying
 strengths, effectively removing 0 to 100% of the color::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Grayscale(alpha=(0.0, 1.0))
 
 .. figure:: ../../images/overview_of_augmenters/color/grayscale.jpg

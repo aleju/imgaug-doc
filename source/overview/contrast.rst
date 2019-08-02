@@ -220,6 +220,7 @@ uniformly sampled from ``[3..21]``. Sampling happens once per image. ::
 Create a CLAHE augmenter with kernel sizes of ``SxS``, where ``S`` is
 sampled from ``N(7, 2)``, but does not go below ``3``::
 
+    import imgaug.parameters as iap
     aug = iaa.CLAHE(
         tile_grid_size_px=iap.Discretize(iap.Normal(loc=7, scale=2)),
         tile_grid_size_px_min=3)
@@ -278,7 +279,6 @@ Same as in the previous example, but alpha-blends the contrast-enhanced
 augmented images with the original input images using random blend
 strengths. This leads to random strengths of the contrast adjustment. ::
 
-    import imgaug.augmenters as iaa
     aug = iaa.Alpha((0.0, 1.0), iaa.AllChannelsHistogramEqualization())
 
 .. figure:: ../../images/overview_of_augmenters/contrast/allchannelshistogramequalization_alpha.jpg

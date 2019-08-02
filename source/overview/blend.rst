@@ -29,6 +29,7 @@ Convert each image to pure grayscale and alpha-blend the result with the
 original image using an alpha of ``50%``, thereby removing about ``50%`` of
 all color. This is equivalent to ``iaa.Grayscale(0.5)``. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Alpha(0.5, iaa.Grayscale(1.0))
 
 .. figure:: ../../images/overview_of_augmenters/blend/alpha_050_grayscale.jpg
@@ -111,6 +112,7 @@ This is also equivalent to ``iaa.Alpha(0.5, iaa.Grayscale(1.0))``, as
 the opacity has a fixed value of ``0.5`` and is hence identical for all
 pixels. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.AlphaElementwise(0.5, iaa.Grayscale(1.0))
 
 .. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_050_grayscale.jpg
@@ -186,6 +188,7 @@ Detect per image all edges, mark them in a black and white image and
 then alpha-blend the result with the original image using simplex noise
 masks. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.SimplexNoiseAlpha(iaa.EdgeDetect(1.0))
 
 .. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha.jpg
@@ -224,6 +227,7 @@ which means that most of the original images (parameter/branch `second`)
 will be kept, rather than using the results of the augmentation
 (parameter/branch `first`). ::
 
+    import imgaug.parameters as iap
     aug = iaa.SimplexNoiseAlpha(
         iaa.EdgeDetect(1.0),
         sigmoid_thresh=iap.Normal(10.0, 5.0))
@@ -247,6 +251,7 @@ Detect per image all edges, mark them in a black and white image and
 then alpha-blend the result with the original image using frequency noise
 masks. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.FrequencyNoiseAlpha(first=iaa.EdgeDetect(1.0))
 
 .. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha.jpg
@@ -298,6 +303,7 @@ most of the original images (parameter/branch `second`) will be kept,
 rather than using the results of the augmentation (parameter/branch
 `first`). ::
 
+    import imgaug.parameters as iap
     aug = iaa.FrequencyNoiseAlpha(
         first=iaa.EdgeDetect(1.0),
         sigmoid_thresh=iap.Normal(10.0, 5.0))

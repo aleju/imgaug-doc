@@ -12,6 +12,7 @@ Add a value to all pixels in an image.
 Add random values between -40 and 40 to images, with each value
 being sampled once per image and then being the same for all pixels::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Add((-40, 40))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/add.jpg
@@ -39,6 +40,7 @@ for neighbouring pixels.
 Add random values between -40 and 40 to images, with each value being sampled
 per pixel::
 
+    import imgaug.augmenters as iaa
     aug = iaa.AddElementwise((-40, 40))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/addelementwise.jpg
@@ -65,6 +67,7 @@ Add gaussian noise to an image, sampled once per pixel from a normal
 distribution ``N(0, s)``, where ``s`` is sampled per image and varies between
 ``0`` and ``0.2*255``::
 
+    import imgaug.augmenters as iaa
     aug = iaa.AdditiveGaussianNoise(scale=(0, 0.2*255))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise.jpg
@@ -113,6 +116,7 @@ salt and pepper noise.
 Add laplace noise to an image, sampled once per pixel from ``Laplace(0, s)``,
 where ``s`` is sampled per image and varies between ``0`` and ``0.2*255``::
 
+    import imgaug.augmenters as iaa
     aug = iaa.AdditiveLaplaceNoise(scale=(0, 0.2*255))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise.jpg
@@ -165,6 +169,7 @@ It is recommended to usually set ``per_channel`` to ``True``.
 Add poisson noise to an image, sampled once per pixel from ``Poisson(lam)``,
 where ``lam`` is sampled per image and varies between ``0`` and ``40``::
 
+    import imgaug.augmenters as iaa
     aug = iaa.AdditivePoissonNoise(scale=(0, 40))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise.jpg
@@ -207,6 +212,7 @@ image darker or brighter.
 **Example.**
 Multiply each image with a random value between 0.5 and 1.5::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Multiply((0.5, 1.5))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/multiply.jpg
@@ -232,6 +238,7 @@ pixels, making each pixel darker or brighter.
 **Example.**
 Multiply each pixel with a random value between 0.5 and 1.5::
 
+    import imgaug.augmenters as iaa
     aug = iaa.MultiplyElementwise((0.5, 1.5))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/multiplyelementwise.jpg
@@ -257,6 +264,7 @@ Augmenter that sets a certain fraction of pixels in images to zero.
 Sample per image a value ``p`` from the range ``0<=p<=0.2`` and then drop
 ``p`` percent of all pixels in the image (i.e. convert them to black pixels)::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Dropout(p=(0, 0.2))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/dropout.jpg
@@ -283,6 +291,7 @@ Drop 2% of all pixels by converting them to black pixels, but do
 that on a lower-resolution version of the image that has 50% of the original
 size, leading to 2x2 squares being dropped::
 
+    import imgaug.augmenters as iaa
     aug = iaa.CoarseDropout(0.02, size_percent=0.5)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsedropout.jpg
@@ -293,6 +302,7 @@ Drop 0 to 5% of all pixels by converting them to black pixels, but do
 that on a lower-resolution version of the image that has 5% to 50% of the
 original size, leading to large rectangular areas being dropped::
 
+    import imgaug.augmenters as iaa
     aug = iaa.CoarseDropout((0.0, 0.05), size_percent=(0.02, 0.25))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsedropout_both_uniform.jpg
@@ -320,6 +330,7 @@ Replace pixels in an image with new values.
 Replace ``10%`` of all pixels with either the value ``0`` or the value
 ``255``::
 
+    import imgaug.augmenters as iaa
     aug = ReplaceElementwise(0.1, [0, 255])
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/replaceelementwise.jpg
@@ -353,7 +364,6 @@ Replace ``10%`` of all pixels by gaussian noise centered around ``128``. Sample
 the replacement mask at a lower resolution (``8x8`` pixels) and upscale it to
 the image size, resulting in coarse areas being replaced by gaussian noise. ::
 
-    import imgaug.parameters as iap
     aug = ReplaceElementwise(
         iap.FromLowerResolution(iap.Binomial(0.1), size_px=8),
         iap.Normal(128, 0.4*128),
@@ -374,6 +384,7 @@ always set to ``True``.
 **Example.**
 Replace ``10%`` of all pixels with impulse noise::
 
+    import imgaug.augmenters as iaa
     aug = iaa.ImpulseNoise(0.1)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/impulsenoise.jpg
@@ -388,6 +399,7 @@ Replace pixels in images with salt/pepper noise (white/black-ish colors).
 **Example.**
 Replace ``10%`` of all pixels with salt and pepper noise::
 
+    import imgaug.augmenters as iaa
     aug = iaa.SaltAndPepper(0.1)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/saltandpepper.jpg
@@ -415,6 +427,7 @@ The mask is then upscaled to the input image size, leading to large
 rectangular areas being marked as to be replaced. These areas are then
 replaced in the input image by salt/pepper noise. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.CoarseSaltAndPepper(0.05, size_percent=(0.01, 0.1))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsesaltandpepper.jpg
@@ -452,6 +465,7 @@ images.
 **Example.**
 Replace ``10%`` of all pixels with salt noise (white-ish colors)::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Salt(0.1)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/salt.jpg
@@ -477,6 +491,7 @@ The mask is then upscaled to the input image size, leading to large
 rectangular areas being marked as to be replaced. These areas are then
 replaced in the input image by salt noise. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.CoarseSalt(0.05, size_percent=(0.01, 0.1))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsesalt.jpg
@@ -500,6 +515,7 @@ not uniformly black.
 **Example.**
 Replace ``10%`` of all pixels with pepper noise (black-ish colors)::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Pepper(0.1)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/pepper.jpg
@@ -524,6 +540,7 @@ The mask is then upscaled to the input image size, leading to large
 rectangular areas being marked as to be replaced. These areas are then
 replaced in the input image by pepper noise. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.CoarsePepper(0.05, size_percent=(0.01, 0.1))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsepepper.jpg
@@ -542,6 +559,7 @@ Augmenter that inverts all values in images, i.e. sets a pixel from value
 **Example.**
 Invert in 50% of all images all pixels::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Invert(0.5)
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/invert.jpg
@@ -565,6 +583,7 @@ Augmenter that changes the contrast of images.
 **Example.**
 Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image::
 
+    import imgaug.augmenters as iaa
     aug = iaa.ContrastNormalization((0.5, 1.5))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/contrastnormalization.jpg
@@ -591,6 +610,7 @@ a *compression strength* between ``80`` and ``95`` (randomly and
 uniformly sampled per image). This corresponds to a (very low) *quality*
 setting of ``5`` to ``20``. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.JpegCompression(compression=(70, 99))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/jpegcompression.jpg

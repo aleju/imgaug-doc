@@ -11,6 +11,7 @@ Apply a Convolution to input images.
 **Example.**
 Convolve each image with a 3x3 kernel::
 
+    import imgaug.augmenters as iaa
     matrix = np.array([[0, -1, 0],
                        [-1, 4, -1],
                        [0, -1, 0]])
@@ -50,6 +51,7 @@ image.
 Sharpen an image, then overlay the results with the original using an alpha
 between 0.0 and 1.0::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Sharpen(alpha=(0.0, 1.0), lightness=(0.75, 2.0))
 
 .. figure:: ../../images/overview_of_augmenters/convolutional/sharpen.jpg
@@ -80,6 +82,7 @@ image.
 Emboss an image, then overlay the results with the original using an alpha
 between ``0.0`` and ``1.0``::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Emboss(alpha=(0.0, 1.0), strength=(0.5, 1.5))
 
 .. figure:: ../../images/overview_of_augmenters/convolutional/emboss.jpg
@@ -111,6 +114,7 @@ image.
 Detect edges in images, turning them into black and white images and then overlay
 these with the original images using random alphas between 0.0 and 1.0::
 
+    import imgaug.augmenters as iaa
     aug = iaa.EdgeDetect(alpha=(0.0, 1.0))
 
 **Example.**
@@ -132,6 +136,7 @@ Detect edges having random directions (0 to 360 degrees) in images,
 turning the images into black and white versions and then overlay
 these with the original images using random alphas between 0.0 and 1.0::
 
+    import imgaug.augmenters as iaa
     aug = iaa.DirectedEdgeDetect(alpha=(0.0, 1.0), direction=(0.0, 1.0))
 
 **Example.**

@@ -11,6 +11,7 @@ Augmenter to apply affine transformations to images.
 **Example.**
 Scale images to a value of 50 to 150% of their original size::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Affine(scale=(0.5, 1.5))
 
 .. figure:: ../../images/overview_of_augmenters/geometric/affine_scale.jpg
@@ -101,6 +102,7 @@ Distort images locally by moving points around, each with a distance v (percent
 relative to image size), where v is sampled per point from ``N(0, z)``
 ``z`` is sampled per image from the range 0.01 to 0.05::
 
+    import imgaug.augmenters as iaa
     aug = iaa.PiecewiseAffine(scale=(0.01, 0.05))
 
 .. figure:: ../../images/overview_of_augmenters/geometric/piecewiseaffine.jpg
@@ -143,6 +145,7 @@ and ``0.15`` per image, where the scale is roughly a measure of how far
 the perspective transformation's corner points may be distanced from the
 image's corner points::
 
+    import imgaug.augmenters as iaa
     aug = iaa.PerspectiveTransform(scale=(0.01, 0.15))
 
 .. figure:: ../../images/overview_of_augmenters/geometric/perspectivetransform.jpg
@@ -200,6 +203,7 @@ Distort images locally by moving individual pixels around following
 a distortions field with strength 0.25. The strength of the movement is
 sampled per pixel from the range 0 to 5.0::
 
+    import imgaug.augmenters as iaa
     aug = iaa.ElasticTransformation(alpha=(0, 5.0), sigma=0.25)
 
 .. figure:: ../../images/overview_of_augmenters/geometric/elastictransformations.jpg
@@ -240,6 +244,7 @@ Resize these images afterwards to keep the size that they had before
 augmentation.
 This may cause the images to look distorted. ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Rot90(1)
 
 .. figure:: ../../images/overview_of_augmenters/geometric/rot90_k_is_1.jpg

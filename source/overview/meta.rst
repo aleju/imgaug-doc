@@ -11,6 +11,7 @@ or random order.
 **Example.**
 Apply in predefined order::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Sequential([
         iaa.Affine(translate_px={"x":-40}),
         iaa.AdditiveGaussianNoise(scale=0.1*255)
@@ -40,6 +41,7 @@ List augmenter that applies only some of its children to images.
 **Example.**
 Apply two of four given augmenters::
 
+    import imgaug.augmenters as iaa
     aug = iaa.SomeOf(2, [
         iaa.Affine(rotate=45),
         iaa.AdditiveGaussianNoise(scale=0.2*255),
@@ -86,6 +88,7 @@ Augmenter that always executes exactly one of its children.
 **Example.**
 Apply one of four augmenters to each image::
 
+    import imgaug.augmenters as iaa
     aug = iaa.OneOf([
         iaa.Affine(rotate=45),
         iaa.AdditiveGaussianNoise(scale=0.2*255),
@@ -105,6 +108,7 @@ Augment only p percent of all images with one or more augmenters.
 **Example.**
 Apply gaussian blur to about 50% of all images::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Sometimes(0.5, iaa.GaussianBlur(sigma=2.0))
 
 .. figure:: ../../images/overview_of_augmenters/meta/sometimes.jpg
@@ -132,6 +136,7 @@ Apply child augmenters to specific channels.
 **Example.**
 Increase each pixel's R-value (redness) by ``10`` to ``100``::
 
+    import imgaug.augmenters as iaa
     aug = iaa.WithChannels(0, iaa.Add((10, 100)))
 
 .. figure:: ../../images/overview_of_augmenters/meta/withchannels.jpg
@@ -151,6 +156,7 @@ Noop
 
 Augmenter that never changes input images ("no operation"). ::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Noop()
 
 .. figure:: ../../images/overview_of_augmenters/meta/noop.jpg
@@ -165,6 +171,8 @@ Augmenter that calls a lambda function for each batch of input image.
 
 **Example.**
 Replace in every image each fourth row with black pixels::
+
+    import imgaug.augmenters as iaa
 
     def img_func(images, random_state, parents, hooks):
         for img in images:
@@ -199,6 +207,7 @@ and keypoints.
 Check if each image in a batch has shape ``32x32x3``, otherwise raise an
 exception::
 
+    import imgaug.augmenters as iaa
     seq = iaa.Sequential([
         iaa.AssertShape((None, 32, 32, 3)),
         iaa.Fliplr(0.5) # only executed if shape matches

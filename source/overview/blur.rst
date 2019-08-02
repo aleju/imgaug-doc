@@ -10,6 +10,7 @@ Augmenter to blur images using gaussian kernels.
 **Example.**
 Blur each image with a gaussian kernel with a sigma of ``3.0``::
 
+    import imgaug.augmenters as iaa
     aug = iaa.GaussianBlur(sigma=(0.0, 3.0))
 
 .. figure:: ../../images/overview_of_augmenters/blur/gaussianblur.jpg
@@ -25,6 +26,7 @@ Blur an image by computing simple means over neighbourhoods.
 Blur each image using a mean over neihbourhoods that have a random size
 between 2x2 and 11x11::
 
+    import imgaug.augmenters as iaa
     aug = iaa.AverageBlur(k=(2, 11))
 
 .. figure:: ../../images/overview_of_augmenters/blur/averageblur.jpg
@@ -49,6 +51,7 @@ Blur an image by computing median values over neighbourhoods.
 Blur each image using a median over neihbourhoods that have a random size
 between 3x3 and 11x11::
 
+    import imgaug.augmenters as iaa
     aug = iaa.MedianBlur(k=(3, 11))
 
 .. figure:: ../../images/overview_of_augmenters/blur/medianblur.jpg
@@ -68,6 +71,7 @@ Blur all images using a bilateral filter with a `max distance` sampled
 uniformly from the interval ``[3, 10]`` and wide ranges for `sigma_color`
 and `sigma_space`::
 
+    import imgaug.augmenters as iaa
     aug = iaa.BilateralBlur(
         d=(3, 10), sigma_color=(10, 250), sigma_space=(10, 250))
 
@@ -83,6 +87,7 @@ Blur images in a way that fakes camera or object movements.
 **Example.**
 Apply motion blur with a kernel size of ``15x15`` pixels to images::
 
+    import imgaug.augmenters as iaa
     aug = iaa.MotionBlur(k=15)
 
 .. figure:: ../../images/overview_of_augmenters/blur/motionblur.jpg

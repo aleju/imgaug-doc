@@ -28,6 +28,7 @@ Flip/mirror input images horizontally.
 **Example.**
 Flip 50% of all images horizontally::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Fliplr(0.5)
 
 .. figure:: ../../images/overview_of_augmenters/flip/fliplr.jpg

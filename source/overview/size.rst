@@ -10,6 +10,7 @@ Augmenter that resizes images to specified heights and widths.
 **Example.**
 Resize each image to height=32 and width=64::
 
+    import imgaug.augmenters as iaa
     aug = iaa.Resize({"height": 32, "width": 64})
 
 .. figure:: ../../images/overview_of_augmenters/size/resize_32x64.jpg
@@ -59,6 +60,7 @@ a given full image). Padding adds pixels to the sides (e.g. black pixels).
 Crop or pad each side by up to 10 percent relative to its original size
 (negative values result in cropping, positive in padding)::
 
+    import imgaug.augmenters as iaa
     aug = iaa.CropAndPad(percent=(-0.25, 0.25))
 
 .. figure:: ../../images/overview_of_augmenters/size/cropandpad_percent.jpg
