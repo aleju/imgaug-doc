@@ -17,6 +17,7 @@ Convert non-snowy landscapes to snowy ones.
 
 This augmenter expects to get an image that roughly shows a landscape.
 
+**Example.**
 Search for all pixels in the image with a lightness value in HLS
 colorspace of less than ``140`` and increase their lightness by a factor
 of ``2.5``. ::
@@ -30,6 +31,7 @@ of ``2.5``. ::
 .. figure:: ../../images/overview_of_augmenters/weather/fastsnowylandscape.jpg
     :alt: FastSnowyLandscape
 
+**Example.**
 Search for all pixels in the image with a lightness value in HLS
 colorspace of less than ``128`` or less than ``200`` (one of these
 values is picked per image) and multiply their lightness by a factor
@@ -44,6 +46,7 @@ image). ::
 .. figure:: ../../images/overview_of_augmenters/weather/fastsnowylandscape_random_choice.jpg
     :alt: FastSnowyLandscape with choice and uniform
 
+**Example.**
 Similar to the previous example, but the lightness threshold is sampled
 from ``uniform(100, 255)`` (per image) and the multiplier
 from ``uniform(1.0, 4.0)`` (per image). This seems to produce good and
@@ -69,6 +72,7 @@ image, leading to varying densities and frequency patterns of clouds.
 This augmenter seems to be fairly robust w.r.t. the image size. Tested
 with ``96x128``, ``192x256`` and ``960x1280``.
 
+**Example.**
 Create an augmenter that adds clouds to images::
 
     import imgaug.augmenters as iaa
@@ -90,6 +94,7 @@ low-frequency patterns.
 This augmenter seems to be fairly robust w.r.t. the image size. Tested
 with ``96x128``, ``192x256`` and ``960x1280``.
 
+**Example.**
 Create an augmenter that adds fog to images::
 
     import imgaug.augmenters as iaa
@@ -113,15 +118,18 @@ Add falling snowflakes to images.
 This is a wrapper around ``SnowflakesLayer``. It executes 1 to 3 layers
 per image.
 
+**Example.**
 Add snowflakes to small images (around ``96x128``)::
 
     import imgaug.augmenters as iaa
     aug = iaa.Snowflakes(flake_size=(0.1, 0.4), speed=(0.01, 0.05))
 
+**Example.**
 Add snowflakes to medium-sized images (around ``192x256``)::
 
     aug = iaa.Snowflakes(flake_size=(0.2, 0.7), speed=(0.007, 0.03))
 
+**Example.**
 Add snowflakes to large images (around ``960x1280``)::
 
     aug = iaa.Snowflakes(flake_size=(0.7, 0.95), speed=(0.001, 0.03))

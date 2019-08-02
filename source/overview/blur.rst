@@ -7,6 +7,7 @@ GaussianBlur
 
 Augmenter to blur images using gaussian kernels.
 
+**Example.**
 Blur each image with a gaussian kernel with a sigma of ``3.0``::
 
     aug = iaa.GaussianBlur(sigma=(0.0, 3.0))
@@ -20,6 +21,7 @@ AverageBlur
 
 Blur an image by computing simple means over neighbourhoods.
 
+**Example.**
 Blur each image using a mean over neihbourhoods that have a random size
 between 2x2 and 11x11::
 
@@ -28,6 +30,7 @@ between 2x2 and 11x11::
 .. figure:: ../../images/overview_of_augmenters/blur/averageblur.jpg
     :alt: AverageBlur
 
+**Example.**
 Blur each image using a mean over neihbourhoods that have random sizes,
 which can vary between 5 and 11 in height and 1 and 3 in width::
 
@@ -42,6 +45,7 @@ MedianBlur
 
 Blur an image by computing median values over neighbourhoods.
 
+**Example.**
 Blur each image using a median over neihbourhoods that have a random size
 between 3x3 and 11x11::
 
@@ -59,6 +63,7 @@ Blur/Denoise an image using a bilateral filter.
 Bilateral filters blur homogenous and textured areas, while trying to
 preserve edges.
 
+**Example.**
 Blur all images using a bilateral filter with a `max distance` sampled
 uniformly from the interval ``[3, 10]`` and wide ranges for `sigma_color`
 and `sigma_space`::
@@ -75,6 +80,7 @@ MotionBlur
 
 Blur images in a way that fakes camera or object movements.
 
+**Example.**
 Apply motion blur with a kernel size of ``15x15`` pixels to images::
 
     aug = iaa.MotionBlur(k=15)
@@ -82,6 +88,7 @@ Apply motion blur with a kernel size of ``15x15`` pixels to images::
 .. figure:: ../../images/overview_of_augmenters/blur/motionblur.jpg
     :alt: MotionBlur
 
+**Example.**
 Apply motion blur with a kernel size of ``15x15`` pixels and a blur angle
 of either ``-45`` or ``45`` degrees (randomly picked per image)::
 

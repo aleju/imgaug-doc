@@ -8,6 +8,7 @@ Sequential
 List augmenter that may contain other augmenters to apply in sequence
 or random order.
 
+**Example.**
 Apply in predefined order::
 
     aug = iaa.Sequential([
@@ -18,6 +19,7 @@ Apply in predefined order::
 .. figure:: ../../images/overview_of_augmenters/meta/sequential.jpg
     :alt: Sequential
 
+**Example.**
 Apply in random order (note that the order is sampled once per batch and then
 the same for all images within the batch)::
 
@@ -35,6 +37,7 @@ SomeOf
 
 List augmenter that applies only some of its children to images.
 
+**Example.**
 Apply two of four given augmenters::
 
     aug = iaa.SomeOf(2, [
@@ -47,8 +50,9 @@ Apply two of four given augmenters::
 .. figure:: ../../images/overview_of_augmenters/meta/someof.jpg
     :alt: SomeOf
 
-Apply 0 to <max> given augmenters (where <max> is automatically replaced with
-the number of children)::
+**Example.**
+Apply ``0`` to ``<max>`` given augmenters (where ``<max>`` is automatically
+replaced with the number of children)::
 
     aug = iaa.SomeOf((0, None), [
         iaa.Affine(rotate=45),
@@ -60,6 +64,7 @@ the number of children)::
 .. figure:: ../../images/overview_of_augmenters/meta/someof_0_to_none.jpg
     :alt: SomeOf 0 to None
 
+**Example.**
 Pick two of four given augmenters and apply them in random order::
 
     aug = iaa.SomeOf(2, [
@@ -78,6 +83,7 @@ OneOf
 
 Augmenter that always executes exactly one of its children.
 
+**Example.**
 Apply one of four augmenters to each image::
 
     aug = iaa.OneOf([
@@ -96,6 +102,7 @@ Sometimes
 
 Augment only p percent of all images with one or more augmenters.
 
+**Example.**
 Apply gaussian blur to about 50% of all images::
 
     aug = iaa.Sometimes(0.5, iaa.GaussianBlur(sigma=2.0))
@@ -103,6 +110,7 @@ Apply gaussian blur to about 50% of all images::
 .. figure:: ../../images/overview_of_augmenters/meta/sometimes.jpg
     :alt: Sometimes
 
+**Example.**
 Apply gaussian blur to about 50% of all images. Apply a mixture of affine
 rotations and sharpening to the other 50%. ::
 
@@ -121,14 +129,16 @@ WithChannels
 
 Apply child augmenters to specific channels.
 
-Increase each pixel's R-value (redness) by 10 to 100::
+**Example.**
+Increase each pixel's R-value (redness) by ``10`` to ``100``::
 
     aug = iaa.WithChannels(0, iaa.Add((10, 100)))
 
 .. figure:: ../../images/overview_of_augmenters/meta/withchannels.jpg
     :alt: WithChannels
 
-Rotate each image's red channel by 0 to 45 degrees::
+**Example.**
+Rotate each image's red channel by ``0`` to ``45`` degrees::
 
     aug = iaa.WithChannels(0, iaa.Affine(rotate=(0, 45)))
 
@@ -153,6 +163,7 @@ Lambda
 
 Augmenter that calls a lambda function for each batch of input image.
 
+**Example.**
 Replace in every image each fourth row with black pixels::
 
     def img_func(images, random_state, parents, hooks):
@@ -184,7 +195,8 @@ AssertShape
 Augmenter to make assumptions about the shape of input image(s)
 and keypoints.
 
-Check if each image in a batch has shape 32x32x3, otherwise raise an
+**Example.**
+Check if each image in a batch has shape ``32x32x3``, otherwise raise an
 exception::
 
     seq = iaa.Sequential([
@@ -192,8 +204,9 @@ exception::
         iaa.Fliplr(0.5) # only executed if shape matches
     ])
 
-Check if each image in a batch has a height in the range 32<=x<64,
-a width of exactly 64 and either 1 or 3 channels::
+**Example.**
+Check if each image in a batch has a height in the range ``32<=x<64``,
+a width of exactly ``64`` and either ``1`` or ``3`` channels::
 
     seq = iaa.Sequential([
         iaa.AssertShape((None, (32, 64), 32, [1, 3])),
@@ -206,6 +219,7 @@ ChannelShuffle
 
 Randomize the order of channels in input images.
 
+**Example.**
 Shuffle all channels of 35% of all images::
 
     import imgaug.augmenters as iaa
@@ -214,6 +228,7 @@ Shuffle all channels of 35% of all images::
 .. figure:: ../../images/overview_of_augmenters/meta/channelshuffle.jpg
     :alt: ChannelShuffle
 
+**Example.**
 Shuffle only channels ``0`` and ``1`` of 35% of all images. As the new
 channel orders ``0, 1`` and ``1, 0`` are both valid outcomes of the
 shuffling, it means that for ``0.35 * 0.5 = 0.175`` or 17.5% of all images

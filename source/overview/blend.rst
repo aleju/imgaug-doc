@@ -24,6 +24,7 @@ Currently, if ``factor >= 0.5`` (per image), the results of the first
 branch are used as the new coordinates, otherwise the results of the
 second branch.
 
+**Example.**
 Convert each image to pure grayscale and alpha-blend the result with the
 original image using an alpha of ``50%``, thereby removing about ``50%`` of
 all color. This is equivalent to ``iaa.Grayscale(0.5)``. ::
@@ -33,6 +34,7 @@ all color. This is equivalent to ``iaa.Grayscale(0.5)``. ::
 .. figure:: ../../images/overview_of_augmenters/blend/alpha_050_grayscale.jpg
     :alt: Alpha-blend images with grayscale images
 
+**Example.**
 Same as in the previous example, but the alpha factor is sampled uniformly
 from the interval ``[0.0, 1.0]`` once per image, thereby removing a random
 fraction of all colors. This is equivalent to
@@ -43,6 +45,7 @@ fraction of all colors. This is equivalent to
 .. figure:: ../../images/overview_of_augmenters/blend/alpha_uniform_factor.jpg
     :alt: Alpha-blend images with grayscale images using a random factor
 
+**Example.**
 First, rotate each image by a random degree sampled uniformly from the
 interval ``[-20, 20]``. Then, alpha-blend that new image with the original
 one using a random factor sampled uniformly from the interval
@@ -60,6 +63,7 @@ look rotated (factors near ``0.0``). ::
 .. figure:: ../../images/overview_of_augmenters/blend/alpha_affine_per_channel.jpg
     :alt: Alpha-blend images channelwise with rotated ones
 
+**Example.**
 Apply two branches of augmenters -- ``A`` and ``B`` -- *independently*
 to input images and alpha-blend the results of these branches using a
 factor ``f``. Branch ``A`` increases image pixel intensities by ``100``
@@ -75,6 +79,7 @@ contain a bit of ``A`` and a bit of ``B``. ::
 .. figure:: ../../images/overview_of_augmenters/blend/alpha_two_branches.jpg
     :alt: Alpha with two branches
 
+**Example.**
 Apply median blur to each image and alpha-blend the result with the original
 image using an alpha factor of either exactly ``0.25`` or exactly ``0.75``
 (sampled once per image). ::
@@ -98,6 +103,7 @@ Currently, if ``factor >= 0.5`` (per pixel), the results of the first
 branch are used as the new coordinates, otherwise the results of the
 second branch.
 
+**Example.**
 Convert each image to pure grayscale and alpha-blend the result with the
 original image using an alpha of ``50%`` for all pixels, thereby removing
 about ``50%`` of all color. This is equivalent to ``iaa.Grayscale(0.5)``.
@@ -110,6 +116,7 @@ pixels. ::
 .. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_050_grayscale.jpg
     :alt: Alpha-blend images pixelwise with grayscale images
 
+**Example.**
 Same as in the previous example, but the alpha factor is sampled uniformly
 from the interval ``[0.0, 1.0]`` once per pixel, thereby removing a random
 fraction of all colors from each pixel. This is equivalent to
@@ -120,6 +127,7 @@ fraction of all colors from each pixel. This is equivalent to
 .. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_uniform_factor.jpg
     :alt: Alpha-blend images pixelwise with grayscale images using a random factor
 
+**Example.**
 First, rotate each image by a random degree sampled uniformly from the
 interval ``[-20, 20]``. Then, alpha-blend that new image with the original
 one using a random factor sampled uniformly from the interval
@@ -137,6 +145,7 @@ may not look rotated (factors near ``0.0``). ::
 .. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_affine_per_channel.jpg
     :alt: Alpha-blend images pixelwise and channelwise with rotated ones
 
+**Example.**
 Apply two branches of augmenters -- ``A`` and ``B`` -- *independently*
 to input images and alpha-blend the results of these branches using a
 factor ``f``. Branch ``A`` increases image pixel intensities by ``100``
@@ -152,6 +161,7 @@ contain a bit of ``A`` and a bit of ``B``. ::
 .. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_two_branches.jpg
     :alt: AlphaElementwise with two branches
 
+**Example.**
 Apply median blur to each image and alpha-blend the result with the
 original image using an alpha factor of either exactly ``0.25`` or
 exactly ``0.75`` (sampled once per pixel). ::
@@ -171,6 +181,7 @@ The alpha masks are sampled using a simplex noise method, roughly creating
 connected blobs of 1s surrounded by 0s. If nearest neighbour
 upsampling is used, these blobs can be rectangular with sharp edges.
 
+**Example.**
 Detect per image all edges, mark them in a black and white image and
 then alpha-blend the result with the original image using simplex noise
 masks. ::
@@ -180,6 +191,7 @@ masks. ::
 .. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha.jpg
     :alt: SimplexNoiseAlpha with EdgeDetect
 
+**Example.**
 Same as in the previous example, but using only nearest neighbour
 upscaling to scale the simplex noise masks to the final image sizes, i.e.
 no nearest linear upsampling is used. This leads to rectangles with sharp
@@ -192,6 +204,7 @@ edges. ::
 .. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_nearest.jpg
     :alt: SimplexNoiseAlpha with EdgeDetect and nearest neighbour upscaling
 
+**Example.**
 Same as in the previous example, but using only linear upscaling to
 scale the simplex noise masks to the final image sizes, i.e. no nearest
 neighbour upsampling is used. This leads to rectangles with smooth edges. ::
@@ -203,6 +216,7 @@ neighbour upsampling is used. This leads to rectangles with smooth edges. ::
 .. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_linear.jpg
     :alt: SimplexNoiseAlpha with EdgeDetect and linear upscaling
 
+**Example.**
 Same as in the first example, but using a threshold for the sigmoid
 function that is further to the right. This is more conservative, i.e.
 the generated noise masks will be mostly black (values around ``0.0``),
@@ -228,6 +242,7 @@ which can sometimes create large connected blobs of 1s surrounded by 0s
 and other times results in smaller patterns. If nearest neighbour
 upsampling is used, these blobs can be rectangular with sharp edges.
 
+**Example.**
 Detect per image all edges, mark them in a black and white image and
 then alpha-blend the result with the original image using frequency noise
 masks. ::
@@ -237,6 +252,7 @@ masks. ::
 .. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha.jpg
     :alt: FrequencyNoiseAlpha with EdgeDetect
 
+**Example.**
 Same as the first example, but using only linear upscaling to
 scale the frequency noise masks to the final image sizes, i.e. no nearest
 neighbour upsampling is used. This results in smooth edges. ::
@@ -248,6 +264,7 @@ neighbour upsampling is used. This results in smooth edges. ::
 .. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_nearest.jpg
     :alt: FrequencyNoiseAlpha with EdgeDetect and nearest neighbour upscaling
 
+**Example.**
 Same as the first example, but using only linear upscaling to
 scale the frequency noise masks to the final image sizes, i.e. no nearest
 neighbour upsampling is used. This results in smooth edges. ::
@@ -259,6 +276,7 @@ neighbour upsampling is used. This results in smooth edges. ::
 .. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_linear.jpg
     :alt: FrequencyNoiseAlpha with EdgeDetect and linear upscaling
 
+**Example.**
 Same as in the previous example, but with the exponent set to a constant
 ``-2`` and the sigmoid deactivated, resulting in cloud-like patterns
 without sharp edges. ::
@@ -272,6 +290,7 @@ without sharp edges. ::
 .. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_clouds.jpg
     :alt: FrequencyNoiseAlpha with EdgeDetect and a cloudy pattern
 
+**Example.**
 Same as the first example, but using a threshold for the sigmoid function
 that is further to the right. This is more conservative, i.e. the generated
 noise masks will be mostly black (values around ``0.0``), which means that

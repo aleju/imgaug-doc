@@ -21,7 +21,7 @@ Note that this augmenter is very similar to ``AverageBlur``.
 to the kernel size, with optional upscaling afterwards. The upscaling
 is configured to create "pixelated"/"blocky" images by default.
 
-
+**Example.**
 Create an augmenter that always pools with a kernel size of ``2 x 2``::
 
     import imgaug.augmenters as iaa
@@ -30,6 +30,7 @@ Create an augmenter that always pools with a kernel size of ``2 x 2``::
 .. figure:: ../../images/overview_of_augmenters/pooling/averagepooling.jpg
     :alt: AveragePooling
 
+**Example.**
 Create an augmenter that always pools with a kernel size of ``2 x 2``
 and does *not* resize back to the input image size, i.e. the resulting
 images have half the resolution::
@@ -39,6 +40,7 @@ images have half the resolution::
 .. figure:: ../../images/overview_of_augmenters/pooling/averagepooling_keep_size_false.jpg
     :alt: AveragePooling with keep_size=False
 
+**Example.**
 Create an augmenter that always pools either with a kernel size
 of ``2 x 2`` or ``8 x 8``::
 
@@ -47,6 +49,7 @@ of ``2 x 2`` or ``8 x 8``::
 .. figure:: ../../images/overview_of_augmenters/pooling/averagepooling_choice.jpg
     :alt: AveragePooling with a choice of two kernel sizes
 
+**Example.**
 Create an augmenter that always pools with a kernel size of
 ``1 x 1`` (does nothing) to ``7 x 7``. The kernel sizes are always
 symmetric. ::
@@ -56,6 +59,7 @@ symmetric. ::
 .. figure:: ../../images/overview_of_augmenters/pooling/averagepooling_uniform.jpg
     :alt: AveragePooling with a uniform distribution over kernel sizes
 
+**Example.**
 Create an augmenter that always pools with a kernel size of
 ``H x W`` where ``H`` and ``W`` are both sampled independently from the
 range ``[1..7]``. E.g. resulting kernel sizes could be ``3 x 7``
@@ -82,6 +86,7 @@ The maximum within each pixel window is always taken channelwise.
 This augmenter does not affect heatmaps, segmentation maps or
 coordinates-based augmentables (e.g. keypoints, bounding boxes, ...).
 
+**Example.**
 Create an augmenter that always pools with a kernel size of ``2 x 2``::
 
     import imgaug.augmenters as iaa
@@ -90,6 +95,7 @@ Create an augmenter that always pools with a kernel size of ``2 x 2``::
 .. figure:: ../../images/overview_of_augmenters/pooling/maxpooling.jpg
     :alt: MaxPooling
 
+**Example.**
 Create an augmenter that always pools with a kernel size of ``2 x 2``
 and does *not* resize back to the input image size, i.e. the resulting
 images have half the resolution::
@@ -99,6 +105,7 @@ images have half the resolution::
 .. figure:: ../../images/overview_of_augmenters/pooling/maxpooling_keep_size_false.jpg
     :alt: MaxPooling with keep_size=False
 
+**Example.**
 Create an augmenter that always pools either with a kernel size
 of ``2 x 2`` or ``8 x 8``::
 
@@ -107,6 +114,7 @@ of ``2 x 2`` or ``8 x 8``::
 .. figure:: ../../images/overview_of_augmenters/pooling/maxpooling_choice.jpg
     :alt: MaxPooling with a choice of two kernel sizes
 
+**Example.**
 Create an augmenter that always pools with a kernel size of
 ``1 x 1`` (does nothing) to ``7 x 7``. The kernel sizes are always
 symmetric. ::
@@ -116,6 +124,7 @@ symmetric. ::
 .. figure:: ../../images/overview_of_augmenters/pooling/maxpooling_uniform.jpg
     :alt: MaxPooling with a uniform distribution over kernel sizes
 
+**Example.**
 Create an augmenter that always pools with a kernel size of
 ``H x W`` where ``H`` and ``W`` are both sampled independently from the
 range ``[1..7]``. E.g. resulting kernel sizes could be ``3 x 7``
@@ -142,7 +151,7 @@ The minimum within each pixel window is always taken channelwise.
 This augmenter does not affect heatmaps, segmentation maps or
 coordinates-based augmentables (e.g. keypoints, bounding boxes, ...).
 
-
+**Example.**
 Create an augmenter that always pools with a kernel size of ``2 x 2``::
 
     import imgaug.augmenters as iaa
@@ -151,6 +160,7 @@ Create an augmenter that always pools with a kernel size of ``2 x 2``::
 .. figure:: ../../images/overview_of_augmenters/pooling/minpooling.jpg
     :alt: MinPooling
 
+**Example.**
 Create an augmenter that always pools with a kernel size of ``2 x 2``
 and does *not* resize back to the input image size, i.e. the resulting
 images have half the resolution. ::
@@ -160,6 +170,7 @@ images have half the resolution. ::
 .. figure:: ../../images/overview_of_augmenters/pooling/minpooling_keep_size_false.jpg
     :alt: MinPooling with keep_size=False
 
+**Example.**
 Create an augmenter that always pools either with a kernel size
 of ``2 x 2`` or ``8 x 8``::
 
@@ -168,6 +179,7 @@ of ``2 x 2`` or ``8 x 8``::
 .. figure:: ../../images/overview_of_augmenters/pooling/minpooling_choice.jpg
     :alt: MinPooling with a choice of two kernel sizes
 
+**Example.**
 Create an augmenter that always pools with a kernel size of
 ``1 x 1`` (does nothing) to ``7 x 7``. The kernel sizes are always
 symmetric. ::
@@ -177,6 +189,7 @@ symmetric. ::
 .. figure:: ../../images/overview_of_augmenters/pooling/minpooling_uniform.jpg
     :alt: MinPooling with a uniform distribution over kernel sizes
 
+**Example.**
 Create an augmenter that always pools with a kernel size of
 ``H x W`` where ``H`` and ``W`` are both sampled independently from the
 range ``[1..7]``. E.g. resulting kernel sizes could be ``3 x 7``
@@ -203,7 +216,7 @@ The median within each pixel window is always taken channelwise.
 This augmenter does not affect heatmaps, segmentation maps or
 coordinates-based augmentables (e.g. keypoints, bounding boxes, ...).
 
-
+**Example.**
 Create an augmenter that always pools with a kernel size of ``2 x 2``::
 
     import imgaug.augmenters as iaa
@@ -212,6 +225,7 @@ Create an augmenter that always pools with a kernel size of ``2 x 2``::
 .. figure:: ../../images/overview_of_augmenters/pooling/medianpooling.jpg
     :alt: MedianPooling
 
+**Example.**
 Create an augmenter that always pools with a kernel size of ``2 x 2``
 and does *not* resize back to the input image size, i.e. the resulting
 images have half the resolution::
@@ -221,6 +235,7 @@ images have half the resolution::
 .. figure:: ../../images/overview_of_augmenters/pooling/medianpooling_keep_size_false.jpg
     :alt: MedianPooling with keep_size=False
 
+**Example.**
 Create an augmenter that always pools either with a kernel size
 of ``2 x 2`` or ``8 x 8``::
 
@@ -229,6 +244,7 @@ of ``2 x 2`` or ``8 x 8``::
 .. figure:: ../../images/overview_of_augmenters/pooling/medianpooling_choice.jpg
     :alt: MedianPooling with a choice of two kernel sizes
 
+**Example.**
 Create an augmenter that always pools with a kernel size of
 ``1 x 1`` (does nothing) to ``7 x 7``. The kernel sizes are always
 symmetric. ::
@@ -238,6 +254,7 @@ symmetric. ::
 .. figure:: ../../images/overview_of_augmenters/pooling/medianpooling_uniform.jpg
     :alt: MedianPooling with a uniform distribution over kernel sizes
 
+**Example.**
 Create an augmenter that always pools with a kernel size of
 ``H x W`` where ``H`` and ``W`` are both sampled independently from the
 range ``[1..7]``. E.g. resulting kernel sizes could be ``3 x 7``

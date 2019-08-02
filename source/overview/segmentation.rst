@@ -7,38 +7,42 @@ Superpixels
 
 Completely or partially transform images to their superpixel representation.
 
-Generate about 64 superpixels per image. Replace each one with a probability
-of 50% by its average pixel color. ::
+.. note::
+
+    This augmenter is fairly slow. See :ref:`performance`.
+
+**Example.**
+Generate about ``64`` superpixels per image. Replace each one with a
+probability of ``50%`` by its average pixel color. ::
 
     aug = iaa.Superpixels(p_replace=0.5, n_segments=64)
 
 .. figure:: ../../images/overview_of_augmenters/segmentation/superpixels_50_64.jpg
     :alt: Superpixels
 
-Generate 16 to 128 superpixels per image. Replace each superpixel with a
-probability between 10 and 100% (sampled once per image) by its average pixel
-color. ::
+**Example.**
+Generate ``16`` to ``128`` superpixels per image. Replace each superpixel with
+a probability between ``10`` and ``100%`` (sampled once per image) by its
+average pixel color. ::
 
     aug = iaa.Superpixels(p_replace=(0.1, 1.0), n_segments=(16, 128))
 
 .. figure:: ../../images/overview_of_augmenters/segmentation/superpixels.jpg
     :alt: Superpixels random
 
-Effect of setting ``n_segments`` to a fixed value of 64 and then
-increasing ``p_replace`` from 0.0 and 1.0:
+**Example.**
+Effect of setting ``n_segments`` to a fixed value of ``64`` and then
+increasing ``p_replace`` from ``0.0`` and ``1.0``:
 
 .. figure:: ../../images/overview_of_augmenters/segmentation/superpixels_vary_p.jpg
     :alt: Superpixels varying p
 
-Effect of setting ``p_replace`` to a fixed value of 1.0 and then
-increasing ``n_segments`` from 1\*16 to 9\*16=144:
+**Example.**
+Effect of setting ``p_replace`` to a fixed value of ``1.0`` and then
+increasing ``n_segments`` from ``1*16`` to ``9*16=144``:
 
 .. figure:: ../../images/overview_of_augmenters/segmentation/superpixels_vary_n.jpg
     :alt: Superpixels varying n
-
-.. note::
-
-    This augmenter is fairly slow. See :ref:`performance`.
 
 
 Voronoi
@@ -60,6 +64,7 @@ This augmenter performs the following steps:
        many images. Some images may get more/less cells replaced by
        their average color.)
 
+**Example.**
 Create an augmenter that places a ``20x40`` (``HxW``) grid of cells on
 the image and replaces all pixels within each cell by the cell's average
 color. The process is performed at an image size not exceeding 128px on
@@ -73,6 +78,7 @@ interpolation. ::
 .. figure:: ../../images/overview_of_augmenters/segmentation/voronoi_regular_grid.jpg
     :alt: Voronoi with a regular grid points sampler
 
+**Example.**
 Create a voronoi augmenter that generates a grid of cells dynamically
 adapted to the image size. Larger images get more cells. On the x-axis,
 the distance between two cells is ``w * W`` pixels, where ``W`` is the
@@ -108,6 +114,7 @@ This augmenter is a shortcut for the combination of ``Voronoi`` with
 random coordinates of voronoi cells on each image. The cell coordinates
 are sampled uniformly using the image height and width as maxima.
 
+**Example.**
 Sample for each image uniformly the number of voronoi cells ``N`` from the
 interval ``[100, 500]``. Then generates ``N`` coordinates by sampling
 uniformly the x-coordinates from ``[0, W]`` and the y-coordinates from
@@ -123,6 +130,7 @@ is performed using linear interpolation. ::
 .. figure:: ../../images/overview_of_augmenters/segmentation/uniformvoronoi.jpg
     :alt: UniformVoronoi
 
+**Example.**
 Same as above, but always samples ``N=250`` cells, replaces only
 ``90`` percent of them with their average color (the pixels of the
 remaining ``10`` percent are not changed) and performs the transformation
@@ -146,6 +154,7 @@ on each image. Then, it drops ``p`` percent of the ``R*C`` coordinates
 to randomize the grid. Each image pixel then belongs to the voronoi
 cell with the closest coordinate.
 
+**Example.**
 Place a regular grid of ``10x20`` (``height x width``) coordinates on
 each image. Randomly drop on average ``20`` percent of these points
 to create a less regular pattern. Then use the remaining coordinates
@@ -160,6 +169,7 @@ linear interpolation. ::
 .. figure:: ../../images/overview_of_augmenters/segmentation/regulargridvoronoi.jpg
     :alt: RegularGridVoronoi
 
+**Example.**
 Same as above, generates a grid with randomly ``10`` to ``30`` rows,
 drops none of the generated points, replaces only ``90`` percent of
 the voronoi cells with their average color (the pixels of the remaining
@@ -192,6 +202,7 @@ cell with the closest coordinate.
     make most use of the added points for larger images. It does however
     slow down the augmentation process.
 
+**Example.**
 Place a regular grid of ``R x C`` coordinates on each image, where
 ``R`` is the number of rows and computed as ``R=0.1*H`` with ``H`` being
 the height of the input image. ``C`` is the number of columns and
@@ -208,6 +219,7 @@ within them are averaged. ::
 .. figure:: ../../images/overview_of_augmenters/segmentation/relativeregulargridvoronoi.jpg
     :alt: RelativeRegularGridVoronoi
 
+**Example.**
 Same as above, generates a grid with randomly ``R=r*H`` rows, where
 ``r`` is sampled uniformly from the interval ``[0.03, 0.1]`` and
 ``C=0.1*W`` rows. No points are dropped. The augmenter replaces only

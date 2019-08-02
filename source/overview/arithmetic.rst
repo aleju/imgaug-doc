@@ -8,17 +8,19 @@ Add
 
 Add a value to all pixels in an image.
 
-Add random values between -40 and 40 to images, with each value being sampled
-once per image and then being the same for all pixels::
+**Example.**
+Add random values between -40 and 40 to images, with each value
+being sampled once per image and then being the same for all pixels::
 
     aug = iaa.Add((-40, 40))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/add.jpg
     :alt: Add
 
-Add random values between -40 and 40 to images. In 50% of all images the
-values differ per channel (3 sampled value). In the other 50% of all images
-the value is the same for all channels::
+**Example.**
+Add random values between -40 and 40 to images. In 50% of all
+images the values differ per channel (3 sampled value). In the other 50% of
+all images the value is the same for all channels::
 
     aug = iaa.Add((-40, 40), per_channel=0.5)
 
@@ -32,6 +34,8 @@ AddElementwise
 Add values to the pixels of images with possibly different values
 for neighbouring pixels.
 
+
+**Example.**
 Add random values between -40 and 40 to images, with each value being sampled
 per pixel::
 
@@ -40,6 +44,7 @@ per pixel::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/addelementwise.jpg
     :alt: AddElementwise
 
+**Example.**
 Add random values between -40 and 40 to images. In 50% of all images the
 values differ per channel (3 sampled values per pixel).
 In the other 50% of all images the value is the same for all channels per pixel::
@@ -55,6 +60,7 @@ AdditiveGaussianNoise
 
 Add noise sampled from gaussian distributions elementwise to images.
 
+**Example.**
 Add gaussian noise to an image, sampled once per pixel from a normal
 distribution ``N(0, s)``, where ``s`` is sampled per image and varies between
 ``0`` and ``0.2*255``::
@@ -64,6 +70,7 @@ distribution ``N(0, s)``, where ``s`` is sampled per image and varies between
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise.jpg
     :alt: AdditiveGaussianNoise
 
+**Example.**
 Add gaussian noise to an image, sampled once per pixel from a normal
 distribution ``N(0, 0.05*255)``::
 
@@ -72,6 +79,7 @@ distribution ``N(0, 0.05*255)``::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivegaussiannoise_large.jpg
     :alt: AdditiveGaussianNoise large
 
+**Example.**
 Add laplace noise to an image, sampled channelwise from
 ``N(0, 0.2*255)`` (i.e. three independent samples per pixel)::
 
@@ -101,6 +109,7 @@ puts more weight on the long tail. Hence, this noise will add more
 outliers (very high/low values). It is somewhere between gaussian noise and
 salt and pepper noise.
 
+**Example.**
 Add laplace noise to an image, sampled once per pixel from ``Laplace(0, s)``,
 where ``s`` is sampled per image and varies between ``0`` and ``0.2*255``::
 
@@ -109,6 +118,7 @@ where ``s`` is sampled per image and varies between ``0`` and ``0.2*255``::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise.jpg
     :alt: AdditiveLaplaceNoise
 
+**Example.**
 Add laplace noise to an image, sampled once per pixel from
 ``Laplace(0, 0.2*255)``::
 
@@ -117,6 +127,7 @@ Add laplace noise to an image, sampled once per pixel from
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivelaplacenoise_large.jpg
     :alt: AdditiveLaplaceNoise large
 
+**Example.**
 Add laplace noise to an image, sampled channelwise from
 ``Laplace(0, 0.2*255)`` (i.e. three independent samples per pixel)::
 
@@ -150,6 +161,7 @@ Values of around ``40.0`` for ``lam`` lead to very visible noise (for
 ``uint8``).
 It is recommended to usually set ``per_channel`` to ``True``.
 
+**Example.**
 Add poisson noise to an image, sampled once per pixel from ``Poisson(lam)``,
 where ``lam`` is sampled per image and varies between ``0`` and ``40``::
 
@@ -158,6 +170,7 @@ where ``lam`` is sampled per image and varies between ``0`` and ``40``::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise.jpg
     :alt: AdditivePoissonNoise
 
+**Example.**
 Add poisson noise to an image, sampled once per pixel from ``Poisson(40)``::
 
     aug = iaa.AdditivePoissonNoise(40)
@@ -165,6 +178,7 @@ Add poisson noise to an image, sampled once per pixel from ``Poisson(40)``::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/additivepoissonnoise_large.jpg
     :alt: AdditivePoissonNoise large
 
+**Example.**
 Add poisson noise to an image, sampled channelwise from
 ``Poisson(40)`` (i.e. three independent samples per pixel)::
 
@@ -190,6 +204,7 @@ Multiply
 Multiply all pixels in an image with a specific value, thereby making the
 image darker or brighter.
 
+**Example.**
 Multiply each image with a random value between 0.5 and 1.5::
 
     aug = iaa.Multiply((0.5, 1.5))
@@ -197,6 +212,7 @@ Multiply each image with a random value between 0.5 and 1.5::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/multiply.jpg
     :alt: Multiply
 
+**Example.**
 Multiply 50% of all images with a random value between 0.5 and 1.5
 and multiply the remaining 50% channel-wise, i.e. sample one multiplier
 independently per channel::
@@ -213,6 +229,7 @@ MultiplyElementwise
 Multiply values of pixels with possibly different values for neighbouring
 pixels, making each pixel darker or brighter.
 
+**Example.**
 Multiply each pixel with a random value between 0.5 and 1.5::
 
     aug = iaa.MultiplyElementwise((0.5, 1.5))
@@ -220,6 +237,7 @@ Multiply each pixel with a random value between 0.5 and 1.5::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/multiplyelementwise.jpg
     :alt: MultiplyElementwise
 
+**Example.**
 Multiply in 50% of all images each pixel with random values between 0.5 and 1.5
 and multiply in the remaining 50% of all images the pixels channel-wise, i.e.
 sample one multiplier independently per channel and pixel::
@@ -235,17 +253,19 @@ Dropout
 
 Augmenter that sets a certain fraction of pixels in images to zero.
 
-Sample per image a value p from the range 0<=p<=0.2 and then drop p percent
-of all pixels in the image (i.e. convert them to black pixels)::
+**Example.**
+Sample per image a value ``p`` from the range ``0<=p<=0.2`` and then drop
+``p`` percent of all pixels in the image (i.e. convert them to black pixels)::
 
     aug = iaa.Dropout(p=(0, 0.2))
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/dropout.jpg
     :alt: Dropout
 
-Sample per image a value p from the range 0<=p<=0.2 and then drop p percent
-of all pixels in the image (i.e. convert them to black pixels), but
-do this independently per channel in 50% of all images::
+**Example.**
+Sample per image a value ``p`` from the range ``0<=p<=0.2`` and then drop
+``p`` percent of all pixels in the image (i.e. convert them to black pixels),
+but do this independently per channel in 50% of all images::
 
     aug = iaa.Dropout(p=(0, 0.2), per_channel=0.5)
 
@@ -258,6 +278,7 @@ CoarseDropout
 
 Augmenter that sets rectangular areas within images to zero.
 
+**Example.**
 Drop 2% of all pixels by converting them to black pixels, but do
 that on a lower-resolution version of the image that has 50% of the original
 size, leading to 2x2 squares being dropped::
@@ -267,6 +288,7 @@ size, leading to 2x2 squares being dropped::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsedropout.jpg
     :alt: CoarseDropout
 
+**Example.**
 Drop 0 to 5% of all pixels by converting them to black pixels, but do
 that on a lower-resolution version of the image that has 5% to 50% of the
 original size, leading to large rectangular areas being dropped::
@@ -276,6 +298,7 @@ original size, leading to large rectangular areas being dropped::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsedropout_both_uniform.jpg
     :alt: CoarseDropout p and size uniform
 
+**Example.**
 Drop 2% of all pixels by converting them to black pixels, but do
 that on a lower-resolution version of the image that has 50% of the original
 size, leading to 2x2 squares being dropped. Also do this in 50% of all
@@ -293,6 +316,7 @@ ReplaceElementwise
 
 Replace pixels in an image with new values.
 
+**Example.**
 Replace ``10%`` of all pixels with either the value ``0`` or the value
 ``255``::
 
@@ -301,6 +325,7 @@ Replace ``10%`` of all pixels with either the value ``0`` or the value
 .. figure:: ../../images/overview_of_augmenters/arithmetic/replaceelementwise.jpg
     :alt: ReplaceElementwise
 
+**Example.**
 For ``50%`` of all images, replace ``10%`` of all pixels with either the value
 ``0`` or the value ``255`` (same as in the previous example). For the other
 ``50%`` of all images, replace *channelwise* ``10%`` of all pixels with either
@@ -312,6 +337,7 @@ to have all channels replaced by ``255`` or ``0``. ::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/replaceelementwise_per_channel_050.jpg
     :alt: ReplaceElementwise per channel at 50%
 
+**Example.**
 Replace ``10%`` of all pixels by gaussian noise centered around ``128``. Both
 the replacement mask and the gaussian noise are sampled for ``50%`` of all
 images. ::
@@ -322,6 +348,7 @@ images. ::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/replaceelementwise_gaussian_noise.jpg
     :alt: ReplaceElementwise with gaussian noise
 
+**Example.**
 Replace ``10%`` of all pixels by gaussian noise centered around ``128``. Sample
 the replacement mask at a lower resolution (``8x8`` pixels) and upscale it to
 the image size, resulting in coarse areas being replaced by gaussian noise. ::
@@ -344,6 +371,7 @@ Add impulse noise to images.
 This is identical to ``SaltAndPepper``, except that ``per_channel`` is
 always set to ``True``.
 
+**Example.**
 Replace ``10%`` of all pixels with impulse noise::
 
     aug = iaa.ImpulseNoise(0.1)
@@ -357,6 +385,7 @@ SaltAndPepper
 
 Replace pixels in images with salt/pepper noise (white/black-ish colors).
 
+**Example.**
 Replace ``10%`` of all pixels with salt and pepper noise::
 
     aug = iaa.SaltAndPepper(0.1)
@@ -364,6 +393,7 @@ Replace ``10%`` of all pixels with salt and pepper noise::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/saltandpepper.jpg
     :alt: SaltAndPepper
 
+**Example.**
 Replace *channelwise* ``10%`` of all pixels with salt and pepper
 noise::
 
@@ -378,6 +408,7 @@ CoarseSaltAndPepper
 
 Replace rectangular areas in images with white/black-ish pixel noise.
 
+**Example.**
 Mark ``5%`` of all pixels in a mask to be replaced by salt/pepper
 noise. The mask has ``1%`` to ``10%`` the size of the input image.
 The mask is then upscaled to the input image size, leading to large
@@ -389,6 +420,7 @@ replaced in the input image by salt/pepper noise. ::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsesaltandpepper.jpg
     :alt: CoarseSaltAndPepper
 
+**Example.**
 Same as in the previous example, but the replacement mask before upscaling
 has a size between ``4x4`` and ``16x16`` pixels (the axis sizes are sampled
 independently, i.e. the mask may be rectangular). ::
@@ -398,6 +430,7 @@ independently, i.e. the mask may be rectangular). ::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsesaltandpepper_pixels.jpg
     :alt: CoarseSaltAndPepper with size_px
 
+**Example.**
 Same as in the first example, but mask and replacement are each sampled
 independently per image channel. ::
 
@@ -416,6 +449,7 @@ Replace pixels in images with salt noise, i.e. white-ish pixels.
 This augmenter is similar to ``SaltAndPepper``, but adds no pepper noise to
 images.
 
+**Example.**
 Replace ``10%`` of all pixels with salt noise (white-ish colors)::
 
     aug = iaa.Salt(0.1)
@@ -423,6 +457,7 @@ Replace ``10%`` of all pixels with salt noise (white-ish colors)::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/salt.jpg
     :alt: Salt
 
+**Example.**
 Similar to ``SaltAndPepper``, this augmenter also supports the ``per_channel``
 argument, which is skipped here for brevity.
 
@@ -435,6 +470,7 @@ Replace rectangular areas in images with white-ish pixel noise.
 This augmenter is similar to ``CoarseSaltAndPepper``, but adds no pepper noise
 to images.
 
+**Example.**
 Mark ``5%`` of all pixels in a mask to be replaced by salt
 noise. The mask has ``1%`` to ``10%`` the size of the input image.
 The mask is then upscaled to the input image size, leading to large
@@ -461,6 +497,7 @@ images.
 This augmenter is similar to ``Dropout``, but slower and the black pixels are
 not uniformly black.
 
+**Example.**
 Replace ``10%`` of all pixels with pepper noise (black-ish colors)::
 
     aug = iaa.Pepper(0.1)
@@ -480,6 +517,7 @@ Replace rectangular areas in images with black-ish pixel noise.
 This augmenter is similar to ``CoarseSaltAndPepper``, but adds no salt noise
 to images.
 
+**Example.**
 Mark ``5%`` of all pixels in a mask to be replaced by pepper
 noise. The mask has ``1%`` to ``10%`` the size of the input image.
 The mask is then upscaled to the input image size, leading to large
@@ -501,6 +539,7 @@ Invert
 Augmenter that inverts all values in images, i.e. sets a pixel from value
 ``v`` to ``255-v``.
 
+**Example.**
 Invert in 50% of all images all pixels::
 
     aug = iaa.Invert(0.5)
@@ -508,6 +547,7 @@ Invert in 50% of all images all pixels::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/invert.jpg
     :alt: Invert
 
+**Example.**
 For 50% of all images, invert all pixels in these images with 25% probability
 (per image). In the remaining 50% of all images, invert 25% of all channels::
 
@@ -522,6 +562,7 @@ ContrastNormalization
 
 Augmenter that changes the contrast of images.
 
+**Example.**
 Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image::
 
     aug = iaa.ContrastNormalization((0.5, 1.5))
@@ -529,6 +570,7 @@ Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image::
 .. figure:: ../../images/overview_of_augmenters/arithmetic/contrastnormalization.jpg
     :alt: ContrastNormalization
 
+**Example.**
 Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image
 and for 50% of all images also independently per channel::
 
@@ -543,6 +585,7 @@ JpegCompression
 
 Degrade the quality of images by JPEG-compressing them.
 
+**Example.**
 Remove high frequency components in images via JPEG compression with
 a *compression strength* between ``80`` and ``95`` (randomly and
 uniformly sampled per image). This corresponds to a (very low) *quality*

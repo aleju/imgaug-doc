@@ -9,6 +9,7 @@ Adjust image contrast by scaling pixel values to ``255*((v/255)**gamma)``.
 
 Values in the range ``gamma=(0.5, 2.0)`` seem to be sensible.
 
+**Example.**
 Modify the contrast of images according to ``255*((v/255)**gamma)``,
 where ``v`` is a pixel value and ``gamma`` is sampled uniformly from
 the interval ``[0.5, 2.0]`` (once per image)::
@@ -19,6 +20,7 @@ the interval ``[0.5, 2.0]`` (once per image)::
 .. figure:: ../../images/overview_of_augmenters/contrast/gammacontrast.jpg
     :alt: GammaContrast
 
+**Example.**
 Same as in the previous example, but ``gamma`` is sampled once per image
 *and* channel::
 
@@ -36,6 +38,7 @@ Adjust image contrast to ``255*1/(1+exp(gain*(cutoff-I_ij/255)))``.
 Values in the range ``gain=(5, 20)`` and ``cutoff=(0.25, 0.75)`` seem to
 be sensible.
 
+**Example.**
 Modify the contrast of images according to
 ``255*1/(1+exp(gain*(cutoff-v/255)))``, where ``v`` is a pixel value,
 ``gain`` is sampled uniformly from the interval ``[3, 10]`` (once per
@@ -48,6 +51,7 @@ image) and ``cutoff`` is sampled uniformly from the interval
 .. figure:: ../../images/overview_of_augmenters/contrast/sigmoidcontrast.jpg
     :alt: SigmoidContrast
 
+**Example.**
 Same as in the previous example, but ``gain`` and ``cutoff`` are each
 sampled once per image *and* channel::
 
@@ -66,6 +70,7 @@ Adjust image contrast by scaling pixels to ``255*gain*log_2(1+v/255)``.
 This augmenter is fairly similar to
 ``imgaug.augmenters.arithmetic.Multiply``.
 
+**Example.**
 Modify the contrast of images according to ``255*gain*log_2(1+v/255)``,
 where ``v`` is a pixel value and ``gain`` is sampled uniformly from the
 interval ``[0.6, 1.4]`` (once per image)::
@@ -76,6 +81,7 @@ interval ``[0.6, 1.4]`` (once per image)::
 .. figure:: ../../images/overview_of_augmenters/contrast/logcontrast.jpg
     :alt: LogContrast
 
+**Example.**
 Same as in the previous example, but ``gain`` is sampled once per image
 *and* channel::
 
@@ -90,6 +96,7 @@ LinearContrast
 
 Adjust contrast by scaling each pixel to ``127 + alpha*(v-127)``.
 
+**Example.**
 Modify the contrast of images according to `127 + alpha*(v-127)``,
 where ``v`` is a pixel value and ``alpha`` is sampled uniformly from the
 interval ``[0.4, 1.6]`` (once per image)::
@@ -100,6 +107,7 @@ interval ``[0.4, 1.6]`` (once per image)::
 .. figure:: ../../images/overview_of_augmenters/contrast/linearcontrast.jpg
     :alt: LinearContrast
 
+**Example.**
 Same as in the previous example, but ``alpha`` is sampled once per image
 *and* channel::
 
@@ -123,6 +131,7 @@ operates directly on all channels of the input images. It does not
 perform any colorspace transformations and does not focus on specific
 channels (e.g. ``L`` in ``Lab`` colorspace).
 
+**Example.**
 Create an augmenter that applies CLAHE to all channels of input images::
 
     import imgaug.augmenters as iaa
@@ -131,6 +140,7 @@ Create an augmenter that applies CLAHE to all channels of input images::
 .. figure:: ../../images/overview_of_augmenters/contrast/allchannelsclahe.jpg
     :alt: AllChannelsCLAHE with default settings
 
+**Example.**
 Same as in the previous example, but the `clip_limit` used by CLAHE is
 uniformly sampled per image from the interval ``[1, 10]``. Some images
 will therefore have stronger contrast than others (i.e. higher clip limit
@@ -141,6 +151,7 @@ values). ::
 .. figure:: ../../images/overview_of_augmenters/contrast/allchannelsclahe_random_clip_limit.jpg
     :alt: AllChannelsCLAHE with random clip_limit
 
+**Example.**
 Same as in the previous example, but the `clip_limit` is sampled per
 image *and* channel, leading to different levels of contrast for each
 channel::
@@ -177,7 +188,7 @@ If you want to apply CLAHE to each channel of the original input image's
 colorspace (without any colorspace conversion), use
 ``imgaug.augmenters.contrast.AllChannelsCLAHE`` instead.
 
-
+**Example.**
 Create a standard CLAHE augmenter::
 
     import imgaug.augmenters as iaa
@@ -186,6 +197,7 @@ Create a standard CLAHE augmenter::
 .. figure:: ../../images/overview_of_augmenters/contrast/clahe.jpg
     :alt: CLAHE
 
+**Example.**
 Create a CLAHE augmenter with a clip limit uniformly sampled from
 ``[1..10]``, where ``1`` is rather low contrast and ``10`` is rather
 high contrast::
@@ -195,6 +207,7 @@ high contrast::
 .. figure:: ../../images/overview_of_augmenters/contrast/clahe_clip_limit.jpg
     :alt: CLAHE with uniformly-distributed clip_limit
 
+**Example.**
 Create a CLAHE augmenter with kernel sizes of ``SxS``, where ``S`` is
 uniformly sampled from ``[3..21]``. Sampling happens once per image. ::
 
@@ -203,6 +216,7 @@ uniformly sampled from ``[3..21]``. Sampling happens once per image. ::
 .. figure:: ../../images/overview_of_augmenters/contrast/clahe_grid_sizes_uniform.jpg
     :alt: CLAHE with uniformly-distributed tile_grid_size_px
 
+**Example.**
 Create a CLAHE augmenter with kernel sizes of ``SxS``, where ``S`` is
 sampled from ``N(7, 2)``, but does not go below ``3``::
 
@@ -213,6 +227,7 @@ sampled from ``N(7, 2)``, but does not go below ``3``::
 .. figure:: ../../images/overview_of_augmenters/contrast/clahe_grid_sizes_gaussian.jpg
     :alt: CLAHE with gaussian-distributed tile_grid_size_px
 
+**Example.**
 Create a CLAHE augmenter with kernel sizes of ``HxW``, where ``H`` is
 uniformly sampled from ``[3..21]`` and ``W`` is randomly picked from the
 list ``[3, 5, 7]``::
@@ -222,6 +237,7 @@ list ``[3, 5, 7]``::
 .. figure:: ../../images/overview_of_augmenters/contrast/clahe_grid_sizes.jpg
     :alt: CLAHE with random tile_grid_size_px
 
+**Example.**
 Create a CLAHE augmenter that converts images from BGR colorspace to
 HSV colorspace and then applies the local histogram equalization to the
 ``V`` channel of the images (before converting back to ``BGR``).
@@ -247,6 +263,7 @@ augmenter operates directly on all channels of the input images. It does
 not perform any colorspace transformations and does not focus on specific
 channels (e.g. ``L`` in ``Lab`` colorspace).
 
+**Example.**
 Create an augmenter that applies histogram equalization to all channels
 of input images in the original colorspaces::
 
@@ -256,6 +273,7 @@ of input images in the original colorspaces::
 .. figure:: ../../images/overview_of_augmenters/contrast/allchannelshistogramequalization.jpg
     :alt: AllChannelsHistogramEqualization
 
+**Example.**
 Same as in the previous example, but alpha-blends the contrast-enhanced
 augmented images with the original input images using random blend
 strengths. This leads to random strengths of the contrast adjustment. ::
@@ -293,6 +311,7 @@ If you want to apply HistogramEqualization to each channel of the original
 input image's colorspace (without any colorspace conversion), use
 ``imgaug.augmenters.contrast.AllChannelsHistogramEqualization`` instead.
 
+**Example.**
 Create an augmenter that converts images to ``HLS``/``HSV``/``Lab``
 colorspaces, extracts intensity-related channels (i.e. ``L``/``V``/``L``),
 applies histogram equalization to these channels and converts back to the
@@ -304,6 +323,7 @@ input colorspace::
 .. figure:: ../../images/overview_of_augmenters/contrast/histogramequalization.jpg
     :alt: HistogramEqualization
 
+**Example.**
 Same as in the previous example, but alpha blends the result, leading
 to various strengths of contrast normalization::
 
@@ -312,6 +332,7 @@ to various strengths of contrast normalization::
 .. figure:: ../../images/overview_of_augmenters/contrast/histogramequalization_alpha.jpg
     :alt: HistogramEqualization combined with Alpha
 
+**Example.**
 Same as in the first example, but the colorspace of input images has
 to be ``BGR`` (instead of default ``RGB``) and the histogram equalization
 is applied to the ``V`` channel in ``HSV`` colorspace::

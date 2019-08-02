@@ -12,6 +12,7 @@ as well as children C. It changes images from A to B, then applies the
 child augmenters C and finally changes the colorspace back from B to A.
 See also ChangeColorspace() for more.
 
+**Example.**
 Convert to ``HSV`` colorspace, add a value between ``0`` and ``50``
 (uniformly sampled per image) to the Hue channel, then convert back to the
 input colorspace (``RGB``). ::
@@ -48,6 +49,7 @@ saturation channel's values are clipped to ``[0, 255]``. A modulo operation
 is applied to the hue channel's values, followed by a mapping from
 ``[0, 255]`` to ``[0, 180]`` (and finally the colorspace conversion).
 
+**Example.**
 Create an augmenter that will add a random value between ``0`` and ``50``
 (uniformly sampled per image) hue channel in HSV colorspace. It
 automatically accounts for the hue being in angular representation, i.e.
@@ -62,6 +64,7 @@ The colorspace is finally converted back to ``RGB`` (default setting). ::
 .. figure:: ../../images/overview_of_augmenters/color/withhueandsaturation_add_to_hue.jpg
     :alt: Using WithHueAndSaturation to add random values to the hue channel
 
+**Example.**
 Create an augmenter that adds a random value sampled uniformly
 from the range ``[-30, 10]`` to the hue and multiplies the saturation
 by a random factor sampled uniformly from ``[0.5, 1.5]``. It also
@@ -93,6 +96,7 @@ RGB.
 
 This augmenter is a wrapper around ``WithHueAndSaturation``.
 
+**Example.**
 Multiply hue and saturation by random values between ``0.5`` and ``1.5``
 (independently per channel and the same value for all pixels within
 that channel). The hue will be automatically projected to an angular
@@ -104,6 +108,7 @@ representation. ::
 .. figure:: ../../images/overview_of_augmenters/color/multiplyhueandsaturation.jpg
     :alt: MultiplyHueAndSaturation
 
+**Example.**
 Multiply only the hue by random values between ``0.5`` and ``1.5``. ::
 
     import imgaug.augmenters as iaa
@@ -112,6 +117,7 @@ Multiply only the hue by random values between ``0.5`` and ``1.5``. ::
 .. figure:: ../../images/overview_of_augmenters/color/multiplyhueandsaturation_mul_hue.jpg
     :alt: MultiplyHueAndSaturation, only applied to the hue
 
+**Example.**
 Multiply only the saturation by random values between ``0.5`` and ``1.5``. ::
 
     import imgaug.augmenters as iaa
@@ -132,6 +138,7 @@ RGB.
 
 This augmenter is a shortcut for ``MultiplyHueAndSaturation(mul_hue=...)``.
 
+**Example.**
 Multiply the hue channel of images using random values between ``0.5``
 and ``1.5``::
 
@@ -154,6 +161,7 @@ RGB.
 This augmenter is a shortcut for
 ``MultiplyHueAndSaturation(mul_saturation=...)``.
 
+**Example.**
 Multiply the saturation channel of images using random values between
 ``0.5`` and ``1.5``::
 
@@ -175,6 +183,7 @@ values to the H and S channels and afterwards converts back to RGB.
 This augmenter is faster than using ``WithHueAndSaturation`` in combination
 with ``Add``.
 
+**Example.**
 Add random values between ``-50`` and ``50`` to the hue and saturation
 (independently per channel and the same value for all pixels within
 that channel)::
@@ -200,6 +209,7 @@ converted twice to HSV and back to RGB.
 
 This augmenter is a shortcut for ``AddToHueAndSaturation(value_hue=...)``.
 
+**Example.**
 Sample random values from the discrete uniform range ``[-50..50]``,
 convert them to angular representation and add them to the hue, i.e.
 to the ``H`` channel in ``HSV`` colorspace::
@@ -226,6 +236,7 @@ converted twice to HSV and back to RGB.
 This augmenter is a shortcut for
 ``AddToHueAndSaturation(value_saturation=...)``.
 
+**Example.**
 Sample random values from the discrete uniform range ``[-50..50]``,
 and add them to the saturation, i.e. to the ``S`` channel in ``HSV``
 colorspace::
@@ -261,6 +272,7 @@ Grayscale
 
 Augmenter to convert images to their grayscale versions.
 
+**Example.**
 Change images to grayscale and overlay them with the original image by varying
 strengths, effectively removing 0 to 100% of the color::
 
@@ -269,7 +281,8 @@ strengths, effectively removing 0 to 100% of the color::
 .. figure:: ../../images/overview_of_augmenters/color/grayscale.jpg
     :alt: Grayscale
 
-Visualization of increasing ``alpha`` from 0.0 to 1.0 in 8 steps:
+**Example.**
+Visualization of increasing ``alpha`` from ``0.0`` to ``1.0`` in eight steps:
 
 .. figure:: ../../images/overview_of_augmenters/color/grayscale_vary_alpha.jpg
     :alt: Grayscale vary alpha
@@ -294,6 +307,7 @@ to the color range in the input image.
     images have 4 channels, it is assumed that the 4th channel is an alpha
     channel and it will not be quantized.
 
+**Example.**
 Create an augmenter to apply k-Means color quantization to images using a
 random amount of colors, sampled uniformly from the interval ``[2..16]``.
 It assumes the input image colorspace to be ``RGB`` and clusters colors
@@ -305,6 +319,7 @@ randomly in ``RGB`` or ``Lab`` colorspace. ::
 .. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization.jpg
     :alt: KMeansColorQuantization
 
+**Example.**
 Create an augmenter that quantizes images to (up to) eight colors::
 
     aug = iaa.KMeansColorQuantization(n_colors=8)
@@ -312,6 +327,7 @@ Create an augmenter that quantizes images to (up to) eight colors::
 .. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization_with_8_colors.jpg
     :alt: KMeansColorQuantization with eight colors
 
+**Example.**
 Create an augmenter that quantizes images to (up to) ``n`` colors,
 where ``n`` is randomly and uniformly sampled from the discrete interval
 ``[4..32]``::
@@ -321,6 +337,7 @@ where ``n`` is randomly and uniformly sampled from the discrete interval
 .. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization_with_random_n_colors.jpg
     :alt: KMeansColorQuantization with random n_colors
 
+**Example.**
 Create an augmenter that quantizes input images that are in
 ``BGR`` colorspace. The quantization happens in ``RGB`` or ``Lab``
 colorspace, into which the images are temporarily converted. ::
@@ -331,6 +348,7 @@ colorspace, into which the images are temporarily converted. ::
 .. figure:: ../../images/overview_of_augmenters/color/kmeanscolorquantization_from_bgr.jpg
     :alt: KMeansColorQuantization with input images in BGR colorspace
 
+**Example.**
 Create an augmenter that quantizes images by clustering colors randomly
 in either ``RGB`` or ``HSV`` colorspace. The assumed input colorspace
 of images is ``RGB``. ::
@@ -363,6 +381,7 @@ that are made up of very similar colors.
     images have 4 channels, it is assumed that the 4th channel is an alpha
     channel and it will not be quantized.
 
+**Example.**
 Create an augmenter to apply uniform color quantization to images using a
 random amount of colors, sampled uniformly from the discrete interval
 ``[2..16]``::
@@ -373,6 +392,7 @@ random amount of colors, sampled uniformly from the discrete interval
 .. figure:: ../../images/overview_of_augmenters/color/uniformcolorquantization.jpg
     :alt: UniformColorQuantization
 
+**Example.**
 Create an augmenter that quantizes images to (up to) eight colors::
 
     aug = iaa.UniformColorQuantization(n_colors=8)
@@ -380,6 +400,7 @@ Create an augmenter that quantizes images to (up to) eight colors::
 .. figure:: ../../images/overview_of_augmenters/color/uniformcolorquantization_with_8_colors.jpg
     :alt: UniformColorQuantization with eight colors
 
+**Example.**
 Create an augmenter that quantizes images to (up to) ``n`` colors,
 where ``n`` is randomly and uniformly sampled from the discrete interval
 ``[4..32]``::
@@ -389,6 +410,7 @@ where ``n`` is randomly and uniformly sampled from the discrete interval
 .. figure:: ../../images/overview_of_augmenters/color/uniformcolorquantization_with_random_n_colors.jpg
     :alt: UniformColorQuantization with random n_colors
 
+**Example.**
 Create an augmenter that uniformly quantizes images in either ``RGB``
 or ``HSV`` colorspace (randomly picked per image). The input colorspace
 of all images has to be ``BGR``. ::
