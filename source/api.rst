@@ -9,6 +9,7 @@ API
    api_multicore
    api_dtypes
    api_random
+   api_validation
    api_augmentables_batches
    api_augmentables_bbs
    api_augmentables_heatmaps
