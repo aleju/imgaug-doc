@@ -40,6 +40,8 @@ from .. import dtypes as iadt
 
 
 # TODO allow 3d matrices as input (not only 2D)
+# TODO add _augment_keypoints and other _augment funcs, as these should do
+#      something for e.g. [[0, 0, 1]]
 class Convolve(meta.Augmenter):
     """
     Apply a convolution to input images.
@@ -90,7 +92,7 @@ class Convolve(meta.Augmenter):
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     Examples
@@ -131,14 +133,12 @@ class Convolve(meta.Augmenter):
             self.matrix = None
             self.matrix_type = "None"
         elif ia.is_np_array(matrix):
-            ia.do_assert(
-                matrix.ndim == 2,
+            assert matrix.ndim == 2, (
                 "Expected convolution matrix to have exactly two dimensions, "
-                "got %d (shape %s)." % (
-                    matrix.ndim, matrix.shape))
+                "got %d (shape %s)." % (matrix.ndim, matrix.shape))
             self.matrix = matrix
             self.matrix_type = "constant"
-        elif isinstance(matrix, types.FunctionType):
+        elif ia.is_callable(matrix):
             self.matrix = matrix
             self.matrix_type = "function"
         else:
@@ -157,7 +157,7 @@ class Convolve(meta.Augmenter):
                                      "int32", "int64", "int128", "int256",
                                      "float96", "float128", "float256"],
                          augmenter=self)
-        rss = ia.derive_random_states(random_state, len(images))
+        rss = random_state.duplicate(len(images))
 
         for i, image in enumerate(images):
             _height, _width, nb_channels = images[i].shape
@@ -184,15 +184,13 @@ class Convolve(meta.Augmenter):
                 is_valid_array = (ia.is_np_array(matrices)
                                   and matrices.ndim == 3
                                   and matrices.shape[2] == nb_channels)
-                ia.do_assert(
-                    is_valid_list or is_valid_array,
+                assert is_valid_list or is_valid_array, (
                     "Callable provided to Convole must return either a "
                     "list of 2D matrices (one per image channel) "
                     "or a 2D numpy array "
                     "or a 3D numpy array where the last dimension's size "
                     "matches the number of image channels. "
-                    "Got type %s." % (type(matrices),)
-                )
+                    "Got type %s." % (type(matrices),))
 
                 if ia.is_np_array(matrices):
                     # Shape of matrices is currently (H, W, C), but in the
@@ -223,23 +221,11 @@ class Convolve(meta.Augmenter):
 
         return images
 
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        # pylint: disable=no-self-use
-        # TODO this can fail for some matrices, e.g. [[0, 0, 1]]
-        return heatmaps
-
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
-        # pylint: disable=no-self-use
-        # TODO this can fail for some matrices, e.g. [[0, 0, 1]]
-        return keypoints_on_images
-
     def get_parameters(self):
         return [self.matrix, self.matrix_type]
 
 
-def Sharpen(alpha=0, lightness=1,
-            name=None, deterministic=False, random_state=None):
+class Sharpen(Convolve):
     """
     Sharpen images and alpha-blend the result with the original input images.
 
@@ -281,7 +267,7 @@ def Sharpen(alpha=0, lightness=1,
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     Examples
@@ -300,18 +286,33 @@ def Sharpen(alpha=0, lightness=1,
     (as in the above example).
 
     """
-    alpha_param = iap.handle_continuous_param(
-        alpha, "alpha",
-        value_range=(0, 1.0), tuple_to_uniform=True, list_to_choice=True)
-    lightness_param = iap.handle_continuous_param(
-        lightness, "lightness",
-        value_range=(0, None), tuple_to_uniform=True, list_to_choice=True)
+    def __init__(self, alpha=0, lightness=1,
+                 name=None, deterministic=False, random_state=None):
+        alpha_param = iap.handle_continuous_param(
+            alpha, "alpha",
+            value_range=(0, 1.0), tuple_to_uniform=True, list_to_choice=True)
+        lightness_param = iap.handle_continuous_param(
+            lightness, "lightness",
+            value_range=(0, None), tuple_to_uniform=True, list_to_choice=True)
 
-    def create_matrices(image, nb_channels, random_state_func):
-        alpha_sample = alpha_param.draw_sample(random_state=random_state_func)
-        ia.do_assert(0 <= alpha_sample <= 1.0)
-        lightness_sample = lightness_param.draw_sample(
-            random_state=random_state_func)
+        matrix_gen = _SharpeningMatrixGenerator(alpha_param, lightness_param)
+
+        super(Sharpen, self).__init__(
+            matrix=matrix_gen, name=name, deterministic=deterministic,
+            random_state=random_state)
+
+
+class _SharpeningMatrixGenerator(object):
+    def __init__(self, alpha, lightness):
+        self.alpha = alpha
+        self.lightness = lightness
+
+    def __call__(self, _image, nb_channels, random_state):
+        alpha_sample = self.alpha.draw_sample(random_state=random_state)
+        assert 0 <= alpha_sample <= 1.0, (
+            "Expected 'alpha' to be in the interval [0.0, 1.0], "
+            "got %.4f." % (alpha_sample,))
+        lightness_sample = self.lightness.draw_sample(random_state=random_state)
         matrix_nochange = np.array([
             [0, 0, 0],
             [0, 1, 0],
@@ -328,18 +329,8 @@ def Sharpen(alpha=0, lightness=1,
         )
         return [matrix] * nb_channels
 
-    if name is None:
-        name = "Unnamed%s" % (ia.caller_name(),)
 
-    return Convolve(
-        create_matrices,
-        name=name,
-        deterministic=deterministic,
-        random_state=random_state)
-
-
-def Emboss(alpha=0, strength=1,
-           name=None, deterministic=False, random_state=None):
+class Emboss(Convolve):
     """
     Emboss images and alpha-blend the result with the original input images.
 
@@ -383,7 +374,7 @@ def Emboss(alpha=0, strength=1,
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     Examples
@@ -396,18 +387,33 @@ def Emboss(alpha=0, strength=1,
     using a random blending factor between ``0%`` and ``100%``.
 
     """
-    alpha_param = iap.handle_continuous_param(
-        alpha, "alpha",
-        value_range=(0, 1.0), tuple_to_uniform=True, list_to_choice=True)
-    strength_param = iap.handle_continuous_param(
-        strength, "strength",
-        value_range=(0, None), tuple_to_uniform=True, list_to_choice=True)
+    def __init__(self, alpha=0, strength=1,
+                 name=None, deterministic=False, random_state=None):
+        alpha_param = iap.handle_continuous_param(
+            alpha, "alpha",
+            value_range=(0, 1.0), tuple_to_uniform=True, list_to_choice=True)
+        strength_param = iap.handle_continuous_param(
+            strength, "strength",
+            value_range=(0, None), tuple_to_uniform=True, list_to_choice=True)
 
-    def create_matrices(image, nb_channels, random_state_func):
-        alpha_sample = alpha_param.draw_sample(random_state=random_state_func)
-        ia.do_assert(0 <= alpha_sample <= 1.0)
-        strength_sample = strength_param.draw_sample(
-            random_state=random_state_func)
+        matrix_gen = _EmbossMatrixGenerator(alpha_param, strength_param)
+
+        super(Emboss, self).__init__(
+            matrix=matrix_gen, name=name, deterministic=deterministic,
+            random_state=random_state)
+
+
+class _EmbossMatrixGenerator(object):
+    def __init__(self, alpha, strength):
+        self.alpha = alpha
+        self.strength = strength
+
+    def __call__(self, _image, nb_channels, random_state):
+        alpha_sample = self.alpha.draw_sample(random_state=random_state)
+        assert 0 <= alpha_sample <= 1.0, (
+            "Expected 'alpha' to be in the interval [0.0, 1.0], "
+            "got %.4f." % (alpha_sample,))
+        strength_sample = self.strength.draw_sample(random_state=random_state)
         matrix_nochange = np.array([
             [0, 0, 0],
             [0, 1, 0],
@@ -424,19 +430,10 @@ def Emboss(alpha=0, strength=1,
         )
         return [matrix] * nb_channels
 
-    if name is None:
-        name = "Unnamed%s" % (ia.caller_name(),)
-
-    return Convolve(
-        create_matrices,
-        name=name,
-        deterministic=deterministic,
-        random_state=random_state)
-
 
 # TODO add tests
 # TODO move this to edges.py?
-def EdgeDetect(alpha=0, name=None, deterministic=False, random_state=None):
+class EdgeDetect(Convolve):
     """
     Generate a black & white edge image and alpha-blend it with the input image.
 
@@ -464,7 +461,7 @@ def EdgeDetect(alpha=0, name=None, deterministic=False, random_state=None):
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     Examples
@@ -477,13 +474,28 @@ def EdgeDetect(alpha=0, name=None, deterministic=False, random_state=None):
     blending factor between ``0%`` and ``100%``.
 
     """
-    alpha_param = iap.handle_continuous_param(
-        alpha, "alpha",
-        value_range=(0, 1.0), tuple_to_uniform=True, list_to_choice=True)
+    def __init__(self, alpha=0, name=None, deterministic=False,
+                 random_state=None):
+        alpha_param = iap.handle_continuous_param(
+            alpha, "alpha",
+            value_range=(0, 1.0), tuple_to_uniform=True, list_to_choice=True)
 
-    def create_matrices(_image, nb_channels, random_state_func):
-        alpha_sample = alpha_param.draw_sample(random_state=random_state_func)
-        ia.do_assert(0 <= alpha_sample <= 1.0)
+        matrix_gen = _EdgeDetectMatrixGenerator(alpha_param)
+
+        super(EdgeDetect, self).__init__(
+            matrix=matrix_gen, name=name, deterministic=deterministic,
+            random_state=random_state)
+
+
+class _EdgeDetectMatrixGenerator(object):
+    def __init__(self, alpha):
+        self.alpha = alpha
+
+    def __call__(self, _image, nb_channels, random_state):
+        alpha_sample = self.alpha.draw_sample(random_state=random_state)
+        assert 0 <= alpha_sample <= 1.0, (
+            "Expected 'alpha' to be in the interval [0.0, 1.0], "
+            "got %.4f." % (alpha_sample,))
         matrix_nochange = np.array([
             [0, 0, 0],
             [0, 1, 0],
@@ -500,15 +512,6 @@ def EdgeDetect(alpha=0, name=None, deterministic=False, random_state=None):
         )
         return [matrix] * nb_channels
 
-    if name is None:
-        name = "Unnamed%s" % (ia.caller_name(),)
-
-    return Convolve(
-        create_matrices,
-        name=name,
-        deterministic=deterministic,
-        random_state=random_state)
-
 
 # TODO add tests
 # TODO merge EdgeDetect and DirectedEdgeDetect?
@@ -516,8 +519,7 @@ def EdgeDetect(alpha=0, name=None, deterministic=False, random_state=None):
 # TODO rename arg "direction" to "angle"
 # TODO change direction/angle value range to (0, 360)
 # TODO move this to edges.py?
-def DirectedEdgeDetect(alpha=0, direction=(0.0, 1.0),
-                       name=None, deterministic=False, random_state=None):
+class DirectedEdgeDetect(Convolve):
     """
     Detect edges from specified angles and alpha-blend with the input image.
 
@@ -565,7 +567,7 @@ def DirectedEdgeDetect(alpha=0, direction=(0.0, 1.0),
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     Examples
@@ -595,18 +597,34 @@ def DirectedEdgeDetect(alpha=0, direction=(0.0, 1.0),
     and ``30%``.
 
     """
-    alpha_param = iap.handle_continuous_param(
-        alpha, "alpha",
-        value_range=(0, 1.0), tuple_to_uniform=True, list_to_choice=True)
-    direction_param = iap.handle_continuous_param(
-        direction, "direction",
-        value_range=None, tuple_to_uniform=True, list_to_choice=True)
+    def __init__(self, alpha=0, direction=(0.0, 1.0),
+                 name=None, deterministic=False, random_state=None):
+        alpha_param = iap.handle_continuous_param(
+            alpha, "alpha",
+            value_range=(0, 1.0), tuple_to_uniform=True, list_to_choice=True)
+        direction_param = iap.handle_continuous_param(
+            direction, "direction",
+            value_range=None, tuple_to_uniform=True, list_to_choice=True)
 
-    def create_matrices(_image, nb_channels, random_state_func):
-        alpha_sample = alpha_param.draw_sample(random_state=random_state_func)
-        ia.do_assert(0 <= alpha_sample <= 1.0)
-        direction_sample = direction_param.draw_sample(
-            random_state=random_state_func)
+        matrix_gen = _DirectedEdgeDetectMatrixGenerator(alpha_param,
+                                                        direction_param)
+
+        super(DirectedEdgeDetect, self).__init__(
+            matrix=matrix_gen, name=name, deterministic=deterministic,
+            random_state=random_state)
+
+
+class _DirectedEdgeDetectMatrixGenerator(object):
+    def __init__(self, alpha, direction):
+        self.alpha = alpha
+        self.direction = direction
+
+    def __call__(self, _image, nb_channels, random_state):
+        alpha_sample = self.alpha.draw_sample(random_state=random_state)
+        assert 0 <= alpha_sample <= 1.0, (
+            "Expected 'alpha' to be in the interval [0.0, 1.0], "
+            "got %.4f." % (alpha_sample,))
+        direction_sample = self.direction.draw_sample(random_state=random_state)
 
         deg = int(direction_sample * 360) % 360
         rad = np.deg2rad(deg)
@@ -623,7 +641,8 @@ def DirectedEdgeDetect(alpha=0, direction=(0.0, 1.0),
             if (x, y) != (0, 0):
                 cell_vector = np.array([x, y])
                 distance_deg = np.rad2deg(
-                    ia.angle_between_vectors(cell_vector, direction_vector))
+                    ia.angle_between_vectors(cell_vector,
+                                             direction_vector))
                 distance = distance_deg / 180
                 similarity = (1 - distance)**4
                 matrix_effect[y+1, x+1] = similarity
@@ -643,12 +662,3 @@ def DirectedEdgeDetect(alpha=0, direction=(0.0, 1.0),
         )
 
         return [matrix] * nb_channels
-
-    if name is None:
-        name = "Unnamed%s" % (ia.caller_name(),)
-
-    return Convolve(
-        create_matrices,
-        name=name,
-        deterministic=deterministic,
-        random_state=random_state)

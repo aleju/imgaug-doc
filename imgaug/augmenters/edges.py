@@ -54,7 +54,7 @@ class BinaryImageColorizerIf(object):
         nth_image : int
             Index of the image in the batch.
 
-        random_state : numpy.random.RandomState
+        random_state : imgaug.random.RNG
             Random state to use.
 
         Returns
@@ -120,11 +120,21 @@ class RandomColorsBinaryImageColorizer(BinaryImageColorizerIf):
         return color_true, color_false
 
     def colorize(self, image_binary, image_original, nth_image, random_state):
-        assert image_binary.ndim == 2
-        assert image_binary.dtype.kind == "b"
-        assert image_original.ndim == 3
-        assert image_original.shape[-1] in [1, 3, 4]
-        assert image_original.dtype.name == "uint8"
+        assert image_binary.ndim == 2, (
+            "Expected binary image to colorize to be 2-dimensional, "
+            "got %d dimensions." % (image_binary.ndim,))
+        assert image_binary.dtype.kind == "b", (
+            "Expected binary image to colorize to be boolean, "
+            "got dtype kind %s." % (image_binary.dtype.kind,))
+        assert image_original.ndim == 3, (
+            "Expected original image to be 3-dimensional, got %d "
+            "dimensions." % (image_original.ndim,))
+        assert image_original.shape[-1] in [1, 3, 4], (
+            "Expected original image to have 1, 3 or 4 channels. "
+            "Got %d channels." % (image_original.shape[-1],))
+        assert image_original.dtype.name == "uint8", (
+            "Expected original image to have dtype uint8, got dtype %s." % (
+                image_original.dtype.name))
 
         color_true, color_false = self._draw_samples(random_state)
 
@@ -258,7 +268,7 @@ class Canny(meta.Augmenter):
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     Examples
@@ -266,23 +276,42 @@ class Canny(meta.Augmenter):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.Canny()
 
-    Creates an augmenter that generates random blends between images and
-    their canny edge representations. Apply the augmenter to images using
-    e.g. ``images_aug = aug(images=<list of numpy array>)``.
+    Create an augmenter that generates random blends between images and
+    their canny edge representations.
 
-    >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.Canny(sobel_kernel_size=(0, 7))
-
-    Creates a canny edge augmenter that initially preprocesses images using
-    a sobel filter with kernel size ``3x3`` to ``7x7`` and will sometimes
-    not modify images at all (if a value ``<=2`` is sampled).
-
-    >>> import imgaug.augmenters as iaa
     >>> aug = iaa.Canny(alpha=(0.0, 0.5))
 
-    Creates a canny edge augmenter that generates edge images with a blending
-    factor of max 50%, i.e. the original (non-edge) image is always at least
-    partially visible.
+    Create a canny edge augmenter that generates edge images with a blending
+    factor of max ``50%``, i.e. the original (non-edge) image is always at
+    least partially visible.
+
+    >>> aug = iaa.Canny(
+    >>>     alpha=(0.0, 0.5),
+    >>>     colorizer=iaa.RandomColorsBinaryImageColorizer(
+    >>>         color_true=255,
+    >>>         color_false=0
+    >>>     )
+    >>> )
+
+    Same as in the previous example, but the edge image always uses the
+    color white for edges and black for the background.
+
+    >>> aug = iaa.Canny(alpha=(0.5, 1.0), sobel_kernel_size=[3, 7])
+
+    Create a canny edge augmenter that initially preprocesses images using
+    a sobel filter with kernel size of either ``3x3`` or ``13x13`` and
+    alpha-blends with result using a strength of ``50%`` (both images
+    equally visible) to ``100%`` (only edge image visible).
+
+    >>> aug = iaa.Alpha(
+    >>>     (0.0, 1.0),
+    >>>     iaa.Canny(alpha=1),
+    >>>     iaa.MedianBlur(13)
+    >>> )
+
+    Create an augmenter that blends a canny edge image with a median-blurred
+    version of the input image. The median blur uses a fixed kernel size
+    of ``13x13`` pixels.
 
     """
 
@@ -346,13 +375,12 @@ class Canny(meta.Augmenter):
 
     def _draw_samples(self, augmentables, random_state):
         nb_images = len(augmentables)
-        rss = ia.derive_random_states(random_state, 4)
+        rss = random_state.duplicate(4)
 
         alpha_samples = self.alpha.draw_samples((nb_images,), rss[0])
 
         hthresh = self.hysteresis_thresholds
         if isinstance(hthresh, tuple):
-            assert len(hthresh) == 2
             min_values = hthresh[0].draw_samples((nb_images,), rss[1])
             max_values = hthresh[1].draw_samples((nb_images,), rss[2])
             hthresh_samples = np.stack([min_values, max_values], axis=-1)
@@ -394,7 +422,7 @@ class Canny(meta.Augmenter):
                              "float256"],
                          augmenter=self)
 
-        rss = ia.derive_random_states(random_state, len(images))
+        rss = random_state.duplicate(len(images))
         samples = self._draw_samples(images, rss[-1])
         alpha_samples = samples[0]
         hthresh_samples = samples[1]
@@ -404,7 +432,6 @@ class Canny(meta.Augmenter):
         gen = enumerate(zip(images, alpha_samples, hthresh_samples,
                             sobel_samples))
         for i, (image, alpha, hthreshs, sobel) in gen:
-            assert image.ndim == 3
             assert image.shape[-1] in [1, 3, 4], (
                 "Canny edge detector can currently only handle images with "
                 "channel numbers that are 1, 3 or 4. Got %d.") % (
@@ -427,15 +454,6 @@ class Canny(meta.Augmenter):
                 result[i] = blend.blend_alpha(image_canny_color, image, alpha)
 
         return result
-
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        # pylint: disable=no-self-use
-        return heatmaps
-
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
-        # pylint: disable=no-self-use
-        return keypoints_on_images
 
     def get_parameters(self):
         return [self.alpha, self.hysteresis_thresholds, self.sobel_kernel_size,

@@ -23,17 +23,15 @@ List of augmenters:
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
-import cv2
 
-from . import meta, arithmetic, blur, contrast, color as augmenters_color
+from . import meta, arithmetic, blur, contrast, color as colorlib
 import imgaug as ia
 from .. import parameters as iap
 from .. import dtypes as iadt
 
 
 class FastSnowyLandscape(meta.Augmenter):
-    """
-    Convert non-snowy landscapes to snowy ones.
+    """Convert non-snowy landscapes to snowy ones.
 
     This augmenter expects to get an image that roughly shows a landscape.
 
@@ -65,11 +63,11 @@ class FastSnowyLandscape(meta.Augmenter):
         All pixels with lightness in HLS colorspace that is below this value
         will have their lightness increased by `lightness_multiplier`.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the discrete interval ``[a..b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the discrete interval ``[a..b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -77,11 +75,11 @@ class FastSnowyLandscape(meta.Augmenter):
         Multiplier for pixel's lightness value in HLS colorspace.
         Affects all pixels selected via `lightness_threshold`.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the discrete interval ``[a..b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the discrete interval ``[a..b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -95,7 +93,7 @@ class FastSnowyLandscape(meta.Augmenter):
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     Examples
@@ -108,8 +106,7 @@ class FastSnowyLandscape(meta.Augmenter):
 
     Search for all pixels in the image with a lightness value in HLS
     colorspace of less than ``140`` and increase their lightness by a factor
-    of ``2.5``. This is the configuration proposed in the original
-    article (see link above).
+    of ``2.5``.
 
     >>> aug = iaa.FastSnowyLandscape(
     >>>     lightness_threshold=[128, 200],
@@ -127,7 +124,7 @@ class FastSnowyLandscape(meta.Augmenter):
     >>>     lightness_multiplier=(1.0, 4.0)
     >>> )
 
-    Similar to above, but the lightness threshold is sampled
+    Similar to the previous example, but the lightness threshold is sampled
     from ``uniform(100, 255)`` (per image) and the multiplier
     from ``uniform(1.0, 4.0)`` (per image). This seems to produce good and
     varied results.
@@ -135,7 +132,8 @@ class FastSnowyLandscape(meta.Augmenter):
     """
 
     def __init__(self, lightness_threshold=(100, 255),
-                 lightness_multiplier=(1.0, 4.0), from_colorspace="RGB",
+                 lightness_multiplier=(1.0, 4.0),
+                 from_colorspace=colorlib.CSPACE_RGB,
                  name=None, deterministic=False, random_state=None):
         super(FastSnowyLandscape, self).__init__(
             name=name, deterministic=deterministic, random_state=random_state)
@@ -150,7 +148,7 @@ class FastSnowyLandscape(meta.Augmenter):
 
     def _draw_samples(self, augmentables, random_state):
         nb_augmentables = len(augmentables)
-        rss = ia.derive_random_states(random_state, 2)
+        rss = random_state.duplicate(2)
         thresh_samples = self.lightness_threshold.draw_samples(
             (nb_augmentables,), rss[1])
         lmul_samples = self.lightness_multiplier.draw_samples(
@@ -163,13 +161,8 @@ class FastSnowyLandscape(meta.Augmenter):
 
         gen = enumerate(zip(images, thresh_samples, lmul_samples))
         for i, (image, thresh, lmul) in gen:
-            cv_vars = augmenters_color.ChangeColorspace.CV_VARS
-            from2hls = "%s2HLS" % (self.from_colorspace,)
-            hls2from = "HLS2%s" % (self.from_colorspace,)
-            color_transform = cv_vars[from2hls]
-            color_transform_inverse = cv_vars[hls2from]
-
-            image_hls = cv2.cvtColor(image, color_transform)
+            image_hls = colorlib.change_colorspace_(
+                image, colorlib.CSPACE_HLS, self.from_colorspace)
             cvt_dtype = image_hls.dtype
             image_hls = image_hls.astype(np.float64)
             lightness = image_hls[..., 1]
@@ -177,190 +170,23 @@ class FastSnowyLandscape(meta.Augmenter):
             lightness[lightness < thresh] *= lmul
 
             image_hls = iadt.restore_dtypes_(image_hls, cvt_dtype)
-            image_rgb = cv2.cvtColor(image_hls, color_transform_inverse)
+            image_rgb = colorlib.change_colorspace_(
+                image_hls, self.from_colorspace, colorlib.CSPACE_HLS)
 
             result[i] = image_rgb
 
         return result
 
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        # pylint: disable=no-self-use
-        return heatmaps
-
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
-        # pylint: disable=no-self-use
-        return keypoints_on_images
-
     def get_parameters(self):
         return [self.lightness_threshold, self.lightness_multiplier]
 
 
-# TODO add vertical gradient alpha to have clouds only at skylevel/groundlevel
-# TODO add configurable parameters
-def Clouds(name=None, deterministic=False, random_state=None):
-    """
-    Add clouds to images.
-
-    This is a wrapper around ``CloudLayer``. It executes 1 to 2 layers per
-    image, leading to varying densities and frequency patterns of clouds.
-
-    This augmenter seems to be fairly robust w.r.t. the image size. Tested
-    with ``96x128``, ``192x256`` and ``960x1280``.
-
-    dtype support::
-
-        * ``uint8``: yes; tested
-        * ``uint16``: no (1)
-        * ``uint32``: no (1)
-        * ``uint64``: no (1)
-        * ``int8``: no (1)
-        * ``int16``: no (1)
-        * ``int32``: no (1)
-        * ``int64``: no (1)
-        * ``float16``: no (1)
-        * ``float32``: no (1)
-        * ``float64``: no (1)
-        * ``float128``: no (1)
-        * ``bool``: no (1)
-
-        - (1) Parameters of this augmenter are optimized for the value range
-              of ``uint8``. While other dtypes may be accepted, they will lead
-              to images augmented in ways inappropriate for the respective
-              dtype.
-
-    Parameters
-    ----------
-    name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    Examples
-    --------
-    >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.Clouds()
-
-    Creates an augmenter that adds clouds to images.
-
-    """
-    if name is None:
-        name = "Unnamed%s" % (ia.caller_name(),)
-
-    layers = [
-        CloudLayer(
-            intensity_mean=(196, 255),
-            intensity_freq_exponent=(-2.5, -2.0),
-            intensity_coarse_scale=10,
-            alpha_min=0,
-            alpha_multiplier=(0.25, 0.75),
-            alpha_size_px_max=(2, 8),
-            alpha_freq_exponent=(-2.5, -2.0),
-            sparsity=(0.8, 1.0),
-            density_multiplier=(0.5, 1.0)
-        ),
-        CloudLayer(
-            intensity_mean=(196, 255),
-            intensity_freq_exponent=(-2.0, -1.0),
-            intensity_coarse_scale=10,
-            alpha_min=0,
-            alpha_multiplier=(0.5, 1.0),
-            alpha_size_px_max=(64, 128),
-            alpha_freq_exponent=(-2.0, -1.0),
-            sparsity=(1.0, 1.4),
-            density_multiplier=(0.8, 1.5)
-        )
-    ]
-    return meta.SomeOf(
-        (1, 2),
-        children=layers,
-        random_order=False,
-        name=name,
-        deterministic=deterministic,
-        random_state=random_state)
-
-
-# TODO add vertical gradient alpha to have fog only at skylevel/groundlevel
-# TODO add configurable parameters
-def Fog(name=None, deterministic=False, random_state=None):
-    """
-    Add fog to images.
-
-    This is a wrapper around ``CloudLayer``. It executes a single layer per
-    image with a configuration leading to fairly dense clouds with
-    low-frequency patterns.
-
-    This augmenter seems to be fairly robust w.r.t. the image size. Tested
-    with ``96x128``, ``192x256`` and ``960x1280``.
-
-    dtype support::
-
-        * ``uint8``: yes; tested
-        * ``uint16``: no (1)
-        * ``uint32``: no (1)
-        * ``uint64``: no (1)
-        * ``int8``: no (1)
-        * ``int16``: no (1)
-        * ``int32``: no (1)
-        * ``int64``: no (1)
-        * ``float16``: no (1)
-        * ``float32``: no (1)
-        * ``float64``: no (1)
-        * ``float128``: no (1)
-        * ``bool``: no (1)
-
-        - (1) Parameters of this augmenter are optimized for the value range
-              of ``uint8``. While other dtypes may be accepted, they will lead
-              to images augmented in ways inappropriate for the respective
-              dtype.
-
-    Parameters
-    ----------
-    name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    Examples
-    --------
-    >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.Fog()
-
-    Creates an augmenter that adds fog to images.
-
-    """
-    if name is None:
-        name = "Unnamed%s" % (ia.caller_name(),)
-
-    return CloudLayer(
-        intensity_mean=(220, 255),
-        intensity_freq_exponent=(-2.0, -1.5),
-        intensity_coarse_scale=2,
-        alpha_min=(0.7, 0.9),
-        alpha_multiplier=0.3,
-        alpha_size_px_max=(2, 8),
-        alpha_freq_exponent=(-4.0, -2.0),
-        sparsity=0.9,
-        density_multiplier=(0.4, 0.9),
-        name=name,
-        deterministic=deterministic,
-        random_state=random_state
-    )
-
-
-# TODO add perspective transform to each cloud layer to make them look more distant?
+# TODO add examples and add these to the overview docs
+# TODO add perspective transform to each cloud layer to make them look more
+#      distant?
 # TODO alpha_mean and density overlap - remove one of them
 class CloudLayer(meta.Augmenter):
-    """
-    Add a single layer of clouds to an image.
+    """Add a single layer of clouds to an image.
 
     dtype support::
 
@@ -391,11 +217,11 @@ class CloudLayer(meta.Augmenter):
         Mean intensity of the clouds (i.e. mean color).
         Recommended to be in the interval ``[190, 255]``.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly
+              sampled per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -411,11 +237,11 @@ class CloudLayer(meta.Augmenter):
         space, i.e. affects final intensity on a coarse level.
         Recommended to be in the interval ``(0, 10]``.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -425,11 +251,11 @@ class CloudLayer(meta.Augmenter):
         Recommended to usually be at around ``0.0`` for clouds and ``>0`` for
         fog.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -440,11 +266,11 @@ class CloudLayer(meta.Augmenter):
         Note that this parameter currently overlaps with `density_multiplier`,
         which is applied a bit later to the alpha mask.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -469,11 +295,11 @@ class CloudLayer(meta.Augmenter):
         get weird patterns with sudden fall-offs to zero that look very
         unnatural.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -482,11 +308,11 @@ class CloudLayer(meta.Augmenter):
         Set this higher to get "denser" clouds wherever they are visible.
         Recommended to be around ``[0.5, 1.5]``.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -496,10 +322,11 @@ class CloudLayer(meta.Augmenter):
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     """
+
     def __init__(self, intensity_mean, intensity_freq_exponent,
                  intensity_coarse_scale, alpha_min, alpha_multiplier,
                  alpha_size_px_max, alpha_freq_exponent, sparsity,
@@ -521,20 +348,11 @@ class CloudLayer(meta.Augmenter):
             density_multiplier, "density_multiplier")
 
     def _augment_images(self, images, random_state, parents, hooks):
-        rss = ia.derive_random_states(random_state, len(images))
+        rss = random_state.duplicate(len(images))
         result = images
         for i, (image, rs) in enumerate(zip(images, rss)):
             result[i] = self.draw_on_image(image, rs)
         return result
-
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        # pylint: disable=no-self-use
-        return heatmaps
-
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
-        # pylint: disable=no-self-use
-        return keypoints_on_images
 
     def get_parameters(self):
         return [self.intensity_mean,
@@ -587,7 +405,7 @@ class CloudLayer(meta.Augmenter):
             self.density_multiplier.draw_sample(random_state)
 
         height, width = image.shape[0:2]
-        rss_alpha, rss_intensity = ia.derive_random_states(random_state, 2)
+        rss_alpha, rss_intensity = random_state.duplicate(2)
 
         intensity_coarse = self._generate_intensity_map_coarse(
             height, width, intensity_mean_sample,
@@ -651,15 +469,18 @@ class CloudLayer(meta.Augmenter):
         return alpha
 
 
-def Snowflakes(density=(0.005, 0.075), density_uniformity=(0.3, 0.9),
-               flake_size=(0.2, 0.7), flake_size_uniformity=(0.4, 0.8),
-               angle=(-30, 30), speed=(0.007, 0.03),
-               name=None, deterministic=False, random_state=None):
+# TODO add vertical gradient alpha to have clouds only at skylevel/groundlevel
+# TODO add configurable parameters
+class Clouds(meta.SomeOf):
     """
-    Add falling snowflakes to images.
+    Add clouds to images.
 
-    This is a wrapper around ``SnowflakesLayer``. It executes 1 to 3 layers
-    per image.
+    This is a wrapper around :class:`imgaug.augmenters.weather.CloudLayer`.
+    It executes 1 to 2 layers per image, leading to varying densities and
+    frequency patterns of clouds.
+
+    This augmenter seems to be fairly robust w.r.t. the image size. Tested
+    with ``96x128``, ``192x256`` and ``960x1280``.
 
     dtype support::
 
@@ -684,162 +505,134 @@ def Snowflakes(density=(0.005, 0.075), density_uniformity=(0.3, 0.9),
 
     Parameters
     ----------
-    density : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
-        Density of the snowflake layer, as a probability of each pixel in
-        low resolution space to be a snowflake.
-        Valid values are in the interval ``[0.0, 1.0]``.
-        Recommended to be in the interval ``[0.01, 0.075]``.
-
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
-            * If a ``StochasticParameter``, then a value will be sampled
-              per image from that parameter.
-
-    density_uniformity : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
-        Size uniformity of the snowflakes. Higher values denote more
-        similarly sized snowflakes.
-        Valid values are in the interval ``[0.0, 1.0]``.
-        Recommended to be around ``0.5``.
-
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
-            * If a ``StochasticParameter``, then a value will be sampled
-              per image from that parameter.
-
-    flake_size : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
-        Size of the snowflakes. This parameter controls the resolution at
-        which snowflakes are sampled. Higher values mean that the resolution
-        is closer to the input image's resolution and hence each sampled
-        snowflake will be smaller (because of the smaller pixel size).
-
-        Valid values are in the interval ``(0.0, 1.0]``.
-        Recommended values:
-
-            * On ``96x128`` a value of ``(0.1, 0.4)`` worked well.
-            * On ``192x256`` a value of ``(0.2, 0.7)`` worked well.
-            * On ``960x1280`` a value of ``(0.7, 0.95)`` worked well.
-
-        Datatype behaviour:
-
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
-            * If a ``StochasticParameter``, then a value will be sampled
-              per image from that parameter.
-
-    flake_size_uniformity : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
-        Controls the size uniformity of the snowflakes. Higher values mean
-        that the snowflakes are more similarly sized.
-        Valid values are in the interval ``[0.0, 1.0]``.
-        Recommended to be around ``0.5``.
-
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
-            * If a ``StochasticParameter``, then a value will be sampled
-              per image from that parameter.
-
-    angle : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
-        Angle in degrees of motion blur applied to the snowflakes, where
-        ``0.0`` is motion blur that points straight upwards.
-        Recommended to be in the interval ``[-30, 30]``.
-        See also :func:`imgaug.augmenters.blur.MotionBlur.__init__`.
-
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
-            * If a ``StochasticParameter``, then a value will be sampled
-              per image from that parameter.
-
-    speed : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
-        Perceived falling speed of the snowflakes. This parameter controls the
-        motion blur's kernel size. It follows roughly the form
-        ``kernel_size = image_size * speed``. Hence, values around ``1.0``
-        denote that the motion blur should "stretch" each snowflake over
-        the whole image.
-
-        Valid values are in the interval ``[0.0, 1.0]``.
-        Recommended values:
-
-            * On ``96x128`` a value of ``(0.01, 0.05)`` worked well.
-            * On ``192x256`` a value of ``(0.007, 0.03)`` worked well.
-            * On ``960x1280`` a value of ``(0.001, 0.03)`` worked well.
-
-        Datatype behaviour:
-
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
-            * If a ``StochasticParameter``, then a value will be sampled
-              per image from that parameter.
-
     name : None or str, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     Examples
     --------
     >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.Snowflakes(flake_size=(0.1, 0.4), speed=(0.01, 0.05))
+    >>> aug = iaa.Clouds()
 
-    Adds snowflakes to small images (around ``96x128``).
-
-    >>> aug = iaa.Snowflakes(flake_size=(0.2, 0.7), speed=(0.007, 0.03))
-
-    Adds snowflakes to medium-sized images (around ``192x256``).
-
-    >>> aug = iaa.Snowflakes(flake_size=(0.7, 0.95), speed=(0.001, 0.03))
-
-    Adds snowflakes to large images (around ``960x1280``).
+    Create an augmenter that adds clouds to images.
 
     """
-    if name is None:
-        name = "Unnamed%s" % (ia.caller_name(),)
 
-    layer = SnowflakesLayer(
-        density=density,
-        density_uniformity=density_uniformity,
-        flake_size=flake_size,
-        flake_size_uniformity=flake_size_uniformity,
-        angle=angle,
-        speed=speed,
-        blur_sigma_fraction=(0.0001, 0.001)
-    )
+    def __init__(self, name=None, deterministic=False, random_state=None):
+        layers = [
+            CloudLayer(
+                intensity_mean=(196, 255),
+                intensity_freq_exponent=(-2.5, -2.0),
+                intensity_coarse_scale=10,
+                alpha_min=0,
+                alpha_multiplier=(0.25, 0.75),
+                alpha_size_px_max=(2, 8),
+                alpha_freq_exponent=(-2.5, -2.0),
+                sparsity=(0.8, 1.0),
+                density_multiplier=(0.5, 1.0)
+            ),
+            CloudLayer(
+                intensity_mean=(196, 255),
+                intensity_freq_exponent=(-2.0, -1.0),
+                intensity_coarse_scale=10,
+                alpha_min=0,
+                alpha_multiplier=(0.5, 1.0),
+                alpha_size_px_max=(64, 128),
+                alpha_freq_exponent=(-2.0, -1.0),
+                sparsity=(1.0, 1.4),
+                density_multiplier=(0.8, 1.5)
+            )
+        ]
 
-    return meta.SomeOf(
-        (1, 3),
-        children=[layer.deepcopy() for _ in range(3)],
-        random_order=False,
-        name=name,
-        deterministic=deterministic,
-        random_state=random_state
-    )
+        super(Clouds, self).__init__(
+            (1, 2),
+            children=layers,
+            random_order=False,
+            name=name,
+            deterministic=deterministic,
+            random_state=random_state)
 
 
+# TODO add vertical gradient alpha to have fog only at skylevel/groundlevel
+# TODO add configurable parameters
+class Fog(CloudLayer):
+    """Add fog to images.
+
+    This is a wrapper around :class:`imgaug.augmenters.weather.CloudLayer`.
+    It executes a single layer per image with a configuration leading to
+    fairly dense clouds with low-frequency patterns.
+
+    This augmenter seems to be fairly robust w.r.t. the image size. Tested
+    with ``96x128``, ``192x256`` and ``960x1280``.
+
+    dtype support::
+
+        * ``uint8``: yes; tested
+        * ``uint16``: no (1)
+        * ``uint32``: no (1)
+        * ``uint64``: no (1)
+        * ``int8``: no (1)
+        * ``int16``: no (1)
+        * ``int32``: no (1)
+        * ``int64``: no (1)
+        * ``float16``: no (1)
+        * ``float32``: no (1)
+        * ``float64``: no (1)
+        * ``float128``: no (1)
+        * ``bool``: no (1)
+
+        - (1) Parameters of this augmenter are optimized for the value range
+              of ``uint8``. While other dtypes may be accepted, they will lead
+              to images augmented in ways inappropriate for the respective
+              dtype.
+
+    Parameters
+    ----------
+    name : None or str, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    deterministic : bool, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.Fog()
+
+    Create an augmenter that adds fog to images.
+
+    """
+
+    def __init__(self, name=None, deterministic=False, random_state=None):
+        super(Fog, self).__init__(
+            intensity_mean=(220, 255),
+            intensity_freq_exponent=(-2.0, -1.5),
+            intensity_coarse_scale=2,
+            alpha_min=(0.7, 0.9),
+            alpha_multiplier=0.3,
+            alpha_size_px_max=(2, 8),
+            alpha_freq_exponent=(-4.0, -2.0),
+            sparsity=0.9,
+            density_multiplier=(0.4, 0.9),
+            name=name,
+            deterministic=deterministic,
+            random_state=random_state
+        )
+
+
+# TODO add examples and add these to the overview docs
 # TODO snowflakes are all almost 100% white, add some grayish tones and
 #      maybe color to them
 class SnowflakesLayer(meta.Augmenter):
-    """
-    Add a single layer of falling snowflakes to images.
+    """Add a single layer of falling snowflakes to images.
 
     dtype support::
 
@@ -867,11 +660,11 @@ class SnowflakesLayer(meta.Augmenter):
         Valid values are in the interval ``[0.0, 1.0]``.
         Recommended to be in the interval ``[0.01, 0.075]``.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -881,11 +674,11 @@ class SnowflakesLayer(meta.Augmenter):
         Valid values are in the interval ``[0.0, 1.0]``.
         Recommended to be around ``0.5``.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -904,11 +697,11 @@ class SnowflakesLayer(meta.Augmenter):
 
         Datatype behaviour:
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -918,11 +711,11 @@ class SnowflakesLayer(meta.Augmenter):
         Valid values are in the interval ``[0.0, 1.0]``.
         Recommended to be around ``0.5``.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -932,11 +725,11 @@ class SnowflakesLayer(meta.Augmenter):
         Recommended to be in the interval ``[-30, 30]``.
         See also :func:`imgaug.augmenters.blur.MotionBlur.__init__`.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -956,11 +749,11 @@ class SnowflakesLayer(meta.Augmenter):
 
         Datatype behaviour:
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -971,11 +764,11 @@ class SnowflakesLayer(meta.Augmenter):
         Recommended to be in the interval ``[0.0001, 0.001]``. May still
         require tinkering based on image size.
 
-            * If a number, then that value will always be used.
-            * If a tuple ``(a, b)``, then a value will be uniformly sampled
-              from the interval ``[a, b]`` per image.
-            * If a list, then a random value will be sampled from that list
-              per image.
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
             * If a ``StochasticParameter``, then a value will be sampled
               per image from that parameter.
 
@@ -992,7 +785,7 @@ class SnowflakesLayer(meta.Augmenter):
     deterministic : bool, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
-    random_state : None or int or numpy.random.RandomState, optional
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
 
     """
@@ -1023,20 +816,11 @@ class SnowflakesLayer(meta.Augmenter):
         self.gate_noise_size = (8, 8)
 
     def _augment_images(self, images, random_state, parents, hooks):
-        rss = ia.derive_random_states(random_state, len(images))
+        rss = random_state.duplicate(len(images))
         result = images
         for i, (image, rs) in enumerate(zip(images, rss)):
             result[i] = self.draw_on_image(image, rs)
         return result
-
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        # pylint: disable=no-self-use
-        return heatmaps
-
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
-        # pylint: disable=no-self-use
-        return keypoints_on_images
 
     def get_parameters(self):
         return [self.density,
@@ -1055,8 +839,9 @@ class SnowflakesLayer(meta.Augmenter):
             "got %d dimensions." % (image.ndim,))
         assert image.shape[2] in [1, 3], (
             "Expected to get image with a channel axis of size 1 or 3, "
-            "got %d (shape: %s)" % (image.shape[2], image.shape)
-        )
+            "got %d (shape: %s)" % (image.shape[2], image.shape))
+
+        rss = random_state.duplicate(2)
 
         flake_size_sample = self.flake_size.draw_sample(random_state)
         flake_size_uniformity_sample = self.flake_size_uniformity.draw_sample(
@@ -1074,15 +859,14 @@ class SnowflakesLayer(meta.Augmenter):
             height_down,
             width_down,
             self.density,
-            ia.derive_random_state(random_state)
+            rss[0]
         )
 
         # gate the sampled noise via noise in range [0.0, 1.0]
         # this leads to less flakes in some areas of the image and more in
         # other areas
         gate_noise = iap.Beta(1.0, 1.0 - self.density_uniformity)
-        noise = self._gate(noise, gate_noise, self.gate_noise_size,
-                           ia.derive_random_state(random_state))
+        noise = self._gate(noise, gate_noise, self.gate_noise_size, rss[1])
         noise = ia.imresize_single_image(noise, (height, width),
                                          interpolation="cubic")
 
@@ -1164,3 +948,186 @@ class SnowflakesLayer(meta.Augmenter):
     def _blend_by_max(cls, image_f32, noise_small_blur_rgb):
         image_f32 = np.maximum(image_f32, noise_small_blur_rgb)
         return np.clip(image_f32, 0, 255).astype(np.uint8)
+
+
+class Snowflakes(meta.SomeOf):
+    """Add falling snowflakes to images.
+
+    This is a wrapper around
+    :class:`imgaug.augmenters.weather.SnowflakesLayer`. It executes 1 to 3
+    layers per image.
+
+    dtype support::
+
+        * ``uint8``: yes; tested
+        * ``uint16``: no (1)
+        * ``uint32``: no (1)
+        * ``uint64``: no (1)
+        * ``int8``: no (1)
+        * ``int16``: no (1)
+        * ``int32``: no (1)
+        * ``int64``: no (1)
+        * ``float16``: no (1)
+        * ``float32``: no (1)
+        * ``float64``: no (1)
+        * ``float128``: no (1)
+        * ``bool``: no (1)
+
+        - (1) Parameters of this augmenter are optimized for the value range
+              of ``uint8``. While other dtypes may be accepted, they will lead
+              to images augmented in ways inappropriate for the respective
+              dtype.
+
+    Parameters
+    ----------
+    density : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
+        Density of the snowflake layer, as a probability of each pixel in
+        low resolution space to be a snowflake.
+        Valid values are in the interval ``[0.0, 1.0]``.
+        Recommended to be in the interval ``[0.01, 0.075]``.
+
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
+            * If a ``StochasticParameter``, then a value will be sampled
+              per image from that parameter.
+
+    density_uniformity : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
+        Size uniformity of the snowflakes. Higher values denote more
+        similarly sized snowflakes.
+        Valid values are in the interval ``[0.0, 1.0]``.
+        Recommended to be around ``0.5``.
+
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
+            * If a ``StochasticParameter``, then a value will be sampled
+              per image from that parameter.
+
+    flake_size : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
+        Size of the snowflakes. This parameter controls the resolution at
+        which snowflakes are sampled. Higher values mean that the resolution
+        is closer to the input image's resolution and hence each sampled
+        snowflake will be smaller (because of the smaller pixel size).
+
+        Valid values are in the interval ``(0.0, 1.0]``.
+        Recommended values:
+
+            * On ``96x128`` a value of ``(0.1, 0.4)`` worked well.
+            * On ``192x256`` a value of ``(0.2, 0.7)`` worked well.
+            * On ``960x1280`` a value of ``(0.7, 0.95)`` worked well.
+
+        Datatype behaviour:
+
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
+            * If a ``StochasticParameter``, then a value will be sampled
+              per image from that parameter.
+
+    flake_size_uniformity : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
+        Controls the size uniformity of the snowflakes. Higher values mean
+        that the snowflakes are more similarly sized.
+        Valid values are in the interval ``[0.0, 1.0]``.
+        Recommended to be around ``0.5``.
+
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
+            * If a ``StochasticParameter``, then a value will be sampled
+              per image from that parameter.
+
+    angle : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
+        Angle in degrees of motion blur applied to the snowflakes, where
+        ``0.0`` is motion blur that points straight upwards.
+        Recommended to be in the interval ``[-30, 30]``.
+        See also :func:`imgaug.augmenters.blur.MotionBlur.__init__`.
+
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
+            * If a ``StochasticParameter``, then a value will be sampled
+              per image from that parameter.
+
+    speed : number or tuple of number or list of number or imgaug.parameters.StochasticParameter
+        Perceived falling speed of the snowflakes. This parameter controls the
+        motion blur's kernel size. It follows roughly the form
+        ``kernel_size = image_size * speed``. Hence, values around ``1.0``
+        denote that the motion blur should "stretch" each snowflake over
+        the whole image.
+
+        Valid values are in the interval ``[0.0, 1.0]``.
+        Recommended values:
+
+            * On ``96x128`` a value of ``(0.01, 0.05)`` worked well.
+            * On ``192x256`` a value of ``(0.007, 0.03)`` worked well.
+            * On ``960x1280`` a value of ``(0.001, 0.03)`` worked well.
+
+        Datatype behaviour:
+
+            * If a ``number``, then that value will always be used.
+            * If a ``tuple`` ``(a, b)``, then a value will be uniformly sampled
+              per image from the interval ``[a, b]``.
+            * If a ``list``, then a random value will be sampled from that
+              ``list`` per image.
+            * If a ``StochasticParameter``, then a value will be sampled
+              per image from that parameter.
+
+    name : None or str, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    deterministic : bool, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.Snowflakes(flake_size=(0.1, 0.4), speed=(0.01, 0.05))
+
+    Add snowflakes to small images (around ``96x128``).
+
+    >>> aug = iaa.Snowflakes(flake_size=(0.2, 0.7), speed=(0.007, 0.03))
+
+    Add snowflakes to medium-sized images (around ``192x256``).
+
+    >>> aug = iaa.Snowflakes(flake_size=(0.7, 0.95), speed=(0.001, 0.03))
+
+    Add snowflakes to large images (around ``960x1280``).
+
+    """
+
+    def __init__(self, density=(0.005, 0.075), density_uniformity=(0.3, 0.9),
+                 flake_size=(0.2, 0.7), flake_size_uniformity=(0.4, 0.8),
+                 angle=(-30, 30), speed=(0.007, 0.03),
+                 name=None, deterministic=False, random_state=None):
+        layer = SnowflakesLayer(
+            density=density,
+            density_uniformity=density_uniformity,
+            flake_size=flake_size,
+            flake_size_uniformity=flake_size_uniformity,
+            angle=angle,
+            speed=speed,
+            blur_sigma_fraction=(0.0001, 0.001)
+        )
+
+        super(Snowflakes, self).__init__(
+            (1, 3),
+            children=[layer.deepcopy() for _ in range(3)],
+            random_order=False,
+            name=name,
+            deterministic=deterministic,
+            random_state=random_state
+        )

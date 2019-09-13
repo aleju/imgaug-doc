@@ -1,7 +1,6 @@
 from __future__ import print_function, division, absolute_import
 
 import copy
-import warnings
 
 import numpy as np
 
@@ -19,44 +18,23 @@ class UnnormalizedBatch(object):
 
     Parameters
     ----------
-    images : None \
-             or (N,H,W,C) ndarray \
-             or (N,H,W) ndarray \
-             or iterable of (H,W,C) ndarray \
-             or iterable of (H,W) ndarray
+    images : None or (N,H,W,C) ndarray or (N,H,W) ndarray or iterable of (H,W,C) ndarray or iterable of (H,W) ndarray
         The images to augment.
 
-    heatmaps : None \
-               or (N,H,W,C) ndarray \
-               or imgaug.augmentables.heatmaps.HeatmapsOnImage \
-               or iterable of (H,W,C) ndarray \
-               or iterable of imgaug.augmentables.heatmaps.HeatmapsOnImage
+    heatmaps : None or (N,H,W,C) ndarray or imgaug.augmentables.heatmaps.HeatmapsOnImage or iterable of (H,W,C) ndarray or iterable of imgaug.augmentables.heatmaps.HeatmapsOnImage
         The heatmaps to augment.
         If anything else than ``HeatmapsOnImage``, then the number of heatmaps
         must match the number of images provided via parameter `images`.
         The number is contained either in ``N`` or the first iterable's size.
 
-    segmentation_maps : None \
-            or (N,H,W) ndarray \
-            or imgaug.augmentables.segmaps.SegmentationMapsOnImage \
-            or iterable of (H,W) ndarray \
-            or iterable of imgaug.augmentables.segmaps.SegmentationMapsOnImage
+    segmentation_maps : None or (N,H,W) ndarray or imgaug.augmentables.segmaps.SegmentationMapsOnImage or iterable of (H,W) ndarray or iterable of imgaug.augmentables.segmaps.SegmentationMapsOnImage
         The segmentation maps to augment.
         If anything else than ``SegmentationMapsOnImage``, then the number of
         segmaps must match the number of images provided via parameter
         `images`. The number is contained either in ``N`` or the first
         iterable's size.
 
-    keypoints : None \
-                or list of (N,K,2) ndarray \
-                or tuple of number \
-                or imgaug.augmentables.kps.Keypoint \
-                or iterable of (K,2) ndarray \
-                or iterable of tuple of number \
-                or iterable of imgaug.augmentables.kps.Keypoint \
-                or iterable of imgaug.augmentables.kps.KeypointOnImage \
-                or iterable of iterable of tuple of number \
-                or iterable of iterable of imgaug.augmentables.kps.Keypoint
+    keypoints : None or list of (N,K,2) ndarray or tuple of number or imgaug.augmentables.kps.Keypoint or iterable of (K,2) ndarray or iterable of tuple of number or iterable of imgaug.augmentables.kps.Keypoint or iterable of imgaug.augmentables.kps.KeypointOnImage or iterable of iterable of tuple of number or iterable of iterable of imgaug.augmentables.kps.Keypoint
         The keypoints to augment.
         If a tuple (or iterable(s) of tuple), then iterpreted as (x,y)
         coordinates and must hence contain two numbers.
@@ -72,50 +50,27 @@ class UnnormalizedBatch(object):
         in case of "iterable of iterable of tuples" in the first iterable's
         size.
 
-    bounding_boxes : None \
-                or (N,B,4) ndarray \
-                or tuple of number \
-                or imgaug.augmentables.bbs.BoundingBox \
-                or imgaug.augmentables.bbs.BoundingBoxesOnImage \
-                or iterable of (B,4) ndarray \
-                or iterable of tuple of number \
-                or iterable of imgaug.augmentables.bbs.BoundingBox \
-                or iterable of imgaug.augmentables.bbs.BoundingBoxesOnImage \
-                or iterable of iterable of tuple of number \
-                or iterable of iterable imgaug.augmentables.bbs.BoundingBox
+    bounding_boxes : None or (N,B,4) ndarray or tuple of number or imgaug.augmentables.bbs.BoundingBox or imgaug.augmentables.bbs.BoundingBoxesOnImage or iterable of (B,4) ndarray or iterable of tuple of number or iterable of imgaug.augmentables.bbs.BoundingBox or iterable of imgaug.augmentables.bbs.BoundingBoxesOnImage or iterable of iterable of tuple of number or iterable of iterable imgaug.augmentables.bbs.BoundingBox
         The bounding boxes to augment.
         This is analogous to the `keypoints` parameter. However, each
         tuple -- and also the last index in case of arrays -- has size 4,
         denoting the bounding box coordinates ``x1``, ``y1``, ``x2`` and ``y2``.
 
-    polygons : None  \
-               or (N,#polys,#points,2) ndarray \
-               or imgaug.augmentables.polys.Polygon \
-               or imgaug.augmentables.polys.PolygonsOnImage \
-               or iterable of (#polys,#points,2) ndarray \
-               or iterable of tuple of number \
-               or iterable of imgaug.augmentables.kps.Keypoint \
-               or iterable of imgaug.augmentables.polys.Polygon \
-               or iterable of imgaug.augmentables.polys.PolygonsOnImage \
-               or iterable of iterable of (#points,2) ndarray \
-               or iterable of iterable of tuple of number \
-               or iterable of iterable of imgaug.augmentables.kps.Keypoint \
-               or iterable of iterable of imgaug.augmentables.polys.Polygon \
-               or iterable of iterable of iterable of tuple of number \
-               or iterable of iterable of iterable of tuple of \
-               imgaug.augmentables.kps.Keypoint
+    polygons : None  or (N,#polys,#points,2) ndarray or imgaug.augmentables.polys.Polygon or imgaug.augmentables.polys.PolygonsOnImage or iterable of (#polys,#points,2) ndarray or iterable of tuple of number or iterable of imgaug.augmentables.kps.Keypoint or iterable of imgaug.augmentables.polys.Polygon or iterable of imgaug.augmentables.polys.PolygonsOnImage or iterable of iterable of (#points,2) ndarray or iterable of iterable of tuple of number or iterable of iterable of imgaug.augmentables.kps.Keypoint or iterable of iterable of imgaug.augmentables.polys.Polygon or iterable of iterable of iterable of tuple of number or iterable of iterable of iterable of tuple of imgaug.augmentables.kps.Keypoint
         The polygons to augment.
         This is similar to the `keypoints` parameter. However, each polygon
         may be made up of several ``(x,y)`` coordinates (three or more are
         required for valid polygons).
         The following datatypes will be interpreted as a single polygon on a
         single image:
+
           * ``imgaug.augmentables.polys.Polygon``
           * ``iterable of tuple of number``
           * ``iterable of imgaug.augmentables.kps.Keypoint``
 
         The following datatypes will be interpreted as multiple polygons on a
         single image:
+
           * ``imgaug.augmentables.polys.PolygonsOnImage``
           * ``iterable of imgaug.augmentables.polys.Polygon``
           * ``iterable of iterable of tuple of number``
@@ -124,28 +79,14 @@ class UnnormalizedBatch(object):
 
         The following datatypes will be interpreted as multiple polygons on
         multiple images:
+
           * ``(N,#polys,#points,2) ndarray``
           * ``iterable of (#polys,#points,2) ndarray``
           * ``iterable of iterable of (#points,2) ndarray``
           * ``iterable of iterable of iterable of tuple of number``
           * ``iterable of iterable of iterable of tuple of imgaug.augmentables.kps.Keypoint``
 
-    line_strings : None  \
-               or (N,#lines,#points,2) ndarray \
-               or imgaug.augmentables.lines.LineString \
-               or imgaug.augmentables.lines.LineStringOnImage \
-               or iterable of (#lines,#points,2) ndarray \
-               or iterable of tuple of number \
-               or iterable of imgaug.augmentables.kps.Keypoint \
-               or iterable of imgaug.augmentables.lines.LineString \
-               or iterable of imgaug.augmentables.lines.LineStringOnImage \
-               or iterable of iterable of (#points,2) ndarray \
-               or iterable of iterable of tuple of number \
-               or iterable of iterable of imgaug.augmentables.kps.Keypoint \
-               or iterable of iterable of imgaug.augmentables.polys.LineString \
-               or iterable of iterable of iterable of tuple of number \
-               or iterable of iterable of iterable of tuple of \
-               imgaug.augmentables.kps.Keypoint
+    line_strings : None or (N,#lines,#points,2) ndarray or imgaug.augmentables.lines.LineString or imgaug.augmentables.lines.LineStringOnImage or iterable of (#lines,#points,2) ndarray or iterable of tuple of number or iterable of imgaug.augmentables.kps.Keypoint or iterable of imgaug.augmentables.lines.LineString or iterable of imgaug.augmentables.lines.LineStringOnImage or iterable of iterable of (#points,2) ndarray or iterable of iterable of tuple of number or iterable of iterable of imgaug.augmentables.kps.Keypoint or iterable of iterable of imgaug.augmentables.polys.LineString or iterable of iterable of iterable of tuple of number or iterable of iterable of iterable of tuple of imgaug.augmentables.kps.Keypoint
         The line strings to augment.
         See `polygons` for more details as polygons follow a similar
         structure to line strings.
@@ -193,12 +134,15 @@ class UnnormalizedBatch(object):
             The batch, with ``*_unaug`` attributes being normalized.
 
         """
-        assert all([
-            attr is None for attr_name, attr in self.__dict__.items()
-            if attr_name.endswith("_aug")]), \
-            "Expected UnnormalizedBatch to not contain any augmented data " \
-            "before normalization, but at least one '*_aug' attribute was " \
-            "already set."
+        contains_no_augmented_data_yet = all([
+            attr is None
+            for attr_name, attr
+            in self.__dict__.items()
+            if attr_name.endswith("_aug")])
+        assert contains_no_augmented_data_yet, (
+            "Expected UnnormalizedBatch to not contain any augmented data "
+            "before normalization, but at least one '*_aug' attribute was "
+            "already set.")
 
         images_unaug = nlib.normalize_images(self.images_unaug)
         shapes = None
@@ -289,15 +233,13 @@ class Batch(object):
     heatmaps : None or list of imgaug.augmentables.heatmaps.HeatmapsOnImage
         The heatmaps to augment.
 
-    segmentation_maps : None or list of \
-                        imgaug.augmentables.segmaps.SegmentationMapsOnImage
+    segmentation_maps : None or list of imgaug.augmentables.segmaps.SegmentationMapsOnImage
         The segmentation maps to augment.
 
     keypoints : None or list of imgaug.augmentables.kps.KeypointOnImage
         The keypoints to augment.
 
-    bounding_boxes : None \
-                     or list of imgaug.augmentables.bbs.BoundingBoxesOnImage
+    bounding_boxes : None or list of imgaug.augmentables.bbs.BoundingBoxesOnImage
         The bounding boxes to augment.
 
     polygons : None or list of imgaug.augmentables.polys.PolygonsOnImage

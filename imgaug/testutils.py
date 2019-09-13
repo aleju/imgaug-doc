@@ -6,11 +6,36 @@ Placing them in test/ directory seems to be against convention, so they are part
 from __future__ import print_function, division, absolute_import
 
 import random
+import copy
 
 import numpy as np
 import six.moves as sm
+# unittest.mock is not available in 2.7 (though unittest2 might contain it?)
+try:
+    import unittest.mock as mock
+except ImportError:
+    import mock
 
 import imgaug as ia
+import imgaug.random as iarandom
+from imgaug.augmentables.kps import KeypointsOnImage
+
+
+class ArgCopyingMagicMock(mock.MagicMock):
+    """A MagicMock that copies its call args/kwargs before storing the call.
+
+    This is useful for imgaug as many augmentation methods change data
+    in-place.
+
+    Taken from https://stackoverflow.com/a/23264042/3760780
+
+    """
+
+    def _mock_call(self, *args, **kwargs):
+        args_copy = copy.deepcopy(args)
+        kwargs_copy = copy.deepcopy(kwargs)
+        return super(ArgCopyingMagicMock, self)._mock_call(
+            *args_copy, **kwargs_copy)
 
 
 def create_random_images(size):
@@ -31,8 +56,10 @@ def create_random_keypoints(size_images, nb_keypoints_per_img):
 
 
 def array_equal_lists(list1, list2):
-    ia.do_assert(isinstance(list1, list))
-    ia.do_assert(isinstance(list2, list))
+    assert isinstance(list1, list), (
+        "Expected list1 to be a list, got type %s." % (type(list1),))
+    assert isinstance(list2, list), (
+        "Expected list2 to be a list, got type %s." % (type(list2),))
 
     if len(list1) != len(list2):
         return False
@@ -45,6 +72,11 @@ def array_equal_lists(list1, list2):
 
 
 def keypoints_equal(kps1, kps2, eps=0.001):
+    if isinstance(kps1, KeypointsOnImage):
+        assert isinstance(kps2, KeypointsOnImage)
+        kps1 = [kps1]
+        kps2 = [kps2]
+
     if len(kps1) != len(kps2):
         return False
 
@@ -64,6 +96,6 @@ def keypoints_equal(kps1, kps2, eps=0.001):
 
 
 def reseed(seed=0):
-    ia.seed(seed)
+    iarandom.seed(seed)
     np.random.seed(seed)
     random.seed(seed)

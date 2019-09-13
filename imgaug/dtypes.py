@@ -1,7 +1,8 @@
 from __future__ import print_function, division
-import warnings
+
 import numpy as np
 import six.moves as sm
+
 import imgaug as ia
 
 KIND_TO_DTYPES = {
@@ -30,7 +31,7 @@ def normalize_dtype(dtype):
 
 def change_dtype_(arr, dtype, clip=True, round=True):
     assert ia.is_np_array(arr), (
-            "Expected array as input, got type %s." % (type(arr),))
+        "Expected array as input, got type %s." % (type(arr),))
     dtype = normalize_dtype(dtype)
 
     if arr.dtype.name == dtype.name:
@@ -76,11 +77,16 @@ def change_dtypes_(images, dtypes, clip=True, round=True):
             if not isinstance(dtypes, list)
             else normalize_dtypes(dtypes)
         )
-        assert len(dtypes) == len(images)
+        assert len(images) == len(dtypes), (
+            "Expected the provided images and dtypes to match, but got "
+            "iterables of size %d (images) %d (dtypes)." % (
+                len(images), len(dtypes)))
 
         result = images
         for i, (image, dtype) in enumerate(zip(images, dtypes)):
-            assert ia.is_np_array(image)
+            assert ia.is_np_array(image), (
+                "Expected each image to be an ndarray, got type %s "
+                "instead." % (type(image),))
             result[i] = change_dtype_(image, dtype, clip=clip, round=round)
     else:
         raise Exception("Expected numpy array or iterable of numpy arrays, "
@@ -106,7 +112,8 @@ def increase_itemsize_of_dtype(dtype, factor):
     dtype = normalize_dtype(dtype)
 
     assert ia.is_single_integer(factor), (
-        "The itemsize increase factor must be an integer.")
+        "Expected 'factor' to be an integer, got type %s instead." % (
+            type(factor),))
     # int8 -> int64 = factor 8
     # uint8 -> uint64 = factor 8
     # float16 -> float128 = factor 8
@@ -200,13 +207,15 @@ def get_value_range_of_dtype(dtype):
 # TODO call this function wherever data is clipped
 def clip_(array, min_value, max_value):
     # uint64 is disallowed, because numpy's clip seems to convert it to float64
+    # int64 is disallowed, because numpy's clip converts it to float64 since
+    # 1.17
     # TODO find the cause for that
     gate_dtypes(array,
                 allowed=["bool",
                          "uint8", "uint16", "uint32",
-                         "int8", "int16", "int32", "int64",
+                         "int8", "int16", "int32",
                          "float16", "float32", "float64", "float128"],
-                disallowed=["uint64"],
+                disallowed=["uint64", "int64"],
                 augmenter=None)
 
     # If the min of the input value range is above the allowed min, we do not
@@ -229,6 +238,12 @@ def clip_(array, min_value, max_value):
         # argument
         if len(array.shape) == 0:
             array = np.clip(array, min_value, max_value)
+        elif array.dtype.name == "int32":
+            # Since 1.17 (before maybe too?), numpy.clip() turns int32
+            # to float64. float64 should cover the whole value range of int32,
+            # so the dtype is not rejected here.
+            # TODO Verify this. Is rounding needed before conversion?
+            array = np.clip(array, min_value, max_value).astype(array.dtype)
         else:
             array = np.clip(array, min_value, max_value, out=array)
     return array
@@ -241,8 +256,12 @@ def clip_to_dtype_value_range_(array, dtype, validate=True,
     if validate:
         array_val = array
         if ia.is_single_integer(validate):
-            assert validate >= 1
-            assert validate_values is None
+            assert validate >= 1, (
+                "If 'validate' is an integer, it must have a value >=1, "
+                "got %d instead." % (validate,))
+            assert validate_values is None, (
+                "If 'validate' is an integer, 'validate_values' must be "
+                "None. Got type %s instead." % (type(validate_values),))
             array_val = array.flat[0:validate]
         if validate_values is not None:
             min_value_found, max_value_found = validate_values
@@ -261,12 +280,18 @@ def clip_to_dtype_value_range_(array, dtype, validate=True,
 
 def gate_dtypes(dtypes, allowed, disallowed, augmenter=None):
     # assume that at least one allowed dtype string is given
-    assert len(allowed) > 0
-    assert ia.is_string(allowed[0])  # check only first dtype for performance
+    assert len(allowed) > 0, (
+        "Expected at least one dtype to be allowed, but got an empty list.")
+    # check only first dtype for performance
+    assert ia.is_string(allowed[0]), (
+        "Expected only strings as dtypes, but got type %s." % (
+            type(allowed[0]),))
 
     if len(disallowed) > 0:
         # check only first disallowed dtype for performance
-        assert ia.is_string(disallowed[0])
+        assert ia.is_string(disallowed[0]), (
+            "Expected only strings as dtypes, but got type %s." % (
+                type(disallowed[0]),))
 
     # verify that "allowed" and "disallowed" do not contain overlapping
     # dtypes
@@ -304,7 +329,7 @@ def gate_dtypes(dtypes, allowed, disallowed, augmenter=None):
                     ))
         else:
             if augmenter is None:
-                warnings.warn(
+                ia.warn(
                         "Got dtype '%s', which was neither explicitly allowed "
                         "(%s), nor explicitly disallowed (%s). Generated "
                         "outputs may contain errors." % (
@@ -313,7 +338,7 @@ def gate_dtypes(dtypes, allowed, disallowed, augmenter=None):
                             ", ".join(disallowed)
                         ))
             else:
-                warnings.warn(
+                ia.warn(
                     "Got dtype '%s' in augmenter '%s' (class '%s'), which was "
                     "neither explicitly allowed (%s), nor explicitly "
                     "disallowed (%s). Generated outputs may contain "
