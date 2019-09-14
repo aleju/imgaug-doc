@@ -37,7 +37,7 @@ from .. import dtypes as iadt
 # TODO this should be placed in some other file than edges.py as it could be
 #      re-used wherever a binary image is the result
 @six.add_metaclass(ABCMeta)
-class BinaryImageColorizerIf(object):
+class IBinaryImageColorizer(object):
     @abstractmethod
     def colorize(self, image_binary, image_original, nth_image, random_state):
         """
@@ -66,7 +66,7 @@ class BinaryImageColorizerIf(object):
 
 
 # TODO see above, this should be moved to another file
-class RandomColorsBinaryImageColorizer(BinaryImageColorizerIf):
+class RandomColorsBinaryImageColorizer(IBinaryImageColorizer):
     """
     Colorizer using two randomly sampled foreground/background colors.
 
@@ -254,7 +254,7 @@ class Canny(meta.Augmenter):
             * If this is a StochasticParameter, a random value will be sampled
               from that parameter per image.
 
-    colorizer : None or imgaug.augmenters.edges.BinaryImageColorizerIf, optional
+    colorizer : None or imgaug.augmenters.edges.IBinaryImageColorizer, optional
         A strategy to convert binary edge images to color images.
         If this is ``None``, an instance of ``RandomColorBinaryImageColorizer``
         is created, which means that each edge image is converted into an

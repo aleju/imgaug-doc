@@ -483,7 +483,7 @@ class Voronoi(meta.Augmenter):
 
     Parameters
     ----------
-    points_sampler : PointSamplerIf
+    points_sampler : IPointsSampler
         A points sampler which will be queried per image to generate the
         coordinates of the centers of voronoi cells.
 
@@ -580,8 +580,8 @@ class Voronoi(meta.Augmenter):
         super(Voronoi, self).__init__(
             name=name, deterministic=deterministic, random_state=random_state)
 
-        assert isinstance(points_sampler, PointsSamplerIf), (
-            "Expected 'points_sampler' to be an instance of PointsSamplerIf, "
+        assert isinstance(points_sampler, IPointsSampler), (
+            "Expected 'points_sampler' to be an instance of IPointsSampler, "
             "got %s." % (type(points_sampler),))
         self.points_sampler = points_sampler
 
@@ -1083,7 +1083,7 @@ class RelativeRegularGridVoronoi(Voronoi):
 
 
 @six.add_metaclass(ABCMeta)
-class PointsSamplerIf(object):
+class IPointsSampler(object):
     """Interface for all point samplers.
 
     Point samplers return coordinate arrays of shape ``Nx2``.
@@ -1141,7 +1141,7 @@ def _verify_sample_points_images(images):
                 images.ndim, images.shape))
 
 
-class RegularGridPointsSampler(PointsSamplerIf):
+class RegularGridPointsSampler(IPointsSampler):
     """Sampler that generates a regular grid of coordinates on an image.
 
     'Regular grid' here means that on each axis all coordinates have the
@@ -1258,10 +1258,10 @@ class RegularGridPointsSampler(PointsSamplerIf):
         return self.__repr__()
 
 
-class RelativeRegularGridPointsSampler(PointsSamplerIf):
+class RelativeRegularGridPointsSampler(IPointsSampler):
     """Regular grid coordinate sampler; places more points on larger images.
 
-    This is similar to ``RegularGridPointSampler``, but the number of rows
+    This is similar to ``RegularGridPointsSampler``, but the number of rows
     and columns is given as fractions of each image's height and width.
     Hence, more coordinates are generated for larger images.
 
@@ -1354,12 +1354,12 @@ class RelativeRegularGridPointsSampler(PointsSamplerIf):
         return self.__repr__()
 
 
-class DropoutPointsSampler(PointsSamplerIf):
+class DropoutPointsSampler(IPointsSampler):
     """Remove a defined fraction of sampled points.
 
     Parameters
     ----------
-    other_points_sampler : PointSamplerIf
+    other_points_sampler : IPointsSampler
         Another point sampler that is queried to generate a list of points.
         The dropout operation will be applied to that list.
 
@@ -1397,8 +1397,8 @@ class DropoutPointsSampler(PointsSamplerIf):
     """
 
     def __init__(self, other_points_sampler, p_drop):
-        assert isinstance(other_points_sampler, PointsSamplerIf), (
-            "Expected to get an instance of PointsSamplerIf as argument "
+        assert isinstance(other_points_sampler, IPointsSampler), (
+            "Expected to get an instance of IPointsSampler as argument "
             "'other_points_sampler', got type %s." % (
                 type(other_points_sampler),))
         self.other_points_sampler = other_points_sampler
@@ -1482,7 +1482,7 @@ class DropoutPointsSampler(PointsSamplerIf):
         return self.__repr__()
 
 
-class UniformPointsSampler(PointsSamplerIf):
+class UniformPointsSampler(IPointsSampler):
     """Sample points uniformly on images.
 
     This point sampler generates `n_points` points per image. The x- and
@@ -1563,7 +1563,7 @@ class UniformPointsSampler(PointsSamplerIf):
         return self.__repr__()
 
 
-class SubsamplingPointsSampler(PointsSamplerIf):
+class SubsamplingPointsSampler(IPointsSampler):
     """Ensure that the number of sampled points is below a maximum.
 
     This point sampler will sample points from another sampler and
@@ -1572,7 +1572,7 @@ class SubsamplingPointsSampler(PointsSamplerIf):
 
     Parameters
     ----------
-    other_points_sampler : PointsSamplerIf
+    other_points_sampler : IPointsSampler
         Another point sampler that is queried to generate a ``list`` of points.
         The dropout operation will be applied to that ``list``.
 
@@ -1598,8 +1598,8 @@ class SubsamplingPointsSampler(PointsSamplerIf):
     """
 
     def __init__(self, other_points_sampler, n_points_max):
-        assert isinstance(other_points_sampler, PointsSamplerIf), (
-            "Expected to get an instance of PointsSamplerIf as argument "
+        assert isinstance(other_points_sampler, IPointsSampler), (
+            "Expected to get an instance of IPointsSampler as argument "
             "'other_points_sampler', got type %s." % (
                 type(other_points_sampler),))
         self.other_points_sampler = other_points_sampler
