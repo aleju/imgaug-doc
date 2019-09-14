@@ -82,8 +82,10 @@ def parse(fp):
             if is_in_docstring or is_single_line_docstring:
                 # handling here
                 docstring_buffer.append(line)
+
                 opsup = DtypeSupportForOperation.from_docstring(
-                    current_type, group, current_name, "\n".join(docstring_buffer))
+                    current_type, group, current_name,
+                    "\n".join(docstring_buffer))
                 if opsup is not None:
                     dtype_supports.append(opsup)
 
@@ -168,6 +170,10 @@ def plot(dtype_supports, save_fp_pattern):
         cell_bg_colors = []
 
         for dts in dts_by_groups[group]:
+            # skip private functions/methods/classes
+            if dts.name.startswith("_"):
+                continue
+
             for scenario in dts.scenarios:
                 if len(dts.scenarios) == 1:
                     rows.append("%s" % (dts.name,))
@@ -345,7 +351,14 @@ class DtypeSupportForOperation(object):
 
     @classmethod
     def _parse_scenario_to_grid(cls, docstring):
-        if "See :func:`" in docstring or "See ``" in docstring:
+        # Remove comments from scenario docstring, if there are any.
+        # this is important, because the comments may also contain formulations
+        # like "See XYZ".
+        docstring_no_comments = re.sub("^[\n\s\t]+", "", docstring)
+        docstring_no_comments = docstring_no_comments.split("\n\n")[0]
+
+        if ("See :func:`" in docstring_no_comments
+                or "See ``" in docstring_no_comments):
             return cls._parse_scenario_to_grid_see(docstring)
         elif "minimum of (" in docstring:
             return cls._parse_scenario_to_grid_minimum(docstring)
@@ -362,11 +375,18 @@ class DtypeSupportForOperation(object):
             op_type = "class"
             match = re.match(r"^[\s\t]*See ``(?P<name>[^`]+)``.*$", docstring.strip())
 
+        if match is None:
+            msg = (
+                "Tried to parse a 'See XYZ' string, but found neither a "
+                "function indicator, nor a class indicator. Docstring: %s" % (
+                    docstring))
+            raise ValueError(msg)
+
         op_name = match.groupdict()["name"]
         scenario_name = None
         if "(" in op_name:
             pos = op_name.index("(")
-            scenario_name = op_name[pos:-1]
+            scenario_name = op_name[pos+1:-1]
             op_name = op_name[:pos]
         return DtypeSupportGridSee(op_type, op_name, scenario_name)
 
@@ -593,7 +613,13 @@ class DtypeSupportGrid(object):
             assert cell.dtype in order_dict
             order_dict[cell.dtype] = cell
         cells_ordered = list(order_dict.values())
-        assert all([v is not None for v in cells_ordered])
+        all_found = all([v is not None for v in cells_ordered])
+        if not all_found:
+            dt_names = [key for key, value in cells_ordered.items()
+                        if value is None]
+            msg = "Could not find the following dtypes: %s" % (
+                ", ".join(dt_names),)
+            raise ValueError(msg)
         self.cells = cells_ordered
 
     def add(self, dtype, support_level, test_level, comments):
