@@ -3,8 +3,6 @@ import imgaug as ia
 from imgaug import augmenters as iaa
 import numpy as np
 import imageio
-from skimage import data
-import matplotlib.pyplot as plt
 import tempfile
 import six.moves as sm
 import re
@@ -19,14 +17,13 @@ except ImportError:
 np.random.seed(44)
 ia.seed(44)
 
-#IMAGES_DIR = "docs/readme_images"
 IMAGES_DIR = "readme_images"
 
 
 def main():
     draw_small_overview()
-    #draw_single_sequential_images()
-    #draw_per_augmenter_videos()
+    draw_single_sequential_images()
+    draw_per_augmenter_videos()
 
 
 def draw_small_overview():
@@ -456,7 +453,7 @@ def draw_per_augmenter_videos():
                     #    "Keypoints + BBs"
                     #))
                     frames_heatmap.append(_subt(heatmap_aug.draw_on_image(image_aug)[0], "Heatmaps"))
-                    frames_segmap.append(_subt(segmap_aug.draw_on_image(image_aug), "Segmentation Maps"))
+                    frames_segmap.append(_subt(segmap_aug.draw_on_image(image_aug)[0], "Segmentation Maps"))
                 else:
                     frames_images.append(_subt(image_aug, "Images"))
             return frames_images, frames_kps, frames_bbs, frames_heatmap, frames_segmap
@@ -759,6 +756,38 @@ def draw_per_augmenter_videos():
     ])
 
     # ###
+    # blend
+    # ###
+    descriptors.extend([
+        _Descriptor.from_augsubs(
+            "blend",
+            "Alpha\nwith EdgeDetect(1.0)",
+            [("factor=%.1f" % (factor,), iaa.Alpha(factor=factor, first=iaa.EdgeDetect(1.0)))
+             for factor in [0.0, 0.25, 0.5, 0.75, 1.0]]
+        ),
+        _Descriptor.from_augsubs(
+            "blend",
+            "Alpha\nwith EdgeDetect(1.0)\n(per_channel=True)",
+            [("factor=(%.2f, %.2f)" % (factor[0], factor[1]), iaa.Alpha(factor=factor, first=iaa.EdgeDetect(1.0), per_channel=0.5))
+             for factor in [(0.0, 0.2), (0.15, 0.35), (0.4, 0.6), (0.65, 0.85), (0.8, 1.0)]],
+            seed=4
+        ),
+        # AlphaElementwise
+        _Descriptor.from_augsubs(
+            "blend",
+            "SimplexNoiseAlpha\nwith EdgeDetect(1.0)",
+            [("", iaa.SimplexNoiseAlpha(first=iaa.EdgeDetect(1.0))) for _ in range(7)],
+            seed=15
+        ),
+        _Descriptor.from_augsubs(
+            "blend",
+            "FrequencyNoiseAlpha\nwith EdgeDetect(1.0)",
+            [("exponent=%.1f" % (exponent,), iaa.FrequencyNoiseAlpha(exponent=exponent, first=iaa.EdgeDetect(1.0), size_px_max=16, upscale_method="linear", sigmoid=False))
+             for exponent in [-4, -2, 0, 2, 4]]
+        )
+    ])
+
+    # ###
     # blur
     # ###
     descriptors.extend([
@@ -806,15 +835,50 @@ def draw_per_augmenter_videos():
         # WithColorspace
         _Descriptor.from_augsubs(
             "color",
+            "MultiplyHueAndSaturation",
+            [("mul=%.2f" % (mul,), iaa.MultiplyHueAndSaturation(mul=mul)) for mul in [0.5, 0.75, 1.0, 1.25, 1.5]]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
+            "MultiplyHue",
+            [("mul=%.2f" % (mul,), iaa.MultiplyHue(mul=mul)) for mul in [-1.0, -0.5, 0.0, 0.5, 1.0]]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
+            "MultiplySaturation",
+            [("mul=%.2f" % (mul,), iaa.MultiplySaturation(mul=mul)) for mul in [0.0, 0.5, 1.0, 1.5, 2.0]]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
             "AddToHueAndSaturation",
             [("value=%d" % (val,), iaa.AddToHueAndSaturation(val)) for val in [-45, -25, 0, 25, 45]]
         ),
         _Descriptor.from_augsubs(
             "color",
+            "AddToHue",
+            [("value=%d" % (val,), iaa.AddToHue(val)) for val in [-45, -25, 0, 25, 45]]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
+            "AddToSaturation",
+            [("value=%d" % (val,), iaa.AddToSaturation(val)) for val in [-45, -25, 0, 25, 45]]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
             "Grayscale",
             [("alpha=%.1f" % (alpha,), iaa.Grayscale(alpha=alpha)) for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]]
-        )
+        ),
         # ChangeColorspace
+        _Descriptor.from_augsubs(
+            "color",
+            "KMeansColorQuantization\n(to_colorspace=RGB)",
+            [("n_colors=%d\n" % (n_colors,), iaa.KMeansColorQuantization(n_colors=n_colors, to_colorspace=iaa.CSPACE_RGB)) for n_colors in [2, 4, 8, 16, 32]]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
+            "UniformColorQuantization\n(to_colorspace=RGB)",
+            [("n_colors=%d" % (n_colors,), iaa.UniformColorQuantization(n_colors=n_colors, to_colorspace=iaa.CSPACE_RGB)) for n_colors in [2, 4, 8, 16, 32]]
+        ),
     ])
 
     # ####
@@ -932,6 +996,17 @@ def draw_per_augmenter_videos():
     ])
 
     # ###
+    # edges
+    # ###
+    descriptors.extend([
+        _Descriptor.from_augsubs(
+            "edges",
+            "Canny",
+            [("alpha=%.2f" % (alpha,), iaa.Canny(alpha=alpha))
+             for alpha in [0.1, 0.3, 0.5, 0.7, 0.9]]),
+    ])
+
+    # ###
     # flip
     # ###
     descriptors.extend([
@@ -1035,35 +1110,29 @@ def draw_per_augmenter_videos():
     ])
 
     # ###
-    # overlay
+    # pooling
     # ###
     descriptors.extend([
         _Descriptor.from_augsubs(
-            "overlay",
-            "Alpha\nwith EdgeDetect(1.0)",
-            [("factor=%.1f" % (factor,), iaa.Alpha(factor=factor, first=iaa.EdgeDetect(1.0)))
-             for factor in [0.0, 0.25, 0.5, 0.75, 1.0]]
-        ),
+            "pooling",
+            "AveragePooling",
+            [("kernel_size=%d" % (k,), iaa.AveragePooling(k))
+             for k in [1, 2, 4, 8, 16]]),
         _Descriptor.from_augsubs(
-            "overlay",
-            "Alpha\nwith EdgeDetect(1.0)\n(per_channel=True)",
-            [("factor=(%.2f, %.2f)" % (factor[0], factor[1]), iaa.Alpha(factor=factor, first=iaa.EdgeDetect(1.0), per_channel=0.5))
-             for factor in [(0.0, 0.2), (0.15, 0.35), (0.4, 0.6), (0.65, 0.85), (0.8, 1.0)]],
-            seed=4
-        ),
-        # AlphaElementwise
+            "pooling",
+            "MaxPooling",
+            [("kernel_size=%d" % (k,), iaa.MaxPooling(k))
+             for k in [1, 2, 4, 8, 16]]),
         _Descriptor.from_augsubs(
-            "overlay",
-            "SimplexNoiseAlpha\nwith EdgeDetect(1.0)",
-            [("", iaa.SimplexNoiseAlpha(first=iaa.EdgeDetect(1.0))) for _ in range(7)],
-            seed=15
-        ),
+            "pooling",
+            "MinPooling",
+            [("kernel_size=%d" % (k,), iaa.MinPooling(k))
+             for k in [1, 2, 4, 8, 16]]),
         _Descriptor.from_augsubs(
-            "overlay",
-            "FrequencyNoiseAlpha\nwith EdgeDetect(1.0)",
-            [("exponent=%.1f" % (exponent,), iaa.FrequencyNoiseAlpha(exponent=exponent, first=iaa.EdgeDetect(1.0), size_px_max=16, upscale_method="linear", sigmoid=False))
-             for exponent in [-4, -2, 0, 2, 4]]
-        )
+            "pooling",
+            "MedianPooling",
+            [("kernel_size=%d" % (k,), iaa.MedianPooling(k))
+             for k in [1, 2, 4, 8, 16]]),
     ])
 
     # ###
@@ -1079,14 +1148,37 @@ def draw_per_augmenter_videos():
             "segmentation",
             "Superpixels\n(n_segments=100)",
             [("p_replace=%.2f" % (p_replace,), iaa.Superpixels(p_replace=p_replace, n_segments=100))
-             for p_replace in [0, 0.25, 0.5, 0.75, 1.0]])
+             for p_replace in [0, 0.25, 0.5, 0.75, 1.0]]),
+        _Descriptor.from_augsubs(
+            "segmentation",
+            "UniformVoronoi",
+            [("n_points=%d" % (n_points,), iaa.UniformVoronoi(n_points))
+             for n_points in [50, 100, 200, 400, 800]]),
+        _Descriptor.from_augsubs(
+            "segmentation",
+            "RegularGridVoronoi: rows/cols\n(p_drop_points=0)",
+            [("n_rows=n_cols=%d" % (n_rows,),
+              iaa.RegularGridVoronoi(n_rows=n_rows, n_cols=n_rows, p_drop_points=0))
+             for n_rows in [4, 8, 16, 32, 64]]),
+        _Descriptor.from_augsubs(
+            "segmentation",
+            "RegularGridVoronoi: p_drop_points\n(n_rows=n_cols=30)",
+            [("p_drop_points=%.2f" % (p_drop_points,),
+              iaa.RegularGridVoronoi(n_rows=30, n_cols=30, p_drop_points=p_drop_points))
+             for p_drop_points in [0.0, 0.2, 0.4, 0.6, 0.8]]),
+        _Descriptor.from_augsubs(
+            "segmentation",
+            "RegularGridVoronoi: p_replace\n(n_rows=n_cols=16)",
+            [("p_replace=%.2f" % (p_replace,),
+              iaa.RegularGridVoronoi(n_rows=16, n_cols=16, p_drop_points=0, p_replace=p_replace))
+             for p_replace in [1.0, 0.8, 0.6, 0.4, 0.2]]),
     ])
 
     # ###
     # size
     # ###
     descriptors.extend([
-        # TODO Scale
+        # TODO Resize
         _Descriptor.from_augsubs(
             "size",
             "CropAndPad",
@@ -1195,6 +1287,8 @@ def draw_per_augmenter_videos():
     table = _MarkdownTable()
 
     for descriptor in descriptors:
+        print(descriptor.title)
+
         frames_images, frames_kps, frames_bbs, frames_hm, frames_segmap = \
             descriptor.generate_frames(
                 image if descriptor.module != "weather" else image_landscape,
