@@ -89,6 +89,9 @@ def add_scalar(image, value):
         Image with value added to it.
 
     """
+    if image.size == 0:
+        return np.copy(image)
+
     iadt.gate_dtypes(
         image,
         allowed=["bool",
@@ -343,6 +346,9 @@ def multiply_scalar(image, multiplier):
         * ``float128``: no
         * ``bool``: limited; tested (1)
 
+        - (1) Non-uint8 dtypes can overflow. For floats, this can result in
+              +/-inf.
+
         Note: tests were only conducted for rather small multipliers, around
         ``-10.0`` to ``+10.0``.
 
@@ -353,9 +359,6 @@ def multiply_scalar(image, multiplier):
         samples to be within the value range of ``float16``, as it has the
         same number of bytes (two) as ``uint16``. This is done to make
         overflows less likely to occur.
-
-        - (1) Non-uint8 dtypes can overflow. For floats, this can result in
-              +/-inf.
 
     Parameters
     ----------
@@ -374,6 +377,9 @@ def multiply_scalar(image, multiplier):
         Image, multiplied by `multiplier`.
 
     """
+    if image.size == 0:
+        return np.copy(image)
+
     iadt.gate_dtypes(
         image,
         allowed=["bool",
@@ -512,6 +518,9 @@ def multiply_elementwise(image, multipliers):
         * ``float128``: no
         * ``bool``: limited; tested (1)
 
+        - (1) Non-uint8 dtypes can overflow. For floats, this can result
+              in +/-inf.
+
         Note: tests were only conducted for rather small multipliers, around
         ``-10.0`` to ``+10.0``.
 
@@ -522,9 +531,6 @@ def multiply_elementwise(image, multipliers):
         samples to be within the value range of ``float16``, as it has the
         same number of bytes (two) as ``uint16``. This is done to make
         overflows less likely to occur.
-
-        - (1) Non-uint8 dtypes can overflow. For floats, this can result
-              in +/-inf.
 
     Parameters
     ----------
@@ -972,6 +978,9 @@ def compress_jpeg(image, compression):
         the result into a new array. Same shape and dtype as the input.
 
     """
+    if image.size == 0:
+        return np.copy(image)
+
     # The value range 1 to 95 is suggested by PIL's save() documentation
     # Values above 95 seem to not make sense (no improvement in visual
     # quality, but large file size).
@@ -995,6 +1004,10 @@ def compress_jpeg(image, compression):
     is_single_channel = (image.ndim == 3 and image.shape[-1] == 1)
     if is_single_channel:
         image = image[..., 0]
+
+    assert has_no_channels or is_single_channel or image.shape[-1] == 3, (
+        "Expected either a grayscale image of shape (H,W) or (H,W,1) or an "
+        "RGB image of shape (H,W,3). Got shape %s." % (image.shape,))
 
     # Map from compression to quality used by PIL
     # We have valid compressions from 0 to 100, i.e. 101 possible
@@ -1035,7 +1048,7 @@ class Add(meta.Augmenter):
 
     dtype support::
 
-        See :func:`imgaug.augmenters.arithmetic.add`.
+        See :func:`imgaug.augmenters.arithmetic.add_scalar`.
 
     Parameters
     ----------
@@ -1143,7 +1156,8 @@ class Add(meta.Augmenter):
             if per_channel_samples_i > 0.5:
                 value = value_samples_i[0:nb_channels]
             else:
-                value = value_samples_i[0]
+                # the if/else here catches the case of the channel axis being 0
+                value = value_samples_i[0] if value_samples_i.size > 0 else []
 
             images[i] = add_scalar(image, value)
 
@@ -1697,7 +1711,8 @@ class Multiply(meta.Augmenter):
             if per_channel_samples_i > 0.5:
                 mul = mul_samples_i[0:nb_channels]
             else:
-                mul = mul_samples_i[0]
+                # the if/else here catches the case of the channel axis being 0
+                mul = mul_samples_i[0] if mul_samples_i.size > 0 else []
             images[i] = multiply_scalar(image, mul)
 
         return images
@@ -3069,7 +3084,11 @@ class Invert(meta.Augmenter):
                 image[..., mask] = invert(image[..., mask],
                                           self.min_value, self.max_value)
             else:
-                if p_samples_i[0] > 0.5:
+                # p_samples_i.size == 0 is the case when the channel axis
+                # has value 0 and hence p_samples_i[0] fails. By still
+                # calling invert() in these cases instead of changing nothing
+                # we allow the unittests for Invert to also test invert().
+                if p_samples_i.size == 0 or p_samples_i[0] > 0.5:
                     image[:, :, :] = invert(image, self.min_value,
                                             self.max_value)
 

@@ -246,6 +246,11 @@ class Superpixels(meta.Augmenter):
         n_segments_samples = np.clip(n_segments_samples, 1, None)
 
         for i, (image, rs) in enumerate(zip(images, rss[1:])):
+            if image.size == 0:
+                # Image with 0-sized axis, nothing to change.
+                # Placing this before the sampling step should be fine.
+                continue
+
             replace_samples = self.p_replace.draw_samples(
                 (n_segments_samples[i],), random_state=rs)
 
@@ -483,7 +488,7 @@ class Voronoi(meta.Augmenter):
 
     Parameters
     ----------
-    points_sampler : PointSamplerIf
+    points_sampler : IPointsSampler
         A points sampler which will be queried per image to generate the
         coordinates of the centers of voronoi cells.
 
@@ -581,7 +586,7 @@ class Voronoi(meta.Augmenter):
             name=name, deterministic=deterministic, random_state=random_state)
 
         assert isinstance(points_sampler, IPointsSampler), (
-            "Expected 'points_sampler' to be an instance of PointsSamplerIf, "
+            "Expected 'points_sampler' to be an instance of IPointsSampler, "
             "got %s." % (type(points_sampler),))
         self.points_sampler = points_sampler
 
@@ -1219,8 +1224,14 @@ class RegularGridPointsSampler(IPointsSampler):
         widths = np.int32([image.shape[1] for image in images])
         # We clip intentionally not to H-1 or W-1 here. If e.g. an image has
         # a width of 1, we want to get a maximum of 1 column of coordinates.
-        n_rows_lst = np.clip(n_rows_lst, 1, heights)
-        n_cols_lst = np.clip(n_cols_lst, 1, widths)
+        # Note that we use two clips here instead of e.g. clip(., 1, height),
+        # because images can have height/width zero and in these cases numpy
+        # prefers the smaller value in clip(). But currently we want to get
+        # at least 1 point for such images.
+        n_rows_lst = np.clip(n_rows_lst, None, heights)
+        n_cols_lst = np.clip(n_cols_lst, None, widths)
+        n_rows_lst = np.clip(n_rows_lst, 1, None)
+        n_cols_lst = np.clip(n_cols_lst, 1, None)
         return n_rows_lst, n_cols_lst
 
     @classmethod
@@ -1237,15 +1248,21 @@ class RegularGridPointsSampler(IPointsSampler):
         # We do not have to subtract 1 here from height/width as these are
         # subpixel coordinates. Technically, we could also place the cell
         # centers outside of the image plane.
-        if n_rows == 1:
-            yy = np.float32([float(height)/2])
+        y_spacing = height / n_rows
+        y_start = 0.0 + y_spacing/2
+        y_end = height - y_spacing/2
+        if y_start - 1e-4 <= y_end <= y_start + 1e-4:
+            yy = np.float32([y_start])
         else:
-            yy = np.linspace(0.0, height, num=n_rows)
+            yy = np.linspace(y_start, y_end, num=n_rows)
 
-        if n_cols == 1:
-            xx = np.float32([float(width)/2])
+        x_spacing = width / n_cols
+        x_start = 0.0 + x_spacing/2
+        x_end = width - x_spacing/2
+        if x_start - 1e-4 <= x_end <= x_start + 1e-4:
+            xx = np.float32([x_start])
         else:
-            xx = np.linspace(0.0, width, num=n_cols)
+            xx = np.linspace(x_start, x_end, num=n_cols)
 
         xx, yy = np.meshgrid(xx, yy)
         grid = np.vstack([xx.ravel(), yy.ravel()]).T
@@ -1261,7 +1278,7 @@ class RegularGridPointsSampler(IPointsSampler):
 class RelativeRegularGridPointsSampler(IPointsSampler):
     """Regular grid coordinate sampler; places more points on larger images.
 
-    This is similar to ``RegularGridPointSampler``, but the number of rows
+    This is similar to ``RegularGridPointsSampler``, but the number of rows
     and columns is given as fractions of each image's height and width.
     Hence, more coordinates are generated for larger images.
 
@@ -1359,7 +1376,7 @@ class DropoutPointsSampler(IPointsSampler):
 
     Parameters
     ----------
-    other_points_sampler : PointSamplerIf
+    other_points_sampler : IPointsSampler
         Another point sampler that is queried to generate a list of points.
         The dropout operation will be applied to that list.
 
@@ -1398,7 +1415,7 @@ class DropoutPointsSampler(IPointsSampler):
 
     def __init__(self, other_points_sampler, p_drop):
         assert isinstance(other_points_sampler, IPointsSampler), (
-            "Expected to get an instance of PointsSamplerIf as argument "
+            "Expected to get an instance of IPointsSampler as argument "
             "'other_points_sampler', got type %s." % (
                 type(other_points_sampler),))
         self.other_points_sampler = other_points_sampler
@@ -1572,7 +1589,7 @@ class SubsamplingPointsSampler(IPointsSampler):
 
     Parameters
     ----------
-    other_points_sampler : PointsSamplerIf
+    other_points_sampler : IPointsSampler
         Another point sampler that is queried to generate a ``list`` of points.
         The dropout operation will be applied to that ``list``.
 
@@ -1599,7 +1616,7 @@ class SubsamplingPointsSampler(IPointsSampler):
 
     def __init__(self, other_points_sampler, n_points_max):
         assert isinstance(other_points_sampler, IPointsSampler), (
-            "Expected to get an instance of PointsSamplerIf as argument "
+            "Expected to get an instance of IPointsSampler as argument "
             "'other_points_sampler', got type %s." % (
                 type(other_points_sampler),))
         self.other_points_sampler = other_points_sampler

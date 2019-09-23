@@ -190,7 +190,7 @@ def change_colorspace_(image, to_colorspace, from_colorspace=CSPACE_RGB):
 
     dtype support::
 
-        * ``uint8``: yes; indirectly tested
+        * ``uint8``: yes; fully tested
         * ``uint16``: no
         * ``uint32``: no
         * ``uint64``: no
@@ -247,6 +247,12 @@ def change_colorspace_(image, to_colorspace, from_colorspace=CSPACE_RGB):
             if image.flags["C_CONTIGUOUS"]:
                 return image
         return None
+
+    # cv2 does not support height/width 0
+    # we don't check here if the channel axis is zero-sized as for colorspace
+    # transformations it should never be 0
+    if 0 in image.shape[0:2]:
+        return image
 
     iadt.gate_dtypes(
         image,
@@ -323,19 +329,7 @@ def change_colorspaces_(images, to_colorspaces, from_colorspaces=CSPACE_RGB):
 
     dtype support::
 
-        * ``uint8``: yes; indirectly tested
-        * ``uint16``: no
-        * ``uint32``: no
-        * ``uint64``: no
-        * ``int8``: no
-        * ``int16``: no
-        * ``int32``: no
-        * ``int64``: no
-        * ``float16``: no
-        * ``float32``: no
-        * ``float64``: no
-        * ``float128``: no
-        * ``bool``: no
+        See :func:`imgaug.augmenters.color.change_colorspace_`.
 
     Parameters
     ----------
@@ -1302,6 +1296,9 @@ class AddToHueAndSaturation(meta.Augmenter):
 
         gen = enumerate(zip(images_hsv, hues, saturations))
         for i, (image_hsv, hue_i, saturation_i) in gen:
+            if image_hsv.size == 0:
+                continue
+
             if self.backend == "cv2":
                 image_hsv = self._transform_image_cv2(
                     image_hsv, hue_i, saturation_i)
