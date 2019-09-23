@@ -4,24 +4,31 @@
 Performance
 ==================
 
-Below are performance measurements of each augmenter for image augmentation (`augment_images()`),
-heatmap augmentation (`augment_heatmaps()`) and keypoint/landmark augmentation
-(`augment_keypoints()`). (Last updated for 0.2.8.)
+Below are performance measurements of each augmenter for image
+augmentation (``augment_images()``), heatmap augmentation
+(``augment_heatmaps()``) and keypoint/landmark augmentation
+(``augment_keypoints()``). (Last updated for ``0.3.0``)
 
-**System**: The numbers were computed based on a haswell-generation i7 3.2Ghz CPU with DDR3
-memory. That is a rather dated system by today's standards. A modern, high-end system
-should achieve higher bandwidths.
+**System**: The numbers were computed based on a haswell-generation i7 3.2Ghz
+CPU with DDR3 memory. That is a rather dated system by today's standards.
+A modern, high-end system should achieve higher bandwidths.
 
-**Experiments Settings**: All augmenters were run with reasonable parameter choices that
-should reflect expected real-world usage, while avoiding too simple parameter values that
-would lead to inflated scores. Some parameter choices are listed below, the remaining ones
-can be looked up in `measure_performance.py`. Kernel sizes were all set to `3x3`, unless
-otherwise mentioned. The inputs focused on a small and large image-size setting, using
-`64x64x3` and `224x224x3` as the respective sizes. The base image was taken from
-skimage.data.astronaut_, which should be a representative real-world image.
-Batch sizes of `1` and `128` were tested. Each augmenter was run `100` times on the generated
-input and the average of the measured runtimes was computed to derive bandwidth in mbit per
-second and the raw number of augmented items (e.g. images) per second.
+All experiments were conducted using python 3.7 and numpy 1.17.0. Note that
+the precise python/numpy version can have significant impact on your
+performance.
+
+**Experiments Settings**: All augmenters were run with reasonable parameter
+choices that should reflect expected real-world usage, while avoiding too
+simple parameter values that would lead to inflated scores. Some parameter
+choices are listed below, the remaining ones can be looked up in
+``measure_performance.py``. Kernel sizes were all set to ``3x3``, unless
+otherwise mentioned. The inputs focused on a small and large image-size
+setting, using ``64x64x3`` and ``224x224x3`` as the respective sizes. The base
+image was taken from skimage.data.astronaut_, which should be a representative
+real-world image. Batch sizes of ``1`` and ``128`` were tested. Each augmenter
+was run at least ``40`` times on the generated input and the average of the
+measured runtimes was computed to derive bandwidth in mbit per second and th
+raw number of augmented items (e.g. images) per second.
 
 .. _skimage.data.astronaut: http://scikit-image.org/docs/dev/api/skimage.data.html#skimage.data.astronaut
 
@@ -33,60 +40,73 @@ From the results, the following points can be derived.
 
 **Inputs:**
 
-* Use large batch sizes whenever possible. Many augmenters are significantly faster with these.
+* Use large batch sizes whenever possible. Many augmenters are significantly
+  faster with these.
 * Large image sizes lead to higher throughput based on mbit/sec.
-  Smaller images lead to lower throughput, but significantly more items/sec (roughly 4-10x more).
-  Use small images whenever possible.
-* For keypoint-based and heatmap-based augmentation, try to increase the number of items
-  per augmented instance. E.g. `augment_keypoints()` accepts a list of `KeypointsOnImage` instances,
-  with each such instance representing the keypoints on an image. Try to place for each image all
-  keypoints in the respective `KeypointsOnImage` instance instead of splitting them into
-  multiple such instances (which would be more work anyways). The same is true for bounding boxes,
-  heatmaps and segmentation maps.
-* Keypoint- and heatmap-based inputs are only affected by augmenters that change the geometry of
-  the image (e.g. `Crop` or `Affine`). Other augmenters are essentially free to execute as they
-  do not perform any changes.
-* Keypoint-based augmentation is very fast for almost all augmenters, reaching several 100k keypoints
-  per second. Slower augmenters are `ElasticTransformation` and `PiecewiseAffine`, as these currently
-  have to fall back to image-based algorithms.
+  Smaller images lead to lower throughput, but significantly more
+  items/sec (roughly 4-10x more). Use small images whenever possible.
+* For keypoint-based and heatmap-based augmentation, try to increase the
+  number of items per augmented instance. E.g. ``augment_keypoints()`` accepts
+  a list of ``KeypointsOnImage`` instances, with each such instance
+  representing the keypoints on an image. Try to place for each image all
+  keypoints in the respective ``KeypointsOnImage`` instance instead of
+  splitting them into multiple such instances (which would be more work
+  anyways). The same is true for bounding boxes, heatmaps and segmentation
+  maps.
+* Keypoint- and heatmap-based inputs are only affected by augmenters that
+  change the geometry of the image (e.g. ``Crop`` or ``Affine``). Other
+  augmenters are essentially free to execute as they do not perform any
+  changes.
+* Keypoint-based augmentation is very fast for almost all augmenters,
+  reaching several 100k keypoints per second. Slower augmenters are
+  ``ElasticTransformation`` and ``PiecewiseAffine``, as these currently have
+  to fall back to image-based algorithms.
 
 **Parameter choices:**
 
-* When possible, nearest neighbour interpolation or linear interpolation should be used as
-  these are significantly faster than other options. Most augmenters that use interpolation
-  offer either an `order` parameter (0=nearest neighbour, 1=linear) or an `interpolation`
-  parameter ("nearest", "linear").
-* Using `keep_size=True` is the default setting in all augmenters that change image sizes.
-  It is convenient, as it ensures that image sizes are not altered by the augmentation.
-  It does however incur a significant performance penalty, often more than halving the
-  bandwidth. Try `keep_size=False` when possible. You can still resize images manually after
-  augmentation or by using `KeepSizeByResize(Sequential(<augmenters>))`.
-* When augmenters offer modes to fill newly created pixels in user-defined ways (e.g.
-  `pad_mode=constant` in `Pad` to fill up all padded pixels with a specified constant color),
-  using `edge` instead of `constant` will usually not incur a significant performance penalty.
+* When possible, nearest neighbour interpolation or linear interpolation
+  should be used as these are significantly faster than other options. Most
+  augmenters that use interpolation offer either an ``order`` parameter
+  (0=nearest neighbour, 1=linear) or an ``interpolation`` parameter
+  ("nearest", "linear").
+* Using ``keep_size=True`` is the default setting in all augmenters that
+  change image sizes. It is convenient, as it ensures that image sizes are
+  not altered by the augmentation. It does however incur a significant
+  performance penalty, often more than halving the bandwidth. Try
+  ``keep_size=False`` when possible. You can still resize images manually after
+  augmentation or by using ``KeepSizeByResize(Sequential(<augmenters>))``.
+* When augmenters offer modes to fill newly created pixels in user-defined
+  ways (e.g. ``pad_mode=constant`` in ``Pad`` to fill up all padded pixels
+  with a specified constant color), using ``edge`` instead of ``constant``
+  will usually not incur a significant performance penalty.
 
 **Specific Augmenter suggestions:**
 
-* For augmenters where an elementwise sibling exists (e.g. `Multiply` and `MultiplyElementwise`),
-  the elementwise augmenter is usually significantly slower than the non-elementwise one.
-* If blurring is required, `AverageBlur` is the fastest choice, followed by `GaussianBlur`.
-* Augmenters that operate on coarser images (e.g. `CoarseDropout` vs `Dropout`) can be
-  significantly faster than their non-coarse siblings.
-* Contrast normalizing augmenters are all comparable in performance, except for histogram-based
-  ones, which are significantly slower.
-* `PiecewiseAffine` is a very slow augmenter and should usually be replaced by ElasticTransformation,
-  which achieves similar outputs and is quite a bit faster.
-* `Superpixels` is a fairly slow augmenter and should usually be wrapped in e.g. `Sometimes`
-  to not apply it very often and reduce its performance impact.
-* Weather augmenters other than `FastSnowyLandscape` are rather slow and should only be used
-  when sensible.
+* For augmenters where an elementwise sibling exists (e.g. ``Multiply`` and
+  ``MultiplyElementwise``), the elementwise augmenter is usually significantly
+  slower than the non-elementwise one.
+* If blurring is required, ``AverageBlur`` is the fastest choice, followed
+  by ``GaussianBlur``.
+* Augmenters that operate on coarser images (e.g. ``CoarseDropout`` vs
+  ``Dropout``) can be significantly faster than their non-coarse siblings.
+* Contrast normalizing augmenters are all comparable in performance, except
+  for histogram-based ones, which are significantly slower.
+* ``PiecewiseAffine`` is a very slow augmenter and should usually be replaced
+  by ElasticTransformation, which achieves similar outputs and is quite a bit
+  faster.
+* ``Superpixels`` is a fairly slow augmenter and should usually be wrapped in
+  e.g. ``Sometimes`` to not apply it very often and reduce its performance
+  impact.
+* Weather augmenters other than ``FastSnowyLandscape`` are rather slow and
+  should only be used when sensible.
 
 ------------------
 Images
 ------------------
 
-Numbers below are for small images (64x64x3) and large images (224x224x3).
-`B=1` denotes a batch size of `1`, `B=128` one of `128`.
+Numbers below are for small images (``64x64x3``) and large
+images (``224x224x3``). ``B=1`` denotes a batch size of ``1``, ``B=128`` one
+of ``128``.
 
 **In mbit/sec:**
 
@@ -610,11 +630,12 @@ Numbers below are for small images (64x64x3) and large images (224x224x3).
 Heatmaps
 ------------------------------
 
-Numbers below are for heatmaps on large images, i.e. 224x224x3. Smaller images were skipped
-for brevity. The heatmaps themselves can be small (64x64xN) or large (224x224xN), with `N`
-denoting the number of heatmaps per `HeatmapsOnImage` instance (i.e. the number of channels
-in the heatmaps array), for which below `1` and `5` are used.
-`B=1` denotes a batch size of `1`, `B=128` one of `128`.
+Numbers below are for heatmaps on large images, i.e. ``224x224x3``. Smaller
+images were skipped for brevity. The heatmaps themselves can be
+small (``64x64xN``) or large (``224x224xN``), with ``N`` denoting the number
+of heatmaps per ``HeatmapsOnImage`` instance (i.e. the number of channels in
+the heatmaps array), for which below ``1`` and ``5`` are used. ``B=1`` denotes
+a batch size of ``1`` , ``B=128`` one of ``128``.
 
 
 **mbit/sec for 64x64x5 or 224x224x5 heatmaps on 224x224x3 images:**
@@ -1140,8 +1161,8 @@ Keypoints and Bounding Boxes
 ------------------------------
 
 Numbers below are for keypoints on small and large images.
-Each `KeypointsOnImage` instance contained `10` `Keypoint` instances.
-`B=1` denotes a batch size of `1`, `B=128` one of `128`.
+Each ``KeypointsOnImage`` instance contained ``10`` ``Keypoint`` instances.
+``B=1`` denotes a batch size of ``1`` , ``B=128`` one of ``128``.
 
 The numbers for bounding boxes can be derived by dividing each value by 4.
 
