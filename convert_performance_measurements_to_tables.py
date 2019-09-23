@@ -36,15 +36,27 @@ EXP_NAME_MAPPING = OrderedDict([
     ("CoarsePepper", "CoarsePepper"),
     ("Invert", "Invert (10%)"),
     ("JpegCompression", "JpegCompression (50-99%)"),
+    ("Alpha", "Alpha (Noop)"),
+    ("AlphaElementwise", "AlphaElementwise (Noop)"),
+    ("SimplexNoiseAlpha", "SimplexNoiseAlpha (Noop)"),
+    ("FrequencyNoiseAlpha", "FrequencyNoiseAlpha (Noop)"),
     ("GaussianBlur", "GaussianBlur (sigma=(1,5))"),
     ("AverageBlur", "AverageBlur"),
     ("MedianBlur", "MedianBlur"),
     ("BilateralBlur", "BilateralBlur"),
     ("MotionBlur", "MotionBlur"),
     ("WithColorspace", "WithColorspace (HSV, Noop)"),
+    ("WithHueAndSaturation", "WithHueAndSaturation"),
+    ("MultiplyHueAndSaturation", "MultiplyHueAndSaturation"),
+    ("MultiplyHue", "MultiplyHue"),
+    ("MultiplySaturation", "MultiplySaturation"),
     ("AddToHueAndSaturation", "AddToHueAndSaturation"),
+    ("AddToHue", "AddToHue"),
+    ("AddToSaturation", "AddToSaturation"),
     ("ChangeColorspace", "ChangeColorspace (HSV)"),
     ("Grayscale", "Grayscale"),
+    ("KMeansColorQuantization", "KMeansColorQuantization (2-16 colors)"),
+    ("UniformColorQuantization", "UniformColorQuantization (2-16 colors)"),
     ("GammaContrast", "GammaContrast"),
     ("SigmoidContrast", "SigmoidContrast"),
     ("LogContrast", "LogContrast"),
@@ -58,6 +70,7 @@ EXP_NAME_MAPPING = OrderedDict([
     ("Emboss", "Emboss"),
     ("EdgeDetect", "EdgeDetect"),
     ("DirectedEdgeDetect", "DirectedEdgeDetect"),
+    ("Canny", "Canny"),
     ("Fliplr", "Fliplr (p=100%)"),
     ("Flipud", "Flipud (p=100%)"),
     ("Affine_order_0_constant", "Affine (order=0, constant)"),
@@ -77,13 +90,24 @@ EXP_NAME_MAPPING = OrderedDict([
     ("ElasticTransformation_order_1_reflect", "ElasticTransformation (order=1, reflect)"),
     ("Rot90", "Rot90"),
     ("Rot90_keep_size", "Rot90 (keep_size)"),
+    ("AveragePooling", "AveragePooling"),
+    ("AveragePooling_keep_size", "AveragePooling (keep_size)"),
+    ("MaxPooling", "MaxPooling"),
+    ("MaxPooling_keep_size", "MaxPooling (keep_size)"),
+    ("MinPooling", "MinPooling"),
+    ("MinPooling_keep_size", "MinPooling (keep_size)"),
+    ("MedianPooling", "MedianPooling"),
+    ("MedianPooling_keep_size", "MedianPooling (keep_size)"),
     ("Superpixels_max_size_64_cubic", "Superpixels (max_size=64, cubic)"),
     ("Superpixels_max_size_64_linear", "Superpixels (max_size=64, linear)"),
     ("Superpixels_max_size_128_linear", "Superpixels (max_size=128, linear)"),
     ("Superpixels_max_size_224_linear", "Superpixels (max_size=224, linear)"),
-    ("Scale_nearest", "Resize (nearest)"),  # legacy support
-    ("Scale_linear", "Resize (linear)"),  # legacy support
-    ("Scale_cubic", "Resize (cubic)"),  # legacy support
+    ("UniformVoronoi", "UniformVoronoi<br>(250-1000k points, linear)"),
+    ("RegularGridVoronoi", "RegularGridVoronoi<br>(16-31 rows/cols)"),
+    ("RelativeRegularGridVoronoi", "RelativeRegularGridVoronoi<br>(7%-14% rows/cols)"),
+    #("Scale_nearest", "Resize (nearest)"),  # legacy support
+    #("Scale_linear", "Resize (linear)"),  # legacy support
+    #("Scale_cubic", "Resize (cubic)"),  # legacy support
     ("Resize_nearest", "Resize (nearest)"),
     ("Resize_linear", "Resize (linear)"),
     ("Resize_cubic", "Resize (cubic)"),
@@ -110,7 +134,7 @@ EXP_NAME_MAPPING = OrderedDict([
 
 
 def main():
-    dir_path = os.path.join("measure_performance_results", "027_after_performance_improvements")
+    dir_path = os.path.join("measure_performance_results", "030")
     with open(os.path.join(dir_path, "results_images.pickle"), "rb") as f:
         measurements_images = pickle.load(f)
 
@@ -135,6 +159,8 @@ def main():
         augmenter_name = subdict["augmenter.name"]
         times = subdict["times"]
 
+        print("augmentername", augmenter_name, image_shape)
+
         assert augmentable == "images"
         assert background is False
         assert image_shape[0] in [64, 224]
@@ -148,7 +174,10 @@ def main():
         rows[augmenter_name][(res_type, bsize_type)] = (imgs_per_sec, mbit_per_sec)
 
     for augmenter_name, exp_name in EXP_NAME_MAPPING.items():
-        for table, index in zip([image_table_imgs_per_sec, image_table_mbits_per_sec], [0, 1]):
+        gen = zip([image_table_imgs_per_sec, image_table_mbits_per_sec],
+                  [0, 1])
+        for table, index in gen:
+            print(augmenter_name, rows[augmenter_name])
             table.add_row(
                 exp_name,
                 res_a_bsize_a=rows[augmenter_name][("a", "a")][index],
