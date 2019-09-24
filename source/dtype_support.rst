@@ -52,8 +52,8 @@ imgaug.augmenters.meta
 .. figure:: ../images/dtype_support/imgaug_augmenters_meta.png
     :alt: dtype support for augmenters in imgaug.augmenters.meta
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.meta``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.meta``.
 
 imgaug.augmenters.arithmetic
 ----------------------------
@@ -61,8 +61,17 @@ imgaug.augmenters.arithmetic
 .. figure:: ../images/dtype_support/imgaug_augmenters_arithmetic.png
     :alt: dtype support for augmenters in imgaug.augmenters.arithmetic
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.arithmetic``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.arithmetic``.
+
+imgaug.augmenters.blend
+-----------------------
+
+.. figure:: ../images/dtype_support/imgaug_augmenters_blend.png
+    :alt: dtype support for augmenters in imgaug.augmenters.blend
+
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.blend``.
 
 imgaug.augmenters.blur
 ----------------------
@@ -70,8 +79,8 @@ imgaug.augmenters.blur
 .. figure:: ../images/dtype_support/imgaug_augmenters_blur.png
     :alt: dtype support for augmenters in imgaug.augmenters.blur
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.blur``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.blur``.
 
 imgaug.augmenters.color
 -----------------------
@@ -79,8 +88,8 @@ imgaug.augmenters.color
 .. figure:: ../images/dtype_support/imgaug_augmenters_color.png
     :alt: dtype support for augmenters in imgaug.augmenters.color
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.color``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.color``.
 
 imgaug.augmenters.contrast
 --------------------------
@@ -88,8 +97,8 @@ imgaug.augmenters.contrast
 .. figure:: ../images/dtype_support/imgaug_augmenters_contrast.png
     :alt: dtype support for augmenters in imgaug.augmenters.contrast
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.contrast``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.contrast``.
 
 imgaug.augmenters.convolutional
 -------------------------------
@@ -97,8 +106,17 @@ imgaug.augmenters.convolutional
 .. figure:: ../images/dtype_support/imgaug_augmenters_convolutional.png
     :alt: dtype support for augmenters in imgaug.augmenters.convolutional
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.convolutional``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.convolutional``.
+
+imgaug.augmenters.edges
+-----------------------
+
+.. figure:: ../images/dtype_support/imgaug_augmenters_edges.png
+    :alt: dtype support for augmenters in imgaug.augmenters.edges
+
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.edges``.
 
 imgaug.augmenters.flip
 ----------------------
@@ -106,8 +124,8 @@ imgaug.augmenters.flip
 .. figure:: ../images/dtype_support/imgaug_augmenters_flip.png
     :alt: dtype support for augmenters in imgaug.augmenters.flip
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.flip``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.flip``.
 
 imgaug.augmenters.geometric
 ---------------------------
@@ -115,17 +133,8 @@ imgaug.augmenters.geometric
 .. figure:: ../images/dtype_support/imgaug_augmenters_geometric.png
     :alt: dtype support for augmenters in imgaug.augmenters.geometric
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.geometric``.
-
-imgaug.augmenters.overlay
--------------------------
-
-.. figure:: ../images/dtype_support/imgaug_augmenters_overlay.png
-    :alt: dtype support for augmenters in imgaug.augmenters.overlay
-
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.overlay``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.geometric``.
 
 imgaug.augmenters.segmentation
 ------------------------------
@@ -133,8 +142,8 @@ imgaug.augmenters.segmentation
 .. figure:: ../images/dtype_support/imgaug_augmenters_segmentation.png
     :alt: dtype support for augmenters in imgaug.augmenters.segmentation
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.segmentation``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.segmentation``.
 
 imgaug.augmenters.size
 ----------------------
@@ -142,8 +151,8 @@ imgaug.augmenters.size
 .. figure:: ../images/dtype_support/imgaug_augmenters_size.png
     :alt: dtype support for augmenters in imgaug.augmenters.size
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.size``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.size``.
 
 imgaug.augmenters.weather
 -------------------------
@@ -151,5 +160,5 @@ imgaug.augmenters.weather
 .. figure:: ../images/dtype_support/imgaug_augmenters_weather.png
     :alt: dtype support for augmenters in imgaug.augmenters.weather
 
-    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and helper functions in
-    ``imgaug.augmenters.weather``.
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.weather``.

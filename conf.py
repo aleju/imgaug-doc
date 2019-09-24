@@ -18,6 +18,7 @@
 #
 import os
 import sys
+import datetime
 
 
 # --------------
@@ -56,6 +57,7 @@ try:
 except ImportError as e:
     from mock import Mock as MagicMock
 
+
 class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
@@ -63,6 +65,7 @@ class Mock(MagicMock):
             return {"float": []}
         else:
             return MagicMock()
+
 
 # 'scipy.spatial', 'scipy.spatial.distance'
 """'numpy', 'pandas', 'scipy',
@@ -118,7 +121,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'imgaug'
-copyright = u'2019, Alexander Jung'
+copyright = u'%d, Alexander Jung' % (datetime.datetime.now().year,)
 author = u'Alexander Jung'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -154,7 +157,7 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-#html_theme = 'alabaster'
+# html_theme = 'alabaster'
 html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme

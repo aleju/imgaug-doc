@@ -8,6 +8,8 @@ API
    api_parameters
    api_multicore
    api_dtypes
+   api_random
+   api_validation
    api_augmentables_batches
    api_augmentables_bbs
    api_augmentables_heatmaps
@@ -24,8 +26,10 @@ API
    api_augmenters_color
    api_augmenters_contrast
    api_augmenters_convolutional
+   api_augmenters_edges
    api_augmenters_flip
    api_augmenters_geometric
+   api_augmenters_pooling
    api_augmenters_segmentation
    api_augmenters_size
    api_augmenters_weather

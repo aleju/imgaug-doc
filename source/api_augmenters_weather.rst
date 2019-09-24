@@ -1,5 +1,5 @@
 imgaug.augmenters\.weather
-=======================
+==========================
 
 .. automodule:: imgaug.augmenters.weather
     :members:
