@@ -1,3 +1,4 @@
+"""Classes representing bounding boxes."""
 from __future__ import print_function, division, absolute_import
 
 import copy
@@ -7,7 +8,9 @@ import skimage.draw
 import skimage.measure
 
 from .. import imgaug as ia
-from .utils import normalize_shape, project_coords
+from .base import IAugmentable
+from .utils import (normalize_shape, project_coords,
+                    _remove_out_of_image_fraction)
 
 
 # TODO functions: square(), to_aspect_ratio(), contains_point()
@@ -52,6 +55,22 @@ class BoundingBox(object):
         self.x2 = x2
         self.y2 = y2
         self.label = label
+
+    @property
+    def coords(self):
+        """Get the top-left and bottom-right coordinates as one array.
+
+        Returns
+        -------
+        ndarray
+            A ``(N, 2)`` numpy array with ``N=2`` containing the top-left
+            and bottom-right coordinates.
+
+        """
+        arr = np.empty((2, 2), dtype=np.float32)
+        arr[0, :] = (self.x1, self.y1)
+        arr[1, :] = (self.x2, self.y2)
+        return arr
 
     @property
     def x1_int(self):
@@ -299,8 +318,7 @@ class BoundingBox(object):
         y2_i = min(self.y2, other.y2)
         if x1_i > x2_i or y1_i > y2_i:
             return default
-        else:
-            return BoundingBox(x1=x1_i, y1=y1_i, x2=x2_i, y2=y2_i)
+        return BoundingBox(x1=x1_i, y1=y1_i, x2=x2_i, y2=y2_i)
 
     def union(self, other):
         """Compute the union BB between this BB and another BB.
@@ -351,6 +369,66 @@ class BoundingBox(object):
             return 0.0
         area_union = self.area + other.area - inters.area
         return inters.area / area_union if area_union > 0 else 0.0
+
+    def compute_out_of_image_area(self, image):
+        """Compute the area of the BB that is outside of the image plane.
+
+        Parameters
+        ----------
+        image : (H,W,...) ndarray or tuple of int
+            Image dimensions to use.
+            If an ``ndarray``, its shape will be used.
+            If a ``tuple``, it is assumed to represent the image shape
+            and must contain at least two integers.
+
+        Returns
+        -------
+        float
+            Total area of the bounding box that is outside of the image plane.
+            Can be ``0.0``.
+
+        """
+        shape = normalize_shape(image)
+        height, width = shape[0:2]
+        bb_image = BoundingBox(x1=0, y1=0, x2=width, y2=height)
+        inter = self.intersection(bb_image, default=None)
+        area = self.area
+        return area if inter is None else area - inter.area
+
+    def compute_out_of_image_fraction(self, image):
+        """Compute fraction of BB area outside of the image plane.
+
+        This estimates ``f = A_ooi / A``, where ``A_ooi`` is the area of the
+        bounding box that is outside of the image plane, while ``A`` is the
+        total area of the bounding box.
+
+        Parameters
+        ----------
+        image : (H,W,...) ndarray or tuple of int
+            Image dimensions to use.
+            If an ``ndarray``, its shape will be used.
+            If a ``tuple``, it is assumed to represent the image shape
+            and must contain at least two integers.
+
+        Returns
+        -------
+        float
+            Fraction of the bounding box area that is outside of the image
+            plane. Returns ``0.0`` if the bounding box is fully inside of
+            the image plane. If the bounding box has an area of zero, the
+            result is ``1.0`` if its coordinates are outside of the image
+            plane, otherwise ``0.0``.
+
+        """
+        area = self.area
+        if area == 0:
+            shape = normalize_shape(image)
+            height, width = shape[0:2]
+            y1_outside = self.y1 < 0 or self.y1 >= height
+            x1_outside = self.x1 < 0 or self.x1 >= width
+            is_outside = (y1_outside or x1_outside)
+            return 1.0 if is_outside else 0.0
+        return self.compute_out_of_image_area(image) / area
 
     def is_fully_within_image(self, image):
         """Estimate whether the bounding box is fully inside the image area.
@@ -432,7 +510,7 @@ class BoundingBox(object):
         """
         if self.is_fully_within_image(image):
             return False
-        elif self.is_partly_within_image(image):
+        if self.is_partly_within_image(image):
             return partly
         return fully
 
@@ -440,6 +518,7 @@ class BoundingBox(object):
                    comment="clip_out_of_image() has the exactly same "
                            "interface.")
     def cut_out_of_image(self, *args, **kwargs):
+        """Clip off all parts of the BB box that are outside of the image."""
         return self.clip_out_of_image(*args, **kwargs)
 
     def clip_out_of_image(self, image):
@@ -561,6 +640,7 @@ class BoundingBox(object):
             Image with bounding box drawn on it.
 
         """
+        # pylint: disable=invalid-name, redefined-outer-name
         if thickness is not None:
             ia.warn_deprecated(
                 "Usage of argument 'thickness' in BoundingBox.draw_on_image() "
@@ -658,11 +738,7 @@ class BoundingBox(object):
             ``H'>0`` and ``W'>0``, otherwise only ``H'>=0`` and ``W'>=0``.
 
         """
-        pad_top = 0
-        pad_right = 0
-        pad_bottom = 0
-        pad_left = 0
-
+        # pylint: disable=no-else-return, too-many-statements
         height, width = image.shape[0], image.shape[1]
         x1, x2, y1, y2 = self.x1_int, self.x2_int, self.y1_int, self.y2_int
 
@@ -690,6 +766,13 @@ class BoundingBox(object):
             # TODO probably more efficient to initialize an array of zeros
             #      and copy only the portions of the bb into that array that
             #      are natively inside the image area
+            from ..augmenters import size as iasize
+
+            pad_top = 0
+            pad_right = 0
+            pad_bottom = 0
+            pad_left = 0
+
             if x1 < 0:
                 pad_left = abs(x1)
                 x2 = x2 + pad_left
@@ -711,7 +794,7 @@ class BoundingBox(object):
                 if pad_max is None:
                     pad_max = max(paddings)
 
-                image = ia.pad(
+                image = iasize.pad(
                     image,
                     top=min(pad_top, pad_max),
                     right=min(pad_right, pad_max),
@@ -743,6 +826,7 @@ class BoundingBox(object):
 
     # TODO also add to_heatmap
     # TODO add this to BoundingBoxesOnImage
+    # TODO add label to keypoints?
     def to_keypoints(self):
         """Convert the BB's corners to keypoints (clockwise, from top left).
 
@@ -761,6 +845,134 @@ class BoundingBox(object):
             Keypoint(x=self.x2, y=self.y2),
             Keypoint(x=self.x1, y=self.y2)
         ]
+
+    def to_polygon(self):
+        """Convert this bounding box to a polygon covering the same area.
+
+        Returns
+        -------
+        imgaug.augmentables.polys.Polygon
+            The bounding box converted to a polygon.
+
+        """
+        # TODO get rid of this deferred import
+        from imgaug.augmentables.polys import Polygon
+
+        return Polygon([
+            (self.x1, self.y1),
+            (self.x2, self.y1),
+            (self.x2, self.y2),
+            (self.x1, self.y2)
+        ], label=self.label)
+
+    # TODO also introduce similar area_almost_equals()
+    def coords_almost_equals(self, other, max_distance=1e-4):
+        """Estimate if this and another BB have almost identical coordinates.
+
+        Parameters
+        ----------
+        other : imgaug.augmentables.bbs.BoundingBox or iterable
+            The other bounding box with which to compare this one.
+            If this is an ``iterable``, it is assumed to represent the top-left
+            and bottom-right coordinates of that bounding box, given as e.g.
+            an ``(2,2)`` ndarray or an ``(4,)`` ndarray or as a similar list.
+
+        max_distance : number, optional
+            The maximum euclidean distance between a corner on one bounding
+            box and the closest corner on the other bounding box. If the
+            distance is exceeded for any such pair, the two BBs are not
+            viewed as equal.
+
+        Returns
+        -------
+        bool
+            Whether the two bounding boxes have almost identical corner
+            coordinates.
+
+        """
+        if isinstance(other, BoundingBox):
+            coords_b = other.coords.flat
+        elif ia.is_np_array(other):
+            # we use flat here in case other is (N,2) instead of (4,)
+            coords_b = other.flat
+        elif ia.is_iterable(other):
+            coords_b = list(ia.flatten(other))
+        else:
+            raise ValueError(
+                "Expected 'other' to be an iterable containing two "
+                "(x,y)-coordinate pairs or a BoundingBox. "
+                "Got type %s." % (type(other),))
+
+        coords_a = self.coords
+
+        return np.allclose(coords_a.flat, coords_b, atol=max_distance, rtol=0)
+
+    def almost_equals(self, other, max_distance=1e-4):
+        """Compare this and another BB's label and coordinates.
+
+        This is the same as
+        :func:`imgaug.augmentables.bbs.BoundingBox.coords_almost_equals` but
+        additionally compares the labels.
+
+        Parameters
+        ----------
+        other : imgaug.augmentables.bbs.BoundingBox or iterable
+            The other object to compare against. Expected to be a
+            ``BoundingBox``.
+
+        max_distance : number, optional
+            See
+            :func:`imgaug.augmentables.bbs.BoundingBox.coords_almost_equals`.
+
+        Returns
+        -------
+        bool
+            ``True`` if the coordinates are almost equal and additionally
+            the labels are equal. Otherwise ``False``.
+
+        """
+        if self.label != other.label:
+            return False
+        return self.coords_almost_equals(other, max_distance=max_distance)
+
+    @classmethod
+    def from_point_soup(cls, xy):
+        """Convert a ``(2P,) or (P,2) ndarray`` to a BB instance.
+
+        This is the inverse of
+        :func:`imgaug.BoundingBoxesOnImage.to_xyxy_array`.
+
+        Parameters
+        ----------
+        xy : (2P,) ndarray or (P, 2) array or iterable of number or iterable of iterable of number
+            Array containing ``P`` points in xy-form denoting a soup of
+            points around which to place a bounding box.
+            The array should usually be of dtype ``float32``.
+
+        Returns
+        -------
+        imgaug.augmentables.bbs.BoundingBox
+            Bounding box around the points.
+
+        """
+        # pylint: disable=unsubscriptable-object
+        xy = np.array(xy, dtype=np.float32)
+
+        assert len(xy) > 0, (
+            "Expected to get at least one point to place a bounding box "
+            "around, got shape %s." % (xy.shape,))
+
+        assert xy.ndim == 1 or (xy.ndim == 2 and xy.shape[-1] == 2), (
+            "Expected input array of shape (P,) or (P, 2), "
+            "got shape %s." % (xy.shape,))
+
+        if xy.ndim == 1:
+            xy = xy.reshape((-1, 2))
+
+        x1, y1 = np.min(xy, axis=0)
+        x2, y2 = np.max(xy, axis=0)
+
+        return cls(x1=x1, y1=y1, x2=x2, y2=y2)
 
     def copy(self, x1=None, y1=None, x2=None, y2=None, label=None):
         """Create a shallow copy of this BoundingBox instance.
@@ -837,6 +1049,28 @@ class BoundingBox(object):
         #      the deepcopy from copy()
         return self.copy(x1=x1, y1=y1, x2=x2, y2=y2, label=label)
 
+    def __getitem__(self, indices):
+        """Get the coordinate(s) with given indices.
+
+        Returns
+        -------
+        ndarray
+            xy-coordinate(s) as ``ndarray``.
+
+        """
+        return self.coords[indices]
+
+    def __iter__(self):
+        """Iterate over the coordinates of this instance.
+
+        Yields
+        ------
+        ndarray
+            An ``(2,)`` ``ndarray`` denoting an xy-coordinate pair.
+
+        """
+        return iter(self.coords)
+
     def __repr__(self):
         return self.__str__()
 
@@ -845,7 +1079,7 @@ class BoundingBox(object):
             self.x1, self.y1, self.x2, self.y2, self.label)
 
 
-class BoundingBoxesOnImage(object):
+class BoundingBoxesOnImage(IAugmentable):
     """Container for the list of all bounding boxes on a single image.
 
     Parameters
@@ -853,8 +1087,10 @@ class BoundingBoxesOnImage(object):
     bounding_boxes : list of imgaug.augmentables.bbs.BoundingBox
         List of bounding boxes on the image.
 
-    shape : tuple of int
-        The shape of the image on which the bounding boxes are placed.
+    shape : tuple of int or ndarray
+        The shape of the image on which the objects are placed.
+        Either an image with shape ``(H,W,[C])`` or a ``tuple`` denoting
+        such an image shape.
 
     Examples
     --------
@@ -872,6 +1108,18 @@ class BoundingBoxesOnImage(object):
     def __init__(self, bounding_boxes, shape):
         self.bounding_boxes = bounding_boxes
         self.shape = normalize_shape(shape)
+
+    @property
+    def items(self):
+        """Get the bounding boxes in this container.
+
+        Returns
+        -------
+        list of BoundingBox
+            Bounding boxes within this container.
+
+        """
+        return self.bounding_boxes
 
     # TODO remove this? here it is image height, but in BoundingBox it is
     #      bounding box height
@@ -929,6 +1177,7 @@ class BoundingBoxesOnImage(object):
             the new image shape.
 
         """
+        # pylint: disable=invalid-name
         shape = normalize_shape(image)
         if shape[0:2] == self.shape[0:2]:
             return self.deepcopy()
@@ -938,17 +1187,18 @@ class BoundingBoxesOnImage(object):
 
     @classmethod
     def from_xyxy_array(cls, xyxy, shape):
-        """Convert an ``(N,4) ndarray`` to a ``BoundingBoxesOnImage`` instance.
+        """Convert an ``(N, 4) or (N, 2, 2) ndarray`` to a BBsOI instance.
 
         This is the inverse of
         :func:`imgaug.BoundingBoxesOnImage.to_xyxy_array`.
 
         Parameters
         ----------
-        xyxy : (N,4) ndarray
-            Array containing the corner coordinates (top-left, bottom-right)
-            of ``N`` bounding boxes in the form ``(x1, y1, x2, y2)``.
-            Should usually be of dtype ``float32``.
+        xyxy : (N, 4) ndarray or (N, 2, 2) array
+            Array containing the corner coordinates of ``N`` bounding boxes.
+            Each bounding box is represented by its top-left and bottom-right
+            coordinates.
+            The array should usually be of dtype ``float32``.
 
         shape : tuple of int
             Shape of the image on which the bounding boxes are placed.
@@ -961,11 +1211,55 @@ class BoundingBoxesOnImage(object):
             derived from the provided corner coordinates.
 
         """
-        assert xyxy.shape[1] == 4, (
-            "Expected input array of shape (N, 4), got shape %s." % (
-                xyxy.shape,))
+        # pylint: disable=unsubscriptable-object
+        xyxy = np.array(xyxy, dtype=np.float32)
 
-        boxes = [BoundingBox(*row) for row in xyxy]
+        # note that np.array([]) is (0,), not (0, 2)
+        if xyxy.shape[0] == 0:
+            return BoundingBoxesOnImage([], shape)
+
+        assert (
+            (xyxy.ndim == 2 and xyxy.shape[-1] == 4)
+            or (xyxy.ndim == 3 and xyxy.shape[1:3] == (2, 2))), (
+                "Expected input array of shape (N, 4) or (N, 2, 2), "
+                "got shape %s." % (xyxy.shape,))
+
+        xyxy = xyxy.reshape((-1, 2, 2))
+        boxes = [BoundingBox.from_point_soup(row) for row in xyxy]
+
+        return cls(boxes, shape)
+
+    @classmethod
+    def from_point_soups(cls, xy, shape):
+        """Convert an ``(N, 2P) or (N, P, 2) ndarray`` to a BBsOI instance.
+
+        Parameters
+        ----------
+        xy : (N, 2P) ndarray or (N, P, 2) array or iterable of iterable of number or iterable of iterable of iterable of number
+            Array containing the corner coordinates of ``N`` bounding boxes.
+            Each bounding box is represented by a soup of ``P`` points.
+            If ``(N, P)`` then the second axis is expected to be in
+            xy-form (e.g. ``x1``, ``y1``, ``x2``, ``y2``, ...).
+            The final bounding box coordinates will be derived using ``min``
+            and ``max`` operations on the xy-values.
+            The array should usually be of dtype ``float32``.
+
+        shape : tuple of int
+            Shape of the image on which the bounding boxes are placed.
+            Should usually be ``(H, W, C)`` or ``(H, W)``.
+
+        Returns
+        -------
+        imgaug.augmentables.bbs.BoundingBoxesOnImage
+            Object containing a list of :class:`BoundingBox` instances
+            derived from the provided point soups.
+
+        """
+        xy = np.array(xy, dtype=np.float32)
+
+        # from_xy_array() already checks the ndim/shape, so we don't have to
+        # do it here
+        boxes = [BoundingBox.from_point_soup(row) for row in xy]
 
         return cls(boxes, shape)
 
@@ -994,6 +1288,89 @@ class BoundingBoxesOnImage(object):
             xyxy_array[i] = [box.x1, box.y1, box.x2, box.y2]
 
         return xyxy_array.astype(dtype)
+
+    def to_xy_array(self):
+        """Convert the ``BoundingBoxesOnImage`` object to an ``(N,2) ndarray``.
+
+        Returns
+        -------
+        ndarray
+            ``(2*B,2) ndarray`` of xy-coordinates, where ``B`` denotes the
+            number of bounding boxes.
+
+        """
+        return self.to_xyxy_array().reshape((-1, 2))
+
+    def fill_from_xyxy_array_(self, xyxy):
+        """Modify the BB coordinates of this instance in-place.
+
+        .. note::
+
+            This currently expects exactly one entry in `xyxy` per bounding
+            in this instance. (I.e. two corner coordinates per instance.)
+            Otherwise, an ``AssertionError`` will be raised.
+
+        .. note::
+
+            This method will automatically flip x-coordinates if ``x1>x2``
+            for a bounding box. (Analogous for y-coordinates.)
+
+        Parameters
+        ----------
+        xyxy : (N, 4) ndarray or iterable of iterable of number
+            Coordinates of ``N`` bounding boxes on an image, given as
+            a ``(N,4)`` array of two corner xy-coordinates per bounding box.
+            ``N`` must match the number of bounding boxes in this instance.
+
+        Returns
+        -------
+        BoundingBoxesOnImage
+            This instance itself, with updated bounding box coordinates.
+            Note that the instance was modified in-place.
+
+        """
+        xyxy = np.array(xyxy, dtype=np.float32)
+
+        # note that np.array([]) is (0,), not (0, 4)
+        assert xyxy.shape[0] == 0 or (xyxy.ndim == 2 and xyxy.shape[-1] == 4), (  # pylint: disable=unsubscriptable-object
+            "Expected input array to have shape (N,4), "
+            "got shape %s." % (xyxy.shape,))
+
+        assert len(xyxy) == len(self.bounding_boxes), (
+            "Expected to receive an array with as many rows there are "
+            "bounding boxes in this instance. Got %d rows, expected %d." % (
+                len(xyxy), len(self.bounding_boxes)))
+
+        for bb, (x1, y1, x2, y2) in zip(self.bounding_boxes, xyxy):
+            bb.x1 = min([x1, x2])
+            bb.y1 = min([y1, y2])
+            bb.x2 = max([x1, x2])
+            bb.y2 = max([y1, y2])
+
+        return self
+
+    def fill_from_xy_array_(self, xy):
+        """Modify the BB coordinates of this instance in-place.
+
+        See
+        :func:`imgaug.augmentables.bbs.BoundingBoxesOnImage.fill_from_xyxy_array_`.
+
+        Parameters
+        ----------
+        xy : (2*B, 2) ndarray or iterable of iterable of number
+            Coordinates of ``B`` bounding boxes on an image, given as
+            a ``(2*B,2)`` array of two corner xy-coordinates per bounding box.
+            ``B`` must match the number of bounding boxes in this instance.
+
+        Returns
+        -------
+        BoundingBoxesOnImage
+            This instance itself, with updated bounding box coordinates.
+            Note that the instance was modified in-place.
+
+        """
+        xy = np.array(xy, dtype=np.float32)
+        return self.fill_from_xyxy_array_(xy.reshape((-1, 4)))
 
     def draw_on_image(self, image, color=(0, 255, 0), alpha=1.0, size=1,
                       copy=True, raise_if_out_of_image=False, thickness=None):
@@ -1032,6 +1409,7 @@ class BoundingBoxesOnImage(object):
             Image with drawn bounding boxes.
 
         """
+        # pylint: disable=redefined-outer-name
         image = np.copy(image) if copy else image
 
         for bb in self.bounding_boxes:
@@ -1074,10 +1452,32 @@ class BoundingBoxesOnImage(object):
             if not bb.is_out_of_image(self.shape, fully=fully, partly=partly)]
         return BoundingBoxesOnImage(bbs_clean, shape=self.shape)
 
+    def remove_out_of_image_fraction(self, fraction):
+        """Remove all BBs with an out of image fraction of at least `fraction`.
+
+        Parameters
+        ----------
+        fraction : number
+            Minimum out of image fraction that a bounding box has to have in
+            order to be removed. A fraction of ``1.0`` removes only bounding
+            boxes that are ``100%`` outside of the image. A fraction of ``0.0``
+            removes all bounding boxes.
+
+        Returns
+        -------
+        imgaug.augmentables.bbs.BoundingBoxesOnImage
+            Reduced set of bounding boxes, with those that had an out of image
+            fraction greater or equal the given one removed.
+
+        """
+        return _remove_out_of_image_fraction(self, fraction,
+                                             BoundingBoxesOnImage)
+
     @ia.deprecated(alt_func="BoundingBoxesOnImage.clip_out_of_image()",
                    comment="clip_out_of_image() has the exactly same "
                            "interface.")
     def cut_out_of_image(self):
+        """Clip off all parts from all BBs that are outside of the image."""
         return self.clip_out_of_image()
 
     def clip_out_of_image(self):
@@ -1129,6 +1529,85 @@ class BoundingBoxesOnImage(object):
             in self.bounding_boxes]
         return BoundingBoxesOnImage(bbs_new, shape=self.shape)
 
+    def to_keypoints_on_image(self):
+        """Convert the bounding boxes to one ``KeypointsOnImage`` instance.
+
+        Returns
+        -------
+        imgaug.augmentables.kps.KeypointsOnImage
+            A keypoints instance containing ``N*4`` coordinates for ``N``
+            bounding boxes. Order matches the order in ``bounding_boxes``.
+
+        """
+        from .kps import KeypointsOnImage
+
+        # This currently uses 4 points instead of 2 points as the method
+        # is primarily used during augmentation and 4 points are overall
+        # the better choice there.
+        arr = np.zeros((len(self.bounding_boxes), 2*4), dtype=np.float32)
+
+        for i, box in enumerate(self.bounding_boxes):
+            arr[i] = [
+                box.x1, box.y1,
+                box.x2, box.y1,
+                box.x2, box.y2,
+                box.x1, box.y2
+            ]
+
+        return KeypointsOnImage.from_xy_array(
+            arr.reshape((-1, 2)),
+            shape=self.shape
+        )
+
+    def invert_to_keypoints_on_image_(self, kpsoi):
+        """Invert the output of ``to_keypoints_on_image()`` in-place.
+
+        This function writes in-place into this ``BoundingBoxesOnImage``
+        instance.
+
+        Parameters
+        ----------
+        kpsoi : imgaug.augmentables.kps.KeypointsOnImages
+            Keypoints to convert back to bounding boxes, i.e. the outputs
+            of ``to_keypoints_on_image()``.
+
+        Returns
+        -------
+        BoundingBoxesOnImage
+            Bounding boxes container with updated coordinates.
+            Note that the instance is also updated in-place.
+
+        """
+        assert len(kpsoi.keypoints) == len(self.bounding_boxes) * 4, (
+            "Expected %d coordinates, got %d." % (
+                len(self.bounding_boxes) * 2, len(kpsoi.keypoints)))
+        for i, bb in enumerate(self.bounding_boxes):
+            xx = [kpsoi.keypoints[4*i+0].x, kpsoi.keypoints[4*i+1].x,
+                  kpsoi.keypoints[4*i+2].x, kpsoi.keypoints[4*i+3].x]
+            yy = [kpsoi.keypoints[4*i+0].y, kpsoi.keypoints[4*i+1].y,
+                  kpsoi.keypoints[4*i+2].y, kpsoi.keypoints[4*i+3].y]
+            bb.x1 = min(xx)
+            bb.y1 = min(yy)
+            bb.x2 = max(xx)
+            bb.y2 = max(yy)
+        self.shape = kpsoi.shape
+        return self
+
+    def to_polygons_on_image(self):
+        """Convert the bounding boxes to one ``PolygonsOnImage`` instance.
+
+        Returns
+        -------
+        imgaug.augmentables.polys.PolygonsOnImage
+            A ``PolygonsOnImage`` containing polygons. Each polygon covers
+            the same area as the corresponding bounding box.
+
+        """
+        from .polys import PolygonsOnImage
+
+        polygons = [bb.to_polygon() for bb in self.bounding_boxes]
+        return PolygonsOnImage(polygons, shape=self.shape)
+
     def copy(self):
         """Create a shallow copy of the ``BoundingBoxesOnImage`` instance.
 
@@ -1153,6 +1632,19 @@ class BoundingBoxesOnImage(object):
         # so use manual copy here too
         bbs = [bb.deepcopy() for bb in self.bounding_boxes]
         return BoundingBoxesOnImage(bbs, tuple(self.shape))
+
+    def __iter__(self):
+        """Iterate over the bounding boxes in this container.
+
+        Yields
+        ------
+        Polygon
+            A bounding box in this container.
+            The order is identical to the order in the bounding box list
+            provided upon class initialization.
+
+        """
+        return iter(self.bounding_boxes)
 
     def __repr__(self):
         return self.__str__()

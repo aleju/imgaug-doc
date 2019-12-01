@@ -1,3 +1,8 @@
+"""Classes dealing with segmentation maps.
+
+E.g. masks, semantic or instance segmentation maps.
+
+"""
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
@@ -5,15 +10,18 @@ import six.moves as sm
 
 from .. import imgaug as ia
 from ..augmenters import blend as blendlib
+from .base import IAugmentable
 
 
 @ia.deprecated(alt_func="SegmentationMapsOnImage",
                comment="(Note the plural 'Maps' instead of old 'Map'.)")
 def SegmentationMapOnImage(*args, **kwargs):
+    """Object representing a segmentation map associated with an image."""
+    # pylint: disable=invalid-name
     return SegmentationMapsOnImage(*args, **kwargs)
 
 
-class SegmentationMapsOnImage(object):
+class SegmentationMapsOnImage(IAugmentable):
     """
     Object representing a segmentation map associated with an image.
 
@@ -171,7 +179,7 @@ class SegmentationMapsOnImage(object):
         Internally, this class may use a different dtype and shape to simplify
         computations.
 
-        .. note ::
+        .. note::
 
             The height and width may have changed compared to the original
             input due to e.g. pooling operations.
@@ -198,6 +206,8 @@ class SegmentationMapsOnImage(object):
 
     @ia.deprecated(alt_func="SegmentationMapsOnImage.get_arr()")
     def get_arr_int(self, *args, **kwargs):
+        """Return the seg.map array, with original dtype and shape ndim."""
+        # pylint: disable=unused-argument
         return self.get_arr()
 
     def draw(self, size=None, colors=None):
@@ -226,13 +236,12 @@ class SegmentationMapsOnImage(object):
         def _handle_sizeval(sizeval, arr_axis_size):
             if sizeval is None:
                 return arr_axis_size
-            elif ia.is_single_float(sizeval):
+            if ia.is_single_float(sizeval):
                 return max(int(arr_axis_size * sizeval), 1)
-            elif ia.is_single_integer(sizeval):
+            if ia.is_single_integer(sizeval):
                 return sizeval
-            else:
-                raise ValueError("Expected float or int, got %s." % (
-                    type(sizeval),))
+            raise ValueError("Expected float or int, got %s." % (
+                type(sizeval),))
 
         if size is None:
             size = [size, size]
@@ -313,7 +322,7 @@ class SegmentationMapsOnImage(object):
             "instead." % (image.shape[2],))
         assert image.dtype.name == "uint8", (
             "Expected to get image with dtype uint8, got dtype %s." % (
-                image.dtype.name,) )
+                image.dtype.name,))
         assert 0 - 1e-8 <= alpha <= 1.0 + 1e-8, (
             "Expected 'alpha' to be in interval [0.0, 1.0], got %.4f." % (
                 alpha,))
@@ -406,8 +415,9 @@ class SegmentationMapsOnImage(object):
             width ``W'=W+left+right``.
 
         """
-        arr_padded = ia.pad(self.arr, top=top, right=right, bottom=bottom,
-                            left=left, mode=mode, cval=cval)
+        from ..augmenters import size as iasize
+        arr_padded = iasize.pad(self.arr, top=top, right=right, bottom=bottom,
+                                left=left, mode=mode, cval=cval)
         return self.deepcopy(arr=arr_padded)
 
     def pad_to_aspect_ratio(self, aspect_ratio, mode="constant", cval=0,
@@ -453,7 +463,8 @@ class SegmentationMapsOnImage(object):
             ``True``.
 
         """
-        arr_padded, pad_amounts = ia.pad_to_aspect_ratio(
+        from ..augmenters import size as iasize
+        arr_padded, pad_amounts = iasize.pad_to_aspect_ratio(
             self.arr,
             aspect_ratio=aspect_ratio,
             mode=mode,
@@ -467,6 +478,7 @@ class SegmentationMapsOnImage(object):
     @ia.deprecated(alt_func="SegmentationMapsOnImage.resize()",
                    comment="resize() has the exactly same interface.")
     def scale(self, *args, **kwargs):
+        """Resize the seg.map(s) array given a target size and interpolation."""
         return self.resize(*args, **kwargs)
 
     def resize(self, sizes, interpolation="nearest"):
@@ -520,6 +532,7 @@ class SegmentationMapsOnImage(object):
             Shallow copy.
 
         """
+        # pylint: disable=protected-access
         segmap = SegmentationMapsOnImage(
             self.arr if arr is None else arr,
             shape=self.shape if shape is None else shape)
@@ -551,6 +564,7 @@ class SegmentationMapsOnImage(object):
             Deep copy.
 
         """
+        # pylint: disable=protected-access
         segmap = SegmentationMapsOnImage(
             np.copy(self.arr if arr is None else arr),
             shape=self.shape if shape is None else shape)

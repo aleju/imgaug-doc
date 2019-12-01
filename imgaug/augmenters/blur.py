@@ -20,6 +20,7 @@ List of augmenters:
     * MedianBlur
     * BilateralBlur
     * MotionBlur
+    * MeanShiftBlur
 
 """
 from __future__ import print_function, division, absolute_import
@@ -29,19 +30,18 @@ from scipy import ndimage
 import cv2
 import six.moves as sm
 
+import imgaug as ia
 from . import meta
 from . import convolutional as iaa_convolutional
-import imgaug as ia
 from .. import parameters as iap
 from .. import dtypes as iadt
 
 
 # TODO add border mode, cval
 def blur_gaussian_(image, sigma, ksize=None, backend="auto", eps=1e-3):
-    """
-    Blur an image using gaussian blurring.
+    """Blur an image using gaussian blurring in-place.
 
-    This operation might change the input image in-place.
+    This operation *may* change the input image in-place.
 
     dtype support::
 
@@ -156,8 +156,9 @@ def blur_gaussian_(image, sigma, ksize=None, backend="auto", eps=1e-3):
 
     Returns
     -------
-    image : numpy.ndarray
+    numpy.ndarray
         The blurred image. Same shape and dtype as the input.
+        (Input image *might* have been altered in-place.)
 
     """
     has_zero_sized_axes = (image.size == 0)
@@ -274,6 +275,107 @@ def blur_gaussian_(image, sigma, ksize=None, backend="auto", eps=1e-3):
     return image
 
 
+def blur_mean_shift_(image, spatial_window_radius, color_window_radius):
+    """Apply a pyramidic mean shift filter to the input image in-place.
+
+    This produces an output image that has similarity with one modified by
+    a bilateral filter. That is different from mean shift *segmentation*,
+    which averages the colors in segments found by mean shift clustering.
+
+    This function is a thin wrapper around ``cv2.pyrMeanShiftFiltering``.
+
+    .. note::
+
+        This function does *not* change the image's colorspace to ``RGB``
+        before applying the mean shift filter. A non-``RGB`` colorspace will
+        hence influence the results.
+
+    .. note::
+
+        This function is quite slow.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: no (1)
+        * ``uint32``: no (1)
+        * ``uint64``: no (1)
+        * ``int8``: no (1)
+        * ``int16``: no (1)
+        * ``int32``: no (1)
+        * ``int64``: no (1)
+        * ``float16``: no (1)
+        * ``float32``: no (1)
+        * ``float64``: no (1)
+        * ``float128``: no (1)
+        * ``bool``: no (1)
+
+        - (1) Not supported by ``cv2.pyrMeanShiftFiltering``.
+
+    Parameters
+    ----------
+    image : ndarray
+        ``(H,W)`` or ``(H,W,1)`` or ``(H,W,3)`` image to blur.
+        Images with no or one channel will be temporarily tiled to have
+        three channels.
+
+    spatial_window_radius : number
+        Spatial radius for pixels that are assumed to be similar.
+
+    color_window_radius : number
+        Color radius for pixels that are assumed to be similar.
+
+    Returns
+    -------
+    ndarray
+        Blurred input image. Same shape and dtype as the input.
+        (Input image *might* have been altered in-place.)
+
+    """
+    if 0 in image.shape[0:2]:
+        return image
+
+    # opencv method only supports uint8
+    assert image.dtype.name == "uint8", (
+        "Expected image with dtype \"uint8\", "
+        "got \"%s\"." % (image.dtype.name,))
+
+    shape_is_hw = (image.ndim == 2)
+    shape_is_hw1 = (image.ndim == 3 and image.shape[-1] == 1)
+    shape_is_hw3 = (image.ndim == 3 and image.shape[-1] == 3)
+
+    assert shape_is_hw or shape_is_hw1 or shape_is_hw3, (
+        "Expected (H,W) or (H,W,1) or (H,W,3) image, "
+        "got shape %s." % (image.shape,))
+
+    # opencv method only supports (H,W,3), so we have to tile here for (H,W)
+    # and (H,W,1)
+    if shape_is_hw:
+        image = np.tile(image[..., np.newaxis], (1, 1, 3))
+    elif shape_is_hw1:
+        image = np.tile(image, (1, 1, 3))
+
+    # prevent image from becoming cv2.UMat
+    if image.flags["C_CONTIGUOUS"] is False:
+        image = np.ascontiguousarray(image)
+
+    spatial_window_radius = max(spatial_window_radius, 0)
+    color_window_radius = max(color_window_radius, 0)
+
+    image = cv2.pyrMeanShiftFiltering(
+        image,
+        sp=spatial_window_radius,
+        sr=color_window_radius,
+        dst=image)
+
+    if shape_is_hw:
+        image = image[..., 0]
+    elif shape_is_hw1:
+        image = image[..., 0:1]
+
+    return image
+
+
 def _compute_gaussian_blur_ksize(sigma):
     if sigma < 3.0:
         ksize = 3.3 * sigma  # 99% of weight
@@ -352,15 +454,20 @@ class GaussianBlur(meta.Augmenter):
         # apply the blur
         self.eps = 1e-3
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
         nb_images = len(images)
         samples = self.sigma.draw_samples((nb_images,),
                                           random_state=random_state)
         for image, sig in zip(images, samples):
             image[...] = blur_gaussian_(image, sigma=sig, eps=self.eps)
-        return images
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.sigma]
 
 
@@ -497,7 +604,12 @@ class AverageBlur(meta.Augmenter):
                 "Expected int, tuple/list with 2 entries or "
                 "StochasticParameter. Got %s." % (type(k),))
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
+
         iadt.gate_dtypes(
             images,
             allowed=["bool",
@@ -521,9 +633,9 @@ class AverageBlur(meta.Augmenter):
             )
 
         gen = enumerate(zip(images, samples[0], samples[1]))
-        for i, (image, kh, kw) in gen:
-            kernel_impossible = (kh == 0 or kw == 0)
-            kernel_does_nothing = (kh == 1 and kw == 1)
+        for i, (image, ksize_h, ksize_w) in gen:
+            kernel_impossible = (ksize_h == 0 or ksize_w == 0)
+            kernel_does_nothing = (ksize_h == 1 and ksize_w == 1)
             has_zero_sized_axes = (image.size == 0)
             if (not kernel_impossible and not kernel_does_nothing
                     and not has_zero_sized_axes):
@@ -534,7 +646,7 @@ class AverageBlur(meta.Augmenter):
                     image = image.astype(np.int16, copy=False)
 
                 if image.ndim == 2 or image.shape[-1] <= 512:
-                    image_aug = cv2.blur(image, (kh, kw))
+                    image_aug = cv2.blur(image, (ksize_h, ksize_w))
                     # cv2.blur() removes channel axis for single-channel images
                     if image_aug.ndim == 2:
                         image_aug = image_aug[..., np.newaxis]
@@ -542,7 +654,7 @@ class AverageBlur(meta.Augmenter):
                     # TODO this is quite inefficient
                     # handling more than 512 channels in cv2.blur()
                     channels = [
-                        cv2.blur(image[..., c], (kh, kw))
+                        cv2.blur(image[..., c], (ksize_h, ksize_w))
                         for c in sm.xrange(image.shape[-1])
                     ]
                     image_aug = np.stack(channels, axis=-1)
@@ -552,10 +664,11 @@ class AverageBlur(meta.Augmenter):
                 elif input_dtype.name in ["int8", "float16"]:
                     image_aug = iadt.restore_dtypes_(image_aug, input_dtype)
 
-                images[i] = image_aug
-        return images
+                batch.images[i] = image_aug
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.k]
 
 
@@ -640,15 +753,19 @@ class MedianBlur(meta.Augmenter):
                 "Expected all values in iterable k to be odd, but at least "
                 "one was not. Add or subtract 1 to/from that value.")
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
         nb_images = len(images)
         samples = self.k.draw_samples((nb_images,), random_state=random_state)
-        for i, (image, ki) in enumerate(zip(images, samples)):
+        for i, (image, ksize) in enumerate(zip(images, samples)):
             has_zero_sized_axes = (image.size == 0)
-            if ki > 1 and not has_zero_sized_axes:
-                ki = ki + 1 if ki % 2 == 0 else ki
+            if ksize > 1 and not has_zero_sized_axes:
+                ksize = ksize + 1 if ksize % 2 == 0 else ksize
                 if image.ndim == 2 or image.shape[-1] <= 512:
-                    image_aug = cv2.medianBlur(image, ki)
+                    image_aug = cv2.medianBlur(image, ksize)
                     # cv2.medianBlur() removes channel axis for single-channel
                     # images
                     if image_aug.ndim == 2:
@@ -657,15 +774,16 @@ class MedianBlur(meta.Augmenter):
                     # TODO this is quite inefficient
                     # handling more than 512 channels in cv2.medainBlur()
                     channels = [
-                        cv2.medianBlur(image[..., c], ki)
+                        cv2.medianBlur(image[..., c], ksize)
                         for c in sm.xrange(image.shape[-1])
                     ]
                     image_aug = np.stack(channels, axis=-1)
 
-                images[i] = image_aug
-        return images
+                batch.images[i] = image_aug
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.k]
 
 
@@ -769,6 +887,7 @@ class BilateralBlur(meta.Augmenter):
 
     def __init__(self, d=1, sigma_color=(10, 250), sigma_space=(10, 250),
                  name=None, deterministic=False, random_state=None):
+        # pylint: disable=invalid-name
         super(BilateralBlur, self).__init__(
             name=name, deterministic=deterministic, random_state=random_state)
 
@@ -782,7 +901,13 @@ class BilateralBlur(meta.Augmenter):
             sigma_space, "sigma_space", value_range=(1, None),
             tuple_to_uniform=True, list_to_choice=True)
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        # pylint: disable=invalid-name
+        if batch is None:
+            return batch
+
+        images = batch.images
+
         # Make sure that all images have 3 channels
         assert all([image.shape[2] == 3 for image in images]), (
             "BilateralBlur can currently only be applied to images with 3 "
@@ -801,11 +926,12 @@ class BilateralBlur(meta.Augmenter):
         for i, (image, di, sigma_color_i, sigma_space_i) in gen:
             has_zero_sized_axes = (image.size == 0)
             if di != 1 and not has_zero_sized_axes:
-                images[i] = cv2.bilateralFilter(image, di, sigma_color_i,
-                                                sigma_space_i)
-        return images
+                batch.images[i] = cv2.bilateralFilter(image, di, sigma_color_i,
+                                                      sigma_space_i)
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.d, self.sigma_color, self.sigma_space]
 
 
@@ -903,38 +1029,149 @@ class MotionBlur(iaa_convolutional.Convolve):
             direction, "direction", value_range=(-1.0-1e-6, 1.0+1e-6),
             tuple_to_uniform=True, list_to_choice=True)
 
-        def _create_matrices(_image, nb_channels, random_state_func):
-            # avoid cyclic import between blur and geometric
-            from . import geometric as iaa_geometric
-
-            # force discrete for k_sample via int() in case of stochastic
-            # parameter
-            k_sample = int(
-                k_param.draw_sample(random_state=random_state_func))
-            angle_sample = angle_param.draw_sample(
-                random_state=random_state_func)
-            direction_sample = direction_param.draw_sample(
-                random_state=random_state_func)
-
-            k_sample = k_sample if k_sample % 2 != 0 else k_sample + 1
-            direction_sample = np.clip(direction_sample, -1.0, 1.0)
-            direction_sample = (direction_sample + 1.0) / 2.0
-
-            matrix = np.zeros((k_sample, k_sample), dtype=np.float32)
-            matrix[:, k_sample//2] = np.linspace(
-                float(direction_sample),
-                1.0 - float(direction_sample),
-                num=k_sample)
-            rot = iaa_geometric.Affine(rotate=angle_sample, order=order)
-
-            # FIXME astype(float32) should be before /255.0 here?
-            matrix = (
-                rot.augment_image(
-                    (matrix * 255).astype(np.uint8)
-                ) / 255.0).astype(np.float32)
-
-            return [matrix/np.sum(matrix)] * nb_channels
+        matrix_gen = _MotionBlurMatrixGenerator(k_param, angle_param,
+                                                direction_param, order)
 
         super(MotionBlur, self).__init__(
-            _create_matrices, name=name, deterministic=deterministic,
+            matrix_gen, name=name, deterministic=deterministic,
             random_state=random_state)
+
+
+class _MotionBlurMatrixGenerator(object):
+    def __init__(self, k, angle, direction, order):
+        self.k = k
+        self.angle = angle
+        self.direction = direction
+        self.order = order
+
+    def __call__(self, _image, nb_channels, random_state):
+        # avoid cyclic import between blur and geometric
+        from . import geometric as iaa_geometric
+
+        # force discrete for k_sample via int() in case of stochastic
+        # parameter
+        k_sample = int(
+            self.k.draw_sample(random_state=random_state))
+        angle_sample = self.angle.draw_sample(
+            random_state=random_state)
+        direction_sample = self.direction.draw_sample(
+            random_state=random_state)
+
+        k_sample = k_sample if k_sample % 2 != 0 else k_sample + 1
+        direction_sample = np.clip(direction_sample, -1.0, 1.0)
+        direction_sample = (direction_sample + 1.0) / 2.0
+
+        matrix = np.zeros((k_sample, k_sample), dtype=np.float32)
+        matrix[:, k_sample//2] = np.linspace(
+            float(direction_sample),
+            1.0 - float(direction_sample),
+            num=k_sample)
+        rot = iaa_geometric.Affine(rotate=angle_sample, order=self.order)
+
+        matrix = (
+            rot.augment_image(
+                (matrix * 255).astype(np.uint8)
+            ).astype(np.float32) / 255.0
+        )
+
+        return [matrix/np.sum(matrix)] * nb_channels
+
+
+# TODO add a per_channel flag?
+# TODO make spatial_radius a fraction of the input image size?
+class MeanShiftBlur(meta.Augmenter):
+    """Apply a pyramidic mean shift filter to each image.
+
+    See also :func:`blur_mean_shift_` for details.
+
+    This augmenter expects input images of shape ``(H,W)`` or ``(H,W,1)``
+    or ``(H,W,3)``.
+
+    .. note::
+
+        This augmenter is quite slow.
+
+    dtype support::
+
+        See :func:`imgaug.augmenters.blur.blur_mean_shift_`.
+
+    Parameters
+    ----------
+    spatial_radius : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        Spatial radius for pixels that are assumed to be similar.
+
+            * If ``number``: Exactly that value will be used for all images.
+            * If ``tuple`` ``(a, b)``: A random value will be uniformly
+              sampled per image from the interval ``[a, b)``.
+            * If ``list``: A random value will be sampled from that ``list``
+              per image.
+            * If ``StochasticParameter``: The parameter will be queried once
+              per batch for ``(N,)`` values with ``N`` denoting the number of
+              images.
+
+    color_radius : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        Color radius for pixels that are assumed to be similar.
+
+            * If ``number``: Exactly that value will be used for all images.
+            * If ``tuple`` ``(a, b)``: A random value will be uniformly
+              sampled per image from the interval ``[a, b)``.
+            * If ``list``: A random value will be sampled from that ``list``
+              per image.
+            * If ``StochasticParameter``: The parameter will be queried once
+              per batch for ``(N,)`` values with ``N`` denoting the number of
+              images.
+
+    name : None or str, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    deterministic : bool, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.MeanShiftBlur()
+
+    Create a mean shift blur augmenter.
+
+    """
+    def __init__(self, spatial_radius=(5.0, 40.0), color_radius=(5.0, 40.0),
+                 name=None, deterministic=False, random_state=None):
+        super(MeanShiftBlur, self).__init__(
+            name=name, deterministic=deterministic, random_state=random_state)
+        self.spatial_window_radius = iap.handle_continuous_param(
+            spatial_radius, "spatial_radius",
+            value_range=(0.01, None), tuple_to_uniform=True,
+            list_to_choice=True)
+        self.color_window_radius = iap.handle_continuous_param(
+            color_radius, "color_radius",
+            value_range=(0.01, None), tuple_to_uniform=True,
+            list_to_choice=True)
+
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is not None:
+            samples = self._draw_samples(batch, random_state)
+            for i, image in enumerate(batch.images):
+                batch.images[i] = blur_mean_shift_(
+                    image,
+                    spatial_window_radius=samples[0][i],
+                    color_window_radius=samples[1][i]
+                )
+
+        return batch
+
+    def _draw_samples(self, batch, random_state):
+        nb_rows = batch.nb_rows
+        return (
+            self.spatial_window_radius.draw_samples((nb_rows,),
+                                                    random_state=random_state),
+            self.color_window_radius.draw_samples((nb_rows,),
+                                                  random_state=random_state)
+        )
+
+    def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.spatial_window_radius, self.color_window_radius]

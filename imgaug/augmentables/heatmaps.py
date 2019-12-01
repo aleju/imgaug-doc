@@ -1,12 +1,14 @@
+"""Classes to represent heatmaps, i.e. float arrays of ``[0.0, 1.0]``."""
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
 import six.moves as sm
 
 from .. import imgaug as ia
+from .base import IAugmentable
 
 
-class HeatmapsOnImage(object):
+class HeatmapsOnImage(IAugmentable):
     """Object representing heatmaps on a single image.
 
     Parameters
@@ -118,9 +120,9 @@ class HeatmapsOnImage(object):
         max_is_one = 1.0 - eps < self.max_value < 1.0 + eps
         if min_is_zero and max_is_one:
             return np.copy(arr)
-        else:
-            diff = self.max_value - self.min_value
-            return self.min_value + diff * arr
+
+        diff = self.max_value - self.min_value
+        return self.min_value + diff * arr
 
     # TODO
     # def find_global_maxima(self):
@@ -318,7 +320,8 @@ class HeatmapsOnImage(object):
             width ``W'=W+left+right``.
 
         """
-        arr_0to1_padded = ia.pad(
+        from ..augmenters import size as iasize
+        arr_0to1_padded = iasize.pad(
             self.arr_0to1,
             top=top,
             right=right,
@@ -326,6 +329,7 @@ class HeatmapsOnImage(object):
             left=left,
             mode=mode,
             cval=cval)
+        # TODO change to deepcopy()
         return HeatmapsOnImage.from_0to1(
             arr_0to1_padded,
             shape=self.shape,
@@ -374,12 +378,14 @@ class HeatmapsOnImage(object):
             ``True``.
 
         """
-        arr_0to1_padded, pad_amounts = ia.pad_to_aspect_ratio(
+        from ..augmenters import size as iasize
+        arr_0to1_padded, pad_amounts = iasize.pad_to_aspect_ratio(
             self.arr_0to1,
             aspect_ratio=aspect_ratio,
             mode=mode,
             cval=cval,
             return_pad_amounts=True)
+        # TODO change to deepcopy()
         heatmaps = HeatmapsOnImage.from_0to1(
             arr_0to1_padded,
             shape=self.shape,
@@ -436,6 +442,7 @@ class HeatmapsOnImage(object):
     @ia.deprecated(alt_func="HeatmapsOnImage.resize()",
                    comment="resize() has the exactly same interface.")
     def scale(self, *args, **kwargs):
+        """Resize the heatmap(s) array given a target size and interpolation."""
         return self.resize(*args, **kwargs)
 
     def resize(self, sizes, interpolation="cubic"):

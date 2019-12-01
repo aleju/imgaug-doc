@@ -34,8 +34,8 @@ import skimage.measure
 import six
 import six.moves as sm
 
-from . import meta
 import imgaug as ia
+from . import meta
 from .. import random as iarandom
 from .. import parameters as iap
 from .. import dtypes as iadt
@@ -222,7 +222,12 @@ class Superpixels(meta.Augmenter):
         self.max_size = max_size
         self.interpolation = interpolation
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
+
         iadt.gate_dtypes(images,
                          allowed=["bool",
                                   "uint8", "uint16", "uint32", "uint64",
@@ -259,8 +264,6 @@ class Superpixels(meta.Augmenter):
                 # color, i.e. the image would not be changed, so just keep it
                 continue
 
-            image = images[i]
-
             orig_shape = image.shape
             image = _ensure_image_max_size(image, self.max_size,
                                            self.interpolation)
@@ -276,8 +279,8 @@ class Superpixels(meta.Augmenter):
                     orig_shape[0:2],
                     interpolation=self.interpolation)
 
-            images[i] = image_aug
-        return images
+            batch.images[i] = image_aug
+        return batch
 
     @classmethod
     def _replace_segments(cls, image, segments, replace_samples):
@@ -316,6 +319,7 @@ class Superpixels(meta.Augmenter):
         return image_sp
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p_replace, self.n_segments, self.max_size,
                 self.interpolation]
 
@@ -596,7 +600,12 @@ class Voronoi(meta.Augmenter):
         self.max_size = max_size
         self.interpolation = interpolation
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
+
         iadt.gate_dtypes(images,
                          allowed=["uint8"],
                          disallowed=["bool",
@@ -610,8 +619,8 @@ class Voronoi(meta.Augmenter):
 
         rss = random_state.duplicate(len(images))
         for i, (image, rs) in enumerate(zip(images, rss)):
-            images[i] = self._augment_single_image(image, rs)
-        return images
+            batch.images[i] = self._augment_single_image(image, rs)
+        return batch
 
     def _augment_single_image(self, image, random_state):
         rss = random_state.duplicate(2)
@@ -634,6 +643,7 @@ class Voronoi(meta.Augmenter):
         return image_aug
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.points_sampler, self.p_replace, self.max_size,
                 self.interpolation]
 
@@ -1339,6 +1349,7 @@ class RelativeRegularGridPointsSampler(IPointsSampler):
             tuple_to_uniform=True, list_to_choice=True)
 
     def sample_points(self, images, random_state):
+        # pylint: disable=protected-access
         random_state = iarandom.RNG(random_state)
         _verify_sample_points_images(images)
 
@@ -1347,6 +1358,7 @@ class RelativeRegularGridPointsSampler(IPointsSampler):
                                                               n_rows, n_cols)
 
     def _draw_samples(self, images, random_state):
+        # pylint: disable=protected-access
         n_augmentables = len(images)
         rss = random_state.duplicate(2)
         n_rows_frac = self.n_rows_frac.draw_samples(n_augmentables,

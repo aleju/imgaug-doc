@@ -21,6 +21,8 @@ List of augmenters:
     * MultiplyElementwise
     * Dropout
     * CoarseDropout
+    * Dropout2d
+    * TotalDropout
     * ReplaceElementwise
     * ImpulseNoise
     * SaltAndPepper
@@ -36,14 +38,14 @@ List of augmenters:
 """
 from __future__ import print_function, division, absolute_import
 
-from PIL import Image as PIL_Image
-import imageio
 import tempfile
+
+import imageio
 import numpy as np
 import cv2
 
-from . import meta
 import imgaug as ia
+from . import meta
 from .. import parameters as iap
 from .. import dtypes as iadt
 
@@ -115,6 +117,9 @@ def _add_scalar_to_uint8(image, value):
     # still faster than the simple numpy image+sample approach without LUT
     # (about 10% at 64x64 and about 2x at 224x224 -- maybe dependent on
     # installed BLAS libraries?)
+
+    # pylint: disable=no-else-return
+
     is_single_value = (
         ia.is_single_number(value)
         or ia.is_np_scalar(value)
@@ -402,6 +407,9 @@ def _multiply_scalar_to_uint8(image, multiplier):
     # else-block code (more than 10x speedup) and is still faster
     # than the simpler image*sample approach without LUT (1.5-3x
     # speedup, maybe dependent on installed BLAS libraries?)
+
+    # pylint: disable=no-else-return
+
     is_single_value = (
         ia.is_single_number(multiplier)
         or ia.is_np_scalar(multiplier)
@@ -563,7 +571,7 @@ def multiply_elementwise(image, multipliers):
         # TODO extend this with some shape checks
         image *= multipliers
         return image
-    elif image.dtype.name == "uint8":
+    if image.dtype.name == "uint8":
         return _multiply_elementwise_to_uint8(image, multipliers)
     return _multiply_elementwise_to_non_uint8(image, multipliers)
 
@@ -742,8 +750,45 @@ def replace_elementwise_(image, mask, replacements):
     return image
 
 
-def invert(image, min_value=None, max_value=None):
+def invert(image, min_value=None, max_value=None, threshold=None,
+           invert_above_threshold=True):
     """Invert an array.
+
+    dtype support::
+
+        See :func:`imgaug.augmenters.arithmetic.invert_`.
+
+    Parameters
+    ----------
+    image : ndarray
+        See :func:`invert_`.
+
+    min_value : None or number, optional
+        See :func:`invert_`.
+
+    max_value : None or number, optional
+        See :func:`invert_`.
+
+    threshold : None or number, optional
+        See :func:`invert_`.
+
+    invert_above_threshold : bool, optional
+        See :func:`invert_`.
+
+    Returns
+    -------
+    ndarray
+        Inverted image.
+
+    """
+    return invert_(np.copy(image), min_value=min_value, max_value=max_value,
+                   threshold=threshold,
+                   invert_above_threshold=invert_above_threshold)
+
+
+def invert_(image, min_value=None, max_value=None, threshold=None,
+            invert_above_threshold=True):
+    """Invert an array in-place.
 
     dtype support::
 
@@ -772,12 +817,12 @@ def invert(image, min_value=None, max_value=None):
             * ``int8``: yes; tested
             * ``int16``: yes; tested
             * ``int32``: yes; tested
-            * ``int64``: no (1)
+            * ``int64``: no (2)
             * ``float16``: yes; tested
             * ``float32``: yes; tested
-            * ``float64``: no (1)
-            * ``float128``: no (2)
-            * ``bool``: no (3)
+            * ``float64``: no (2)
+            * ``float128``: no (3)
+            * ``bool``: no (4)
 
             - (1) Not allowed due to numpy's clip converting from ``uint64`` to
                   ``float64``.
@@ -790,6 +835,7 @@ def invert(image, min_value=None, max_value=None):
     ----------
     image : ndarray
         Image array of shape ``(H,W,[C])``.
+        The array *might* be modified in-place.
 
     min_value : None or number, optional
         Minimum of the value range of input images, e.g. ``0`` for ``uint8``
@@ -801,10 +847,20 @@ def invert(image, min_value=None, max_value=None):
         images. If set to ``None``, the value will be automatically derived
         from the image's dtype.
 
+    threshold : None or number, optional
+        A threshold to use in order to invert only numbers above or below
+        the threshold. If ``None`` no thresholding will be used.
+
+    invert_above_threshold : bool, optional
+        If ``True``, only values ``>=threshold`` will be inverted.
+        Otherwise, only values ``<threshold`` will be inverted.
+        If `threshold` is ``None`` this parameter has no effect.
+
     Returns
     -------
     ndarray
-        Inverted image.
+        Inverted image. This *can* be the same array as input in `image`,
+        modified in-place.
 
     """
     # when no custom min/max are chosen, all bool, uint, int and float dtypes
@@ -838,9 +894,9 @@ def invert(image, min_value=None, max_value=None):
             str(max_value), str(max_value_dt), image.dtype.name)
     )
     assert min_value < max_value, (
-            "Expected min_value to be below max_value, got %s "
-            "and %s" % (
-                str(min_value), str(max_value))
+        "Expected min_value to be below max_value, got %s "
+        "and %s" % (
+            str(min_value), str(max_value))
     )
 
     if min_value != min_value_dt or max_value != max_value_dt:
@@ -849,15 +905,29 @@ def invert(image, min_value=None, max_value=None):
             "dtypes: %s. Got: %s." % (
                 ", ".join(allow_dtypes_custom_minmax), image.dtype.name))
 
+    if image.dtype.name == "uint8":
+        return _invert_uint8_(image, min_value, max_value, threshold,
+                              invert_above_threshold)
+
     dtype_kind_to_invert_func = {
         "b": _invert_bool,
-        "u": _invert_uint,
-        "i": _invert_int,
+        "u": _invert_uint16_or_larger_,  # uint8 handled above
+        "i": _invert_int_,
         "f": _invert_float
     }
 
     func = dtype_kind_to_invert_func[image.dtype.kind]
-    return func(image, min_value, max_value)
+
+    if threshold is None:
+        return func(image, min_value, max_value)
+
+    arr_inv = func(np.copy(image), min_value, max_value)
+    if invert_above_threshold:
+        mask = (image >= threshold)
+    else:
+        mask = (image < threshold)
+    image[mask] = arr_inv[mask]
+    return image
 
 
 def _invert_bool(arr, min_value, max_value):
@@ -867,8 +937,26 @@ def _invert_bool(arr, min_value, max_value):
     return ~arr
 
 
-def _invert_uint(arr, min_value, max_value):
-    if min_value == 0 and max_value == np.iinfo(arr.dtype).max:
+def _invert_uint8_(arr, min_value, max_value, threshold,
+                   invert_above_threshold):
+    if 0 in arr.shape:
+        return np.copy(arr)
+
+    if arr.flags["OWNDATA"] is False:
+        arr = np.copy(arr)
+    if arr.flags["C_CONTIGUOUS"] is False:
+        arr = np.ascontiguousarray(arr)
+
+    table = _generate_table_for_invert_uint8(
+        min_value, max_value, threshold, invert_above_threshold)
+    arr = cv2.LUT(arr, table, dst=arr)
+    return arr
+
+
+def _invert_uint16_or_larger_(arr, min_value, max_value):
+    min_max_is_vr = (min_value == 0
+                     and max_value == np.iinfo(arr.dtype).max)
+    if min_max_is_vr:
         return max_value - arr
     return _invert_by_distance(
         np.clip(arr, min_value, max_value),
@@ -876,7 +964,7 @@ def _invert_uint(arr, min_value, max_value):
     )
 
 
-def _invert_int(arr, min_value, max_value):
+def _invert_int_(arr, min_value, max_value):
     # note that for int dtypes the max value is
     #   (-1) * min_value - 1
     # e.g. -128 and 127 (min/max) for int8
@@ -895,26 +983,25 @@ def _invert_int(arr, min_value, max_value):
     # two-step approach is used.
 
     if min_value == (-1) * max_value - 1:
-        mask = (arr == min_value)
+        arr_inv = np.copy(arr)
+        mask = (arr_inv == min_value)
 
         # there is probably a one-liner here to do this, but
-        #  ((-1) * (arr * ~mask) - 1) + mask * max_value
+        #  ((-1) * (arr_inv * ~mask) - 1) + mask * max_value
         # has the disadvantage of inverting min_value to max_value - 1
         # while
-        #  ((-1) * (arr * ~mask) - 1) + mask * (max_value+1)
-        #  ((-1) * (arr * ~mask) - 1) + mask * max_value + mask
+        #  ((-1) * (arr_inv * ~mask) - 1) + mask * (max_value+1)
+        #  ((-1) * (arr_inv * ~mask) - 1) + mask * max_value + mask
         # both sometimes increase the dtype resolution (e.g. int32 to int64)
-        n_min = np.sum(mask)
-        if n_min > 0:
-            arr[mask] = max_value
-        if n_min < arr.size:
-            arr[~mask] = (-1) * arr[~mask] - 1
-        return arr
-    else:
-        return _invert_by_distance(
-            np.clip(arr, min_value, max_value),
-            min_value, max_value
-        )
+        arr_inv[mask] = max_value
+        arr_inv[~mask] = (-1) * arr_inv[~mask] - 1
+
+        return arr_inv
+
+    return _invert_by_distance(
+        np.clip(arr, min_value, max_value),
+        min_value, max_value
+    )
 
 
 def _invert_float(arr, min_value, max_value):
@@ -927,20 +1014,102 @@ def _invert_float(arr, min_value, max_value):
 
 
 def _invert_by_distance(arr, min_value, max_value):
-    arr_modify = arr
+    arr_inv = arr
     if arr.dtype.kind in ["i", "f"]:
-        arr_modify = iadt.increase_array_resolutions_([np.copy(arr)], 2)[0]
-    distance_from_min = np.abs(arr_modify - min_value)  # d=abs(v-min)
-    arr_modify = max_value - distance_from_min  # v'=MAX-d
+        arr_inv = iadt.increase_array_resolutions_([np.copy(arr)], 2)[0]
+    distance_from_min = np.abs(arr_inv - min_value)  # d=abs(v-min)
+    arr_inv = max_value - distance_from_min  # v'=MAX-d
     # due to floating point inaccuracies, we might exceed the min/max
     # values for floats here, hence clip this happens especially for
     # values close to the float dtype's maxima
     if arr.dtype.kind == "f":
-        arr_modify = np.clip(arr_modify, min_value, max_value)
+        arr_inv = np.clip(arr_inv, min_value, max_value)
     if arr.dtype.kind in ["i", "f"]:
-        arr_modify = iadt.restore_dtypes_(
-            arr_modify, arr.dtype, clip=False)
-    return arr_modify
+        arr_inv = iadt.restore_dtypes_(
+            arr_inv, arr.dtype, clip=False)
+    return arr_inv
+
+
+def _generate_table_for_invert_uint8(min_value, max_value, threshold,
+                                     invert_above_threshold):
+    table = np.arange(256).astype(np.int32)
+    full_value_range = (min_value == 0 and max_value == 255)
+    if full_value_range:
+        table_inv = table[::-1]
+    else:
+        distance_from_min = np.abs(table - min_value)
+        table_inv = max_value - distance_from_min
+    table_inv = np.clip(table_inv, min_value, max_value).astype(np.uint8)
+
+    if threshold is not None:
+        table = table.astype(np.uint8)
+        if invert_above_threshold:
+            table_inv = np.concatenate([
+                table[0:int(threshold)],
+                table_inv[int(threshold):]
+            ], axis=0)
+        else:
+            table_inv = np.concatenate([
+                table_inv[0:int(threshold)],
+                table[int(threshold):]
+            ], axis=0)
+
+    return table_inv
+
+
+def solarize(image, threshold=128):
+    """Invert pixel values above a threshold.
+
+    dtype support::
+
+        See :func:`solarize_`.
+
+    Parameters
+    ----------
+    image : ndarray
+        See :func:`solarize_`.
+
+    threshold : None or number, optional
+        See :func:`solarize_`.
+
+    Returns
+    -------
+    ndarray
+        Inverted image.
+
+    """
+    return solarize_(np.copy(image), threshold=threshold)
+
+
+def solarize_(image, threshold=128):
+    """Invert pixel values above a threshold in-place.
+
+    This function is a wrapper around :func:`invert`.
+
+    This function performs the same transformation as
+    :func:`PIL.ImageOps.solarize`.
+
+    dtype support::
+
+        See :func:`invert_(min_value=None and max_value=None)`.
+
+    Parameters
+    ----------
+    image : ndarray
+        See :func:`invert_`.
+
+    threshold : None or number, optional
+        See :func:`invert_`.
+        Note: The default threshold is optimized for ``uint8`` images.
+
+    Returns
+    -------
+    ndarray
+        Inverted image. This *can* be the same array as input in `image`,
+        modified in-place.
+
+    """
+    return invert_(image, threshold=threshold)
 
 
 def compress_jpeg(image, compression):
@@ -978,6 +1147,8 @@ def compress_jpeg(image, compression):
         the result into a new array. Same shape and dtype as the input.
 
     """
+    import PIL.Image
+
     if image.size == 0:
         return np.copy(image)
 
@@ -1024,7 +1195,7 @@ def compress_jpeg(image, compression):
         )
     )
 
-    image_pil = PIL_Image.fromarray(image)
+    image_pil = PIL.Image.fromarray(image)
     with tempfile.NamedTemporaryFile(mode="wb+", suffix=".jpg") as f:
         image_pil.save(f, quality=quality)
 
@@ -1121,7 +1292,11 @@ class Add(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
         nb_images = len(images)
         nb_channels_max = meta.estimate_max_number_of_channels(images)
         rss = random_state.duplicate(2)
@@ -1159,11 +1334,12 @@ class Add(meta.Augmenter):
                 # the if/else here catches the case of the channel axis being 0
                 value = value_samples_i[0] if value_samples_i.size > 0 else []
 
-            images[i] = add_scalar(image, value)
+            batch.images[i] = add_scalar(image, value)
 
-        return images
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.value, self.per_channel]
 
 
@@ -1251,7 +1427,11 @@ class AddElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
         nb_images = len(images)
         rss = random_state.duplicate(1+nb_images)
         per_channel_samples = self.per_channel.draw_samples(
@@ -1265,11 +1445,12 @@ class AddElementwise(meta.Augmenter):
                             nb_channels if per_channel_samples_i > 0.5 else 1)
             values = self.value.draw_samples(sample_shape, random_state=rs)
 
-            images[i] = add_elementwise(image, values)
+            batch.images[i] = add_elementwise(image, values)
 
-        return images
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.value, self.per_channel]
 
 
@@ -1676,7 +1857,11 @@ class Multiply(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
         nb_images = len(images)
         nb_channels_max = meta.estimate_max_number_of_channels(images)
         rss = random_state.duplicate(2)
@@ -1713,11 +1898,12 @@ class Multiply(meta.Augmenter):
             else:
                 # the if/else here catches the case of the channel axis being 0
                 mul = mul_samples_i[0] if mul_samples_i.size > 0 else []
-            images[i] = multiply_scalar(image, mul)
+            batch.images[i] = multiply_scalar(image, mul)
 
-        return images
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.mul, self.per_channel]
 
 
@@ -1804,7 +1990,11 @@ class MultiplyElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(per_channel,
                                                         "per_channel")
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
         nb_images = len(images)
         rss = random_state.duplicate(1+nb_images)
         per_channel_samples = self.per_channel.draw_samples(
@@ -1829,11 +2019,12 @@ class MultiplyElementwise(meta.Augmenter):
             if mul.dtype.kind != "b" and is_mul_binomial:
                 mul = mul.astype(bool, copy=False)
 
-            images[i] = multiply_elementwise(image, mul)
+            batch.images[i] = multiply_elementwise(image, mul)
 
-        return images
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.mul, self.per_channel]
 
 
@@ -1859,6 +2050,8 @@ class Dropout(MultiplyElementwise):
             * If a tuple ``(a, b)``, then a value ``p`` will be sampled from
               the interval ``[a, b]`` per image and be used as the pixel's
               dropout probability.
+            * If a list, then a value will be sampled from that list per
+              batch and used as the probability.
             * If a ``StochasticParameter``, then this parameter will be used to
               determine per pixel whether it should be *kept* (sampled value
               of ``>0.5``) or shouldn't be kept (sampled value of ``<=0.5``).
@@ -1911,34 +2104,49 @@ class Dropout(MultiplyElementwise):
     """
     def __init__(self, p=0, per_channel=False,
                  name=None, deterministic=False, random_state=None):
-        # TODO add list as an option
-        if ia.is_single_number(p):
-            p2 = iap.Binomial(1 - p)
-        elif ia.is_iterable(p):
-            assert len(p) == 2, (
-                "Expected 'p' given as an iterable to contain exactly 2 values, "
-                "got %d." % (len(p),))
-            assert p[0] < p[1], (
-                "Expected 'p' given as iterable to contain exactly 2 values (a, b) "
-                "with a < b. Got %.4f and %.4f." % (p[0], p[1]))
-            assert 0 <= p[0] <= 1.0 and 0 <= p[1] <= 1.0, (
-                "Expected 'p' given as iterable to only contain values in the "
-                "interval [0.0, 1.0], got %.4f and %.4f." % (p[0], p[1]))
-
-            p2 = iap.Binomial(iap.Uniform(1 - p[1], 1 - p[0]))
-        elif isinstance(p, iap.StochasticParameter):
-            p2 = p
-        else:
-            raise Exception(
-                "Expected p to be float or int or StochasticParameter, got %s." % (
-                    type(p),))
+        p_param = _handle_dropout_probability_param(p, "p")
 
         super(Dropout, self).__init__(
-            p2,
+            p_param,
             per_channel=per_channel,
             name=name,
             deterministic=deterministic,
             random_state=random_state)
+
+
+def _handle_dropout_probability_param(p, name):
+    if ia.is_single_number(p):
+        p_param = iap.Binomial(1 - p)
+    elif isinstance(p, tuple):
+        assert len(p) == 2, (
+            "Expected `%s` to be given as a tuple containing exactly 2 values, "
+            "got %d values." % (name, len(p),))
+        assert p[0] < p[1], (
+            "Expected `%s` to be given as a tuple containing exactly 2 values "
+            "(a, b) with a < b. Got %.4f and %.4f." % (name, p[0], p[1]))
+        assert 0 <= p[0] <= 1.0 and 0 <= p[1] <= 1.0, (
+            "Expected `%s` given as tuple to only contain values in the "
+            "interval [0.0, 1.0], got %.4f and %.4f." % (name, p[0], p[1]))
+
+        p_param = iap.Binomial(iap.Uniform(1 - p[1], 1 - p[0]))
+    elif ia.is_iterable(p):
+        assert all([ia.is_single_number(v) for v in p]), (
+            "Expected iterable parameter '%s' to only contain numbers, "
+            "got %s." % (name, [type(v) for v in p],))
+        assert all([0 <= p_i <= 1.0 for p_i in p]), (
+            "Expected iterable parameter '%s' to only contain probabilities "
+            "in the interval [0.0, 1.0], got values %s." % (
+                name, ", ".join(["%.4f" % (p_i,) for p_i in p])))
+        p_param = iap.Binomial(1 - iap.Choice(p))
+    elif isinstance(p, iap.StochasticParameter):
+        p_param = p
+    else:
+        raise Exception(
+            "Expected `%s` to be float or int or tuple (<number>, <number>) "
+            "or StochasticParameter, got type '%s'." % (
+                name, type(p).__name__,))
+
+    return p_param
 
 
 # TODO add similar cutout augmenter
@@ -1979,6 +2187,8 @@ class CoarseDropout(MultiplyElementwise):
             * If a tuple ``(a, b)``, then a value ``p`` will be sampled from
               the interval ``[a, b]`` per image and be used as the dropout
               probability.
+            * If a list, then a value will be sampled from that list per
+              batch and used as the probability.
             * If a ``StochasticParameter``, then this parameter will be used to
               determine per pixel whether it should be *kept* (sampled value
               of ``>0.5``) or shouldn't be kept (sampled value of ``<=0.5``).
@@ -2087,41 +2297,348 @@ class CoarseDropout(MultiplyElementwise):
     def __init__(self, p=0, size_px=None, size_percent=None, per_channel=False,
                  min_size=4,
                  name=None, deterministic=False, random_state=None):
-        if ia.is_single_number(p):
-            p2 = iap.Binomial(1 - p)
-        elif ia.is_iterable(p):
-            assert len(p) == 2, (
-                "Expected 'p' given as an iterable to contain exactly 2 values, "
-                "got %d." % (len(p),))
-            assert p[0] < p[1], (
-                "Expected 'p' given as iterable to contain exactly 2 values (a, b) "
-                "with a < b. Got %.4f and %.4f." % (p[0], p[1]))
-            assert 0 <= p[0] <= 1.0 and 0 <= p[1] <= 1.0, (
-                "Expected 'p' given as iterable to only contain values in the "
-                "interval [0.0, 1.0], got %.4f and %.4f." % (p[0], p[1]))
-
-            p2 = iap.Binomial(iap.Uniform(1 - p[1], 1 - p[0]))
-        elif isinstance(p, iap.StochasticParameter):
-            p2 = p
-        else:
-            raise Exception("Expected p to be float or int or StochasticParameter, "
-                            "got %s." % (type(p),))
+        p_param = _handle_dropout_probability_param(p, "p")
 
         if size_px is not None:
-            p3 = iap.FromLowerResolution(other_param=p2, size_px=size_px,
-                                         min_size=min_size)
+            p_param = iap.FromLowerResolution(other_param=p_param,
+                                              size_px=size_px,
+                                              min_size=min_size)
         elif size_percent is not None:
-            p3 = iap.FromLowerResolution(other_param=p2, size_percent=size_percent,
-                                         min_size=min_size)
+            p_param = iap.FromLowerResolution(other_param=p_param,
+                                              size_percent=size_percent,
+                                              min_size=min_size)
         else:
             raise Exception("Either size_px or size_percent must be set.")
 
         super(CoarseDropout, self).__init__(
-            p3,
+            p_param,
             per_channel=per_channel,
             name=name,
             deterministic=deterministic,
             random_state=random_state)
+
+
+class Dropout2d(meta.Augmenter):
+    """Drop random channels from images.
+
+    For image data, dropped channels will be filled with zeros.
+
+    .. note::
+
+        This augmenter may also set the arrays of heatmaps and segmentation
+        maps to zero and remove all coordinate-based data (e.g. it removes
+        all bounding boxes on images that were filled with zeros).
+        It does so if and only if *all* channels of an image are dropped.
+        If ``nb_keep_channels >= 1`` then that never happens.
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
+
+    Parameters
+    ----------
+    p : float or tuple of float or imgaug.parameters.StochasticParameter, optional
+        The probability of any channel to be dropped (i.e. set to zero).
+
+            * If a ``float``, then that value will be used for all channels.
+              A value of ``1.0`` would mean, that all channels will be dropped.
+              A value of ``0.0`` would lead to no channels being dropped.
+            * If a tuple ``(a, b)``, then a value ``p`` will be sampled from
+              the interval ``[a, b)`` per batch and be used as the dropout
+              probability.
+            * If a list, then a value will be sampled from that list per
+              batch and used as the probability.
+            * If a ``StochasticParameter``, then this parameter will be used to
+              determine per channel whether it should be *kept* (sampled value
+              of ``>=0.5``) or shouldn't be kept (sampled value of ``<0.5``).
+              If you instead want to provide the probability as a stochastic
+              parameter, you can usually do ``imgaug.parameters.Binomial(1-p)``
+              to convert parameter `p` to a 0/1 representation.
+
+    nb_keep_channels : int
+        Minimum number of channels to keep unaltered in all images.
+        E.g. a value of ``1`` means that at least one channel in every image
+        will not be dropped, even if ``p=1.0``. Set to ``0`` to allow dropping
+        all channels.
+
+    name : None or str, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    deterministic : bool, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.Dropout2d(p=0.5)
+
+    Create a dropout augmenter that drops on average half of all image
+    channels. Dropped channels will be filled with zeros. At least one
+    channel is kept unaltered in each image (default setting).
+
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.Dropout2d(p=0.5, nb_keep_channels=0)
+
+    Create a dropout augmenter that drops on average half of all image
+    channels *and* may drop *all* channels in an image (i.e. images may
+    contain nothing but zeros).
+
+    """
+
+    def __init__(self, p, nb_keep_channels=1, name=None, deterministic=False,
+                 random_state=None):
+        super(Dropout2d, self).__init__(
+            name=name, deterministic=deterministic, random_state=random_state)
+        self.p = _handle_dropout_probability_param(p, "p")
+        self.nb_keep_channels = max(nb_keep_channels, 0)
+
+        self._drop_images = True
+        self._drop_heatmaps = True
+        self._drop_segmentation_maps = True
+        self._drop_keypoints = True
+        self._drop_bounding_boxes = True
+        self._drop_polygons = True
+        self._drop_line_strings = True
+
+        self._heatmaps_cval = 0.0
+        self._segmentation_maps_cval = 0
+
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        imagewise_drop_channel_ids, all_dropped_ids = self._draw_samples(
+            batch, random_state)
+
+        if batch.images is not None:
+            for image, drop_ids in zip(batch.images,
+                                       imagewise_drop_channel_ids):
+                image[:, :, drop_ids] = 0
+
+        # Skip the non-image data steps below if we won't modify non-image
+        # anyways. Minor performance improvement.
+        if len(all_dropped_ids) == 0:
+            return batch
+
+        if batch.heatmaps is not None and self._drop_heatmaps:
+            cval = self._heatmaps_cval
+            for drop_idx in all_dropped_ids:
+                batch.heatmaps[drop_idx].arr_0to1[...] = cval
+
+        if batch.segmentation_maps is not None and self._drop_segmentation_maps:
+            cval = self._segmentation_maps_cval
+            for drop_idx in all_dropped_ids:
+                batch.segmentation_maps[drop_idx].arr[...] = cval
+
+        for attr_name in ["keypoints", "bounding_boxes", "polygons",
+                          "line_strings"]:
+            do_drop = getattr(self, "_drop_%s" % (attr_name,))
+            attr_value = getattr(batch, attr_name)
+            if attr_value is not None and do_drop:
+                for drop_idx in all_dropped_ids:
+                    # same as e.g.:
+                    #     batch.bounding_boxes[drop_idx].bounding_boxes = []
+                    setattr(attr_value[drop_idx], attr_name, [])
+
+        return batch
+
+    def _draw_samples(self, batch, random_state):
+        # maybe noteworthy here that the channel axis can have size 0,
+        # e.g. (5, 5, 0)
+        shapes = batch.get_rowwise_shapes()
+        shapes = [shape
+                  if len(shape) >= 2
+                  else tuple(list(shape) + [1])
+                  for shape in shapes]
+        imagewise_channels = np.array([
+            shape[2] for shape in shapes
+        ], dtype=np.int32)
+
+        # channelwise drop value over all images (float <0.5 = drop channel)
+        p_samples = self.p.draw_samples((int(np.sum(imagewise_channels)),),
+                                        random_state=random_state)
+
+        # We map the flat p_samples array to an imagewise one,
+        # convert the mask to channel-ids to drop and remove channel ids if
+        # there are more to be dropped than are allowed to be dropped (see
+        # nb_keep_channels).
+        # We also track all_dropped_ids, which contains the ids of examples
+        # (not channel ids!) where all channels were dropped.
+        imagewise_channels_to_drop = []
+        all_dropped_ids = []
+        channel_idx = 0
+        for i, nb_channels in enumerate(imagewise_channels):
+            p_samples_i = p_samples[channel_idx:channel_idx+nb_channels]
+
+            drop_ids = np.nonzero(p_samples_i < 0.5)[0]
+            nb_dropable = max(nb_channels - self.nb_keep_channels, 0)
+            if len(drop_ids) > nb_dropable:
+                random_state.shuffle(drop_ids)
+                drop_ids = drop_ids[:nb_dropable]
+            imagewise_channels_to_drop.append(drop_ids)
+
+            all_dropped = (len(drop_ids) == nb_channels)
+            if all_dropped:
+                all_dropped_ids.append(i)
+
+            channel_idx += nb_channels
+
+        return imagewise_channels_to_drop, all_dropped_ids
+
+    def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.p, self.nb_keep_channels]
+
+
+class TotalDropout(meta.Augmenter):
+    """Drop all channels of a defined fraction of all images.
+
+    For image data, all components of dropped images will be filled with zeros.
+
+    .. note::
+
+        This augmenter also sets the arrays of heatmaps and segmentation
+        maps to zero and removes all coordinate-based data (e.g. it removes
+        all bounding boxes on images that were filled with zeros).
+
+    dtype support::
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
+
+    Parameters
+    ----------
+    p : float or tuple of float or imgaug.parameters.StochasticParameter, optional
+        The probability of an image to be filled with zeros.
+
+            * If ``float``: The value will be used for all images.
+              A value of ``1.0`` would mean that all images will be set to zero.
+              A value of ``0.0`` would lead to no images being set to zero.
+            * If ``tuple`` ``(a, b)``: A value ``p`` will be sampled from
+              the interval ``[a, b)`` per batch and be used as the dropout
+              probability.
+            * If a list, then a value will be sampled from that list per
+              batch and used as the probability.
+            * If ``StochasticParameter``: The parameter will be used to
+              determine per image whether it should be *kept* (sampled value
+              of ``>=0.5``) or shouldn't be kept (sampled value of ``<0.5``).
+              If you instead want to provide the probability as a stochastic
+              parameter, you can usually do ``imgaug.parameters.Binomial(1-p)``
+              to convert parameter `p` to a 0/1 representation.
+
+    name : None or str, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    deterministic : bool, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.TotalDropout(1.0)
+
+    Create an augmenter that sets *all* components of all images to zero.
+
+    >>> aug = iaa.TotalDropout(0.5)
+
+    Create an augmenter that sets *all* components of ``50%`` of all images to
+    zero.
+
+    """
+
+    def __init__(self, p, name=None, deterministic=False, random_state=None):
+        super(TotalDropout, self).__init__(
+            name=name, deterministic=deterministic, random_state=random_state)
+        self.p = _handle_dropout_probability_param(p, "p")
+
+        self._drop_images = True
+        self._drop_heatmaps = True
+        self._drop_segmentation_maps = True
+        self._drop_keypoints = True
+        self._drop_bounding_boxes = True
+        self._drop_polygons = True
+        self._drop_line_strings = True
+
+        self._heatmaps_cval = 0.0
+        self._segmentation_maps_cval = 0
+
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        drop_mask = self._draw_samples(batch, random_state)
+        drop_ids = None
+
+        if batch.images is not None and self._drop_images:
+            if ia.is_np_array(batch.images):
+                batch.images[drop_mask, ...] = 0
+            else:
+                drop_ids = self._generate_drop_ids_once(drop_mask, drop_ids)
+                for drop_idx in drop_ids:
+                    batch.images[drop_idx][...] = 0
+
+        if batch.heatmaps is not None and self._drop_heatmaps:
+            drop_ids = self._generate_drop_ids_once(drop_mask, drop_ids)
+            cval = self._heatmaps_cval
+            for drop_idx in drop_ids:
+                batch.heatmaps[drop_idx].arr_0to1[...] = cval
+
+        if batch.segmentation_maps is not None and self._drop_segmentation_maps:
+            drop_ids = self._generate_drop_ids_once(drop_mask, drop_ids)
+            cval = self._segmentation_maps_cval
+            for drop_idx in drop_ids:
+                batch.segmentation_maps[drop_idx].arr[...] = cval
+
+        for attr_name in ["keypoints", "bounding_boxes", "polygons",
+                          "line_strings"]:
+            do_drop = getattr(self, "_drop_%s" % (attr_name,))
+            attr_value = getattr(batch, attr_name)
+            if attr_value is not None and do_drop:
+                drop_ids = self._generate_drop_ids_once(drop_mask, drop_ids)
+                for drop_idx in drop_ids:
+                    # same as e.g.:
+                    #     batch.bounding_boxes[drop_idx].bounding_boxes = []
+                    setattr(attr_value[drop_idx], attr_name, [])
+
+        return batch
+
+    def _draw_samples(self, batch, random_state):
+        p = self.p.draw_samples((batch.nb_rows,), random_state=random_state)
+        drop_mask = (p < 0.5)
+        return drop_mask
+
+    @classmethod
+    def _generate_drop_ids_once(cls, drop_mask, drop_ids):
+        if drop_ids is None:
+            drop_ids = np.nonzero(drop_mask)[0]
+        return drop_ids
+
+    def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.p]
 
 
 class ReplaceElementwise(meta.Augmenter):
@@ -2234,7 +2751,11 @@ class ReplaceElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(per_channel,
                                                         "per_channel")
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
         nb_images = len(images)
         rss = random_state.duplicate(1+2*nb_images)
         per_channel_samples = self.per_channel.draw_samples(
@@ -2269,12 +2790,13 @@ class ReplaceElementwise(meta.Augmenter):
                 replacement_samples = self.replacement.draw_samples(
                     (int(np.sum(mask_samples)),), random_state=rs_replacement)
 
-            images[i] = replace_elementwise_(image, mask_samples,
-                                             replacement_samples)
+            batch.images[i] = replace_elementwise_(image, mask_samples,
+                                                   replacement_samples)
 
-        return images
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.mask, self.replacement, self.per_channel]
 
 
@@ -2975,7 +3497,7 @@ class Invert(meta.Augmenter):
 
     dtype support::
 
-        See :func:`imgaug.augmenters.arithmetic.invert`.
+        See :func:`imgaug.augmenters.arithmetic.invert_`.
 
     Parameters
     ----------
@@ -3010,6 +3532,28 @@ class Invert(meta.Augmenter):
         Maximum of the value range of input images, e.g. ``255`` for ``uint8``
         images. If set to ``None``, the value will be automatically derived
         from the image's dtype.
+
+    threshold : None or number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        A threshold to use in order to invert only numbers above or below
+        the threshold. If ``None`` no thresholding will be used.
+
+            * If ``None``: No thresholding will be used.
+            * If ``number``: The value will be used for all images.
+            * If ``tuple`` ``(a, b)``: A value will be uniformly sampled per
+              image from the interval ``[a, b)``.
+            * If ``list``: A random value will be picked from the list per
+              image.
+            * If ``StochasticParameter``: Per batch of size ``N``, the
+              parameter will be queried once to return ``(N,)`` samples.
+
+    invert_above_threshold : bool or float or imgaug.parameters.StochasticParameter, optional
+        If ``True``, only values ``>=threshold`` will be inverted.
+        Otherwise, only values ``<threshold`` will be inverted.
+        If a ``number``, then expected to be in the interval ``[0.0, 1.0]`` and
+        denoting an imagewise probability. If a ``StochasticParameter`` then
+        ``(N,)`` values will be sampled from the parameter per batch of size
+        ``N`` and interpreted as ``True`` if ``>0.5``.
+        If `threshold` is ``None`` this parameter has no effect.
 
     name : None or str, optional
         See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
@@ -3057,6 +3601,7 @@ class Invert(meta.Augmenter):
     ]
 
     def __init__(self, p=0, per_channel=False, min_value=None, max_value=None,
+                 threshold=None, invert_above_threshold=0.5,
                  name=None, deterministic=False, random_state=None):
         super(Invert, self).__init__(
             name=name, deterministic=deterministic, random_state=random_state)
@@ -3068,34 +3613,150 @@ class Invert(meta.Augmenter):
         self.min_value = min_value
         self.max_value = max_value
 
-    def _augment_images(self, images, random_state, parents, hooks):
-        nb_images = len(images)
-        nb_channels = meta.estimate_max_number_of_channels(images)
-        rss = random_state.duplicate(2)
-        per_channel_samples = self.per_channel.draw_samples(
-            (nb_images,), random_state=rss[0])
-        p_samples = self.p.draw_samples((nb_images, nb_channels),
-                                        random_state=rss[1])
+        if threshold is None:
+            self.threshold = None
+        else:
+            self.threshold = iap.handle_continuous_param(
+                threshold, "threshold", value_range=None, tuple_to_uniform=True,
+                list_to_choice=True)
+        self.invert_above_threshold = iap.handle_probability_param(
+            invert_above_threshold, "invert_above_threshold")
 
-        gen = zip(images, per_channel_samples, p_samples)
-        for image, per_channel_samples_i, p_samples_i in gen:
-            if per_channel_samples_i > 0.5:
-                mask = p_samples_i > 0.5
-                image[..., mask] = invert(image[..., mask],
-                                          self.min_value, self.max_value)
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        samples = self._draw_samples(batch, random_state)
+
+        for i, image in enumerate(batch.images):
+            if 0 in image.shape:
+                continue
+
+            kwargs = {
+                "min_value": samples.min_value[i],
+                "max_value": samples.max_value[i],
+                "threshold": samples.threshold[i],
+                "invert_above_threshold": samples.invert_above_threshold[i]
+            }
+
+            if samples.per_channel[i]:
+                nb_channels = image.shape[2]
+                mask = samples.p[i, :nb_channels]
+                image[..., mask] = invert_(image[..., mask], **kwargs)
             else:
-                # p_samples_i.size == 0 is the case when the channel axis
-                # has value 0 and hence p_samples_i[0] fails. By still
-                # calling invert() in these cases instead of changing nothing
-                # we allow the unittests for Invert to also test invert().
-                if p_samples_i.size == 0 or p_samples_i[0] > 0.5:
-                    image[:, :, :] = invert(image, self.min_value,
-                                            self.max_value)
+                if samples.p[i, 0]:
+                    image[:, :, :] = invert_(image, **kwargs)
 
-        return images
+        return batch
+
+    def _draw_samples(self, batch, random_state):
+        nb_images = batch.nb_rows
+        nb_channels = meta.estimate_max_number_of_channels(batch.images)
+        p = self.p.draw_samples((nb_images, nb_channels),
+                                random_state=random_state)
+        p = (p > 0.5)
+        per_channel = self.per_channel.draw_samples((nb_images,),
+                                                    random_state=random_state)
+        per_channel = (per_channel > 0.5)
+        min_value = [self.min_value] * nb_images
+        max_value = [self.max_value] * nb_images
+
+        if self.threshold is None:
+            threshold = [None] * nb_images
+        else:
+            threshold = self.threshold.draw_samples(
+                (nb_images,), random_state=random_state)
+
+        invert_above_threshold = self.invert_above_threshold.draw_samples(
+            (nb_images,), random_state=random_state)
+        invert_above_threshold = (invert_above_threshold > 0.5)
+
+        return _InvertSamples(
+            p=p,
+            per_channel=per_channel,
+            min_value=min_value,
+            max_value=max_value,
+            threshold=threshold,
+            invert_above_threshold=invert_above_threshold
+        )
 
     def get_parameters(self):
-        return [self.p, self.per_channel, self.min_value, self.max_value]
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.p, self.per_channel, self.min_value, self.max_value,
+                self.threshold, self.invert_above_threshold]
+
+
+class _InvertSamples(object):
+    def __init__(self, p, per_channel, min_value, max_value,
+                 threshold, invert_above_threshold):
+        self.p = p
+        self.per_channel = per_channel
+        self.min_value = min_value
+        self.max_value = max_value
+        self.threshold = threshold
+        self.invert_above_threshold = invert_above_threshold
+
+
+class Solarize(Invert):
+    """Invert all pixel values above a threshold.
+
+    This is the same as :class:`Invert`, but sets a default threshold around
+    ``128`` (+/- 64, decided per image) and default `invert_above_threshold`
+    to ``True`` (i.e. only values above the threshold will be inverted).
+
+    See :class:`Invert` for more details.
+
+    dtype support::
+
+        See :class:`Invert`.
+
+    Parameters
+    ----------
+    p : float or imgaug.parameters.StochasticParameter, optional
+        See :class:`Invert`.
+
+    per_channel : bool or float or imgaug.parameters.StochasticParameter, optional
+        See :class:`Invert`.
+
+    min_value : None or number, optional
+        See :class:`Invert`.
+
+    max_value : None or number, optional
+        See :class:`Invert`.
+
+    threshold : None or number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :class:`Invert`.
+
+    invert_above_threshold : bool or float or imgaug.parameters.StochasticParameter, optional
+        See :class:`Invert`.
+
+    name : None or str, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    deterministic : bool, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.Solarize(0.5, threshold=(32, 128))
+
+    Invert the colors in ``50`` percent of all images for pixels with a
+    value between ``32`` and ``128`` or more. The threshold is sampled once
+    per image. The thresholding operation happens per channel.
+
+    """
+    def __init__(self, p, per_channel=False, min_value=None, max_value=None,
+                 threshold=(128-64, 128+64), invert_above_threshold=True,
+                 name=None, deterministic=False, random_state=None):
+        super(Solarize, self).__init__(
+            p=p, per_channel=per_channel,
+            min_value=min_value, max_value=max_value,
+            threshold=threshold, invert_above_threshold=invert_above_threshold,
+            name=name, deterministic=deterministic, random_state=random_state)
 
 
 # TODO remove from examples
@@ -3161,6 +3822,7 @@ def ContrastNormalization(alpha=1.0, per_channel=False,
     all channels.
 
     """
+    # pylint: disable=invalid-name
     # placed here to avoid cyclic dependency
     from . import contrast as contrast_lib
     return contrast_lib.LinearContrast(
@@ -3239,16 +3901,20 @@ class JpegCompression(meta.Augmenter):
             compression, "compression",
             value_range=(0, 100), tuple_to_uniform=True, list_to_choice=True)
 
-    def _augment_images(self, images, random_state, parents, hooks):
-        result = images
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
         nb_images = len(images)
         samples = self.compression.draw_samples((nb_images,),
                                                 random_state=random_state)
 
         for i, (image, sample) in enumerate(zip(images, samples)):
-            result[i] = compress_jpeg(image, int(sample))
+            batch.images[i] = compress_jpeg(image, int(sample))
 
-        return result
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.compression]

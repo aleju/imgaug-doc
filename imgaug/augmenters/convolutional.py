@@ -26,15 +26,14 @@ For MotionBlur, see ``blur.py``.
 """
 from __future__ import print_function, division, absolute_import
 
-import types
 import itertools
 
 import numpy as np
 import cv2
 import six.moves as sm
 
-from . import meta
 import imgaug as ia
+from . import meta
 from .. import parameters as iap
 from .. import dtypes as iadt
 
@@ -147,7 +146,12 @@ class Convolve(meta.Augmenter):
                 "StochasticParameter. Got %s." % (
                     type(matrix),))
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
+
         iadt.gate_dtypes(images,
                          allowed=["bool",
                                   "uint8", "uint16",
@@ -225,11 +229,12 @@ class Convolve(meta.Augmenter):
             elif input_dtype.name in ["int8", "float16"]:
                 image_aug = iadt.restore_dtypes_(image_aug, input_dtype)
 
-            images[i] = image_aug
+            batch.images[i] = image_aug
 
-        return images
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.matrix, self.matrix_type]
 
 

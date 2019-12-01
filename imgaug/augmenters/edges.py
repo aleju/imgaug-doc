@@ -27,9 +27,9 @@ import numpy as np
 import cv2
 import six
 
+import imgaug as ia
 from . import meta
 from . import blend
-import imgaug as ia
 from .. import parameters as iap
 from .. import dtypes as iadt
 
@@ -38,6 +38,8 @@ from .. import dtypes as iadt
 #      re-used wherever a binary image is the result
 @six.add_metaclass(ABCMeta)
 class IBinaryImageColorizer(object):
+    """Interface for classes that convert binary masks to color images."""
+
     @abstractmethod
     def colorize(self, image_binary, image_original, nth_image, random_state):
         """
@@ -167,7 +169,7 @@ class RandomColorsBinaryImageColorizer(IBinaryImageColorizer):
     def __str__(self):
         return ("RandomColorsBinaryImageColorizer("
                 "color_true=%s, color_false=%s)") % (
-            self.color_true, self.color_false)
+                    self.color_true, self.color_false)
 
 
 class Canny(meta.Augmenter):
@@ -409,7 +411,12 @@ class Canny(meta.Augmenter):
 
         return alpha_samples, hthresh_samples, sobel_samples
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    def _augment_batch(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
+
         iadt.gate_dtypes(images,
                          allowed=["uint8"],
                          disallowed=[
@@ -427,7 +434,6 @@ class Canny(meta.Augmenter):
         alpha_samples = samples[0]
         hthresh_samples = samples[1]
         sobel_samples = samples[2]
-        result = images
 
         gen = enumerate(zip(images, alpha_samples, hthresh_samples,
                             sobel_samples))
@@ -452,11 +458,13 @@ class Canny(meta.Augmenter):
                 image_canny_color = self.colorizer.colorize(
                     image_canny, image, nth_image=i, random_state=rss[i])
 
-                result[i] = blend.blend_alpha(image_canny_color, image, alpha)
+                batch.images[i] = blend.blend_alpha(image_canny_color, image,
+                                                    alpha)
 
-        return result
+        return batch
 
     def get_parameters(self):
+        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.alpha, self.hysteresis_thresholds, self.sobel_kernel_size,
                 self.colorizer]
 

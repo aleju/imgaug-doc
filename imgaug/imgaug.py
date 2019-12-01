@@ -1,3 +1,4 @@
+"""Collection of basic functions used throughout imgaug."""
 from __future__ import print_function, division, absolute_import
 
 import math
@@ -7,6 +8,7 @@ import os
 import json
 import types
 import functools
+import collections
 
 import numpy as np
 import cv2
@@ -15,12 +17,6 @@ import six
 import six.moves as sm
 import skimage.draw
 import skimage.measure
-import collections
-from PIL import (
-    Image as PIL_Image,
-    ImageDraw as PIL_ImageDraw,
-    ImageFont as PIL_ImageFont
-)
 
 
 ALL = "ALL"
@@ -64,7 +60,6 @@ class DeprecationWarning(Warning):  # pylint: disable=redefined-builtin
     our own DeprecatedWarning here so that it is not silent by default.
 
     """
-    pass
 
 
 def warn(msg, category=UserWarning, stacklevel=2):
@@ -107,7 +102,7 @@ def warn_deprecated(msg, stacklevel=2):
     warn(msg, category=DeprecationWarning, stacklevel=stacklevel)
 
 
-class deprecated(object):
+class deprecated(object):  # pylint: disable=invalid-name
     """Decorator to mark deprecated functions with warning.
 
     Adapted from
@@ -159,6 +154,9 @@ class deprecated(object):
 
         @functools.wraps(func)
         def wrapped(*args, **kwargs):
+            # getargpec() is deprecated
+            # pylint: disable=deprecated-method
+
             # TODO add class name if class method
             import inspect
             # arg_names = func.__code__.co_varnames
@@ -342,6 +340,7 @@ def is_single_bool(val):
         ``True`` if the variable is a ``bool``. Otherwise ``False``.
 
     """
+    # pylint: disable=unidiomatic-typecheck
     return type(val) == type(True)
 
 
@@ -455,6 +454,7 @@ def caller_name():
         The name of the caller as a string
 
     """
+    # pylint: disable=protected-access
     return sys._getframe(1).f_code.co_name
 
 
@@ -559,12 +559,12 @@ def new_random_state(seed=None, fully_random=False):
         Both are initialized with the provided seed.
 
     """
+    # pylint: disable=redefined-outer-name
     import imgaug.random
     if seed is None:
         if fully_random:
             return imgaug.random.RNG.create_fully_random()
-        else:
-            return imgaug.random.RNG.create_pseudo_random_()
+        return imgaug.random.RNG.create_pseudo_random_()
     return imgaug.random.RNG(seed)
 
 
@@ -919,6 +919,7 @@ def quokka_segmentation_map(size=None, extract=None):
         Segmentation map object.
 
     """
+    # pylint: disable=invalid-name
     # TODO get rid of this deferred import
     from imgaug.augmentables.segmaps import SegmentationMapsOnImage
 
@@ -1088,7 +1089,7 @@ def quokka_polygons(size=None, extract=None):
     for poly_json in json_dict["polygons"]:
         polygons.append(
             Polygon([(point["x"] - left, point["y"] - top)
-                    for point in poly_json["keypoints"]])
+                     for point in poly_json["keypoints"]])
         )
     if extract is not None:
         shape = (bb_extract.height, bb_extract.width, 3)
@@ -1133,11 +1134,12 @@ def angle_between_vectors(v1, v2):
     3.141592...
 
     """
-    l1 = np.linalg.norm(v1)
-    l2 = np.linalg.norm(v2)
-    v1_u = (v1 / l1) if l1 > 0 else np.float32(v1) * 0
-    v2_u = (v2 / l2) if l2 > 0 else np.float32(v2) * 0
-    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+    # pylint: disable=invalid-name
+    length1 = np.linalg.norm(v1)
+    length2 = np.linalg.norm(v2)
+    v1_unit = (v1 / length1) if length1 > 0 else np.float32(v1) * 0
+    v2_unit = (v2 / length2) if length2 > 0 else np.float32(v2) * 0
+    return np.arccos(np.clip(np.dot(v1_unit, v2_unit), -1.0, 1.0))
 
 
 # TODO is this used anywhere?
@@ -1190,24 +1192,24 @@ def compute_line_intersection_point(x1, y1, x2, y2, x3, y3, x4, y4):
         of them), the result is ``False``.
 
     """
-    def _make_line(p1, p2):
-        A = (p1[1] - p2[1])
-        B = (p2[0] - p1[0])
-        C = (p1[0]*p2[1] - p2[0]*p1[1])
-        return A, B, -C
+    # pylint: disable=invalid-name
+    def _make_line(point1, point2):
+        line_y = (point1[1] - point2[1])
+        line_x = (point2[0] - point1[0])
+        slope = (point1[0] * point2[1] - point2[0] * point1[1])
+        return line_y, line_x, -slope
 
-    L1 = _make_line((x1, y1), (x2, y2))
-    L2 = _make_line((x3, y3), (x4, y4))
+    line1 = _make_line((x1, y1), (x2, y2))
+    line2 = _make_line((x3, y3), (x4, y4))
 
-    D = L1[0] * L2[1] - L1[1] * L2[0]
-    Dx = L1[2] * L2[1] - L1[1] * L2[2]
-    Dy = L1[0] * L2[2] - L1[2] * L2[0]
+    D = line1[0] * line2[1] - line1[1] * line2[0]
+    Dx = line1[2] * line2[1] - line1[1] * line2[2]
+    Dy = line1[0] * line2[2] - line1[2] * line2[0]
     if D != 0:
         x = Dx / D
         y = Dy / D
         return x, y
-    else:
-        return False
+    return False
 
 
 # TODO replace by cv2.putText()?
@@ -1264,6 +1266,12 @@ def draw_text(img, y, x, text, color=(0, 255, 0), size=25):
         Input image with text drawn on it.
 
     """
+    from PIL import (
+        Image as PIL_Image,
+        ImageDraw as PIL_ImageDraw,
+        ImageFont as PIL_ImageFont
+    )
+
     assert img.dtype.name in ["uint8", "float32"], (
         "Can currently draw text only on images of dtype 'uint8' or "
         "'float32'. Got dtype %s." % (img.dtype.name,))
@@ -1384,6 +1392,8 @@ def imresize_many_images(images, sizes=None, interpolation=None):
     height ``16`` and width ``32``.
 
     """
+    # pylint: disable=too-many-statements
+
     # we just do nothing if the input contains zero images
     # one could also argue that an exception would be appropriate here
     if len(images) == 0:
@@ -1412,17 +1422,17 @@ def imresize_many_images(images, sizes=None, interpolation=None):
     # but check beforehand if all images have the same shape, then just
     # convert to a single array and de-convert afterwards
     if isinstance(images, list):
-        nb_shapes = len(set([image.shape for image in images]))
+        nb_shapes = len({image.shape for image in images})
         if nb_shapes == 1:
             return list(imresize_many_images(
                 np.array(images), sizes=sizes, interpolation=interpolation))
-        else:
-            return [
-                imresize_many_images(
-                    image[np.newaxis, ...],
-                    sizes=sizes,
-                    interpolation=interpolation)[0, ...]
-                for image in images]
+
+        return [
+            imresize_many_images(
+                image[np.newaxis, ...],
+                sizes=sizes,
+                interpolation=interpolation)[0, ...]
+            for image in images]
 
     shape = images.shape
     assert images.ndim in [3, 4], "Expected array of shape (N, H, W, [C]), " \
@@ -1459,32 +1469,32 @@ def imresize_many_images(images, sizes=None, interpolation=None):
         "Observed shapes were: %s." % (
             str([image.shape for image in images]),))
 
-    ip = interpolation
-    assert ip is None or ip in IMRESIZE_VALID_INTERPOLATIONS, (
+    inter = interpolation
+    assert inter is None or inter in IMRESIZE_VALID_INTERPOLATIONS, (
         "Expected 'interpolation' to be None or one of %s. Got %s." % (
             ", ".join(
                 [str(valid_ip) for valid_ip in IMRESIZE_VALID_INTERPOLATIONS]
             ),
-            str(ip)
+            str(inter)
         )
     )
-    if ip is None:
+    if inter is None:
         if height_target > height_image or width_target > width_image:
-            ip = cv2.INTER_AREA
+            inter = cv2.INTER_AREA
         else:
-            ip = cv2.INTER_LINEAR
-    elif ip in ["nearest", cv2.INTER_NEAREST]:
-        ip = cv2.INTER_NEAREST
-    elif ip in ["linear", cv2.INTER_LINEAR]:
-        ip = cv2.INTER_LINEAR
-    elif ip in ["area", cv2.INTER_AREA]:
-        ip = cv2.INTER_AREA
+            inter = cv2.INTER_LINEAR
+    elif inter in ["nearest", cv2.INTER_NEAREST]:
+        inter = cv2.INTER_NEAREST
+    elif inter in ["linear", cv2.INTER_LINEAR]:
+        inter = cv2.INTER_LINEAR
+    elif inter in ["area", cv2.INTER_AREA]:
+        inter = cv2.INTER_AREA
     else:  # if ip in ["cubic", cv2.INTER_CUBIC]:
-        ip = cv2.INTER_CUBIC
+        inter = cv2.INTER_CUBIC
 
     # TODO find more beautiful way to avoid circular imports
     from . import dtypes as iadt
-    if ip == cv2.INTER_NEAREST:
+    if inter == cv2.INTER_NEAREST:
         iadt.gate_dtypes(
             images,
             allowed=["bool",
@@ -1517,7 +1527,7 @@ def imresize_many_images(images, sizes=None, interpolation=None):
 
         if input_dtype_name == "bool":
             image = image.astype(np.uint8) * 255
-        elif input_dtype_name == "int8" and ip != cv2.INTER_NEAREST:
+        elif input_dtype_name == "int8" and inter != cv2.INTER_NEAREST:
             image = image.astype(np.int16)
         elif input_dtype_name == "float16":
             image = image.astype(np.float32)
@@ -1525,11 +1535,11 @@ def imresize_many_images(images, sizes=None, interpolation=None):
         if nb_channels is not None and nb_channels > 512:
             channels = [
                 cv2.resize(image[..., c], (width_target, height_target),
-                           interpolation=ip) for c in sm.xrange(nb_channels)]
+                           interpolation=inter) for c in sm.xrange(nb_channels)]
             result_img = np.stack(channels, axis=-1)
         else:
             result_img = cv2.resize(
-                image, (width_target, height_target), interpolation=ip)
+                image, (width_target, height_target), interpolation=inter)
 
         assert result_img.dtype.name == image.dtype.name, (
             "Expected cv2.resize() to keep the input dtype '%s', but got "
@@ -1546,7 +1556,7 @@ def imresize_many_images(images, sizes=None, interpolation=None):
 
         if input_dtype_name == "bool":
             result_img = result_img > 127
-        elif input_dtype_name == "int8" and ip != cv2.INTER_NEAREST:
+        elif input_dtype_name == "int8" and inter != cv2.INTER_NEAREST:
             # TODO somehow better avoid circular imports here
             from . import dtypes as iadt
             result_img = iadt.restore_dtypes_(result_img, np.int8)
@@ -1558,10 +1568,12 @@ def imresize_many_images(images, sizes=None, interpolation=None):
     return result
 
 
-def _assert_two_or_three_dims(image):
-    assert image.ndim in [2, 3], (
+def _assert_two_or_three_dims(shape):
+    if hasattr(shape, "shape"):
+        shape = shape.shape
+    assert len(shape) in [2, 3], (
         "Expected image with two or three dimensions, but got %d dimensions "
-        "and shape %s." % (image.ndim, image.shape))
+        "and shape %s." % (len(shape), shape))
 
 
 def imresize_single_image(image, sizes, interpolation=None):
@@ -1601,441 +1613,6 @@ def imresize_single_image(image, sizes, interpolation=None):
     if grayscale:
         return rs[0, :, :, 0]
     return rs[0, ...]
-
-
-# TODO move this to augmenters.size
-def pad(arr, top=0, right=0, bottom=0, left=0, mode="constant", cval=0):
-    """Pad an image-like array on its top/right/bottom/left side.
-
-    This function is a wrapper around :func:`numpy.pad`.
-
-    dtype support::
-
-        * ``uint8``: yes; fully tested (1)
-        * ``uint16``: yes; fully tested (1)
-        * ``uint32``: yes; fully tested (2) (3)
-        * ``uint64``: yes; fully tested (2) (3)
-        * ``int8``: yes; fully tested (1)
-        * ``int16``: yes; fully tested (1)
-        * ``int32``: yes; fully tested (1)
-        * ``int64``: yes; fully tested (2) (3)
-        * ``float16``: yes; fully tested (2) (3)
-        * ``float32``: yes; fully tested (1)
-        * ``float64``: yes; fully tested (1)
-        * ``float128``: yes; fully tested (2) (3)
-        * ``bool``: yes; tested (2) (3)
-
-        - (1) Uses ``cv2`` if `mode` is one of: ``"constant"``, ``"edge"``,
-              ``"reflect"``, ``"symmetric"``. Otherwise uses ``numpy``.
-        - (2) Uses ``numpy``.
-        - (3) Rejected by ``cv2``.
-
-    Parameters
-    ----------
-    arr : (H,W) ndarray or (H,W,C) ndarray
-        Image-like array to pad.
-
-    top : int, optional
-        Amount of pixels to add to the top side of the image.
-        Must be ``0`` or greater.
-
-    right : int, optional
-        Amount of pixels to add to the right side of the image.
-        Must be ``0`` or greater.
-
-    bottom : int, optional
-        Amount of pixels to add to the bottom side of the image.
-        Must be ``0`` or greater.
-
-    left : int, optional
-        Amount of pixels to add to the left side of the image.
-        Must be ``0`` or greater.
-
-    mode : str, optional
-        Padding mode to use. See :func:`numpy.pad` for details.
-        In case of mode ``constant``, the parameter `cval` will be used as
-        the ``constant_values`` parameter to :func:`numpy.pad`.
-        In case of mode ``linear_ramp``, the parameter `cval` will be used as
-        the ``end_values`` parameter to :func:`numpy.pad`.
-
-    cval : number, optional
-        Value to use for padding if `mode` is ``constant``.
-        See :func:`numpy.pad` for details. The cval is expected to match the
-        input array's dtype and value range.
-
-    Returns
-    -------
-    (H',W') ndarray or (H',W',C) ndarray
-        Padded array with height ``H'=H+top+bottom`` and width
-        ``W'=W+left+right``.
-
-    """
-    import imgaug.dtypes as iadt
-
-    _assert_two_or_three_dims(arr)
-    assert all([v >= 0 for v in [top, right, bottom, left]]), (
-        "Expected padding amounts that are >=0, but got %d, %d, %d, %d "
-        "(top, right, botto, left)" % (top, right, bottom, left))
-
-    if top > 0 or right > 0 or bottom > 0 or left > 0:
-        min_value, _, max_value = iadt.get_value_range_of_dtype(arr.dtype)
-
-        # without the if here there are crashes for float128, e.g. if
-        # cval is an int (just using float(cval) seems to not be accurate
-        # enough)
-        if arr.dtype.name == "float128":
-            cval = np.float128(cval)
-
-        cval = max(min(cval, max_value), min_value)
-
-        # Note that copyMakeBorder() hangs/runs endlessly if arr has an
-        # axis of size 0 and mode is "reflect".
-        # Numpy also complains in these cases if mode is not "constant".
-        has_zero_sized_axis = any([axis == 0 for axis in arr.shape])
-        if has_zero_sized_axis:
-            mode = "constant"
-
-        mapping_mode_np_to_cv2 = {
-            "constant": cv2.BORDER_CONSTANT,
-            "edge": cv2.BORDER_REPLICATE,
-            "linear_ramp": None,
-            "maximum": None,
-            "mean": None,
-            "median": None,
-            "minimum": None,
-            "reflect": cv2.BORDER_REFLECT_101,
-            "symmetric": cv2.BORDER_REFLECT,
-            "wrap": None,
-            cv2.BORDER_CONSTANT: cv2.BORDER_CONSTANT,
-            cv2.BORDER_REPLICATE: cv2.BORDER_REPLICATE,
-            cv2.BORDER_REFLECT_101: cv2.BORDER_REFLECT_101,
-            cv2.BORDER_REFLECT: cv2.BORDER_REFLECT
-        }
-        bad_mode_cv2 = mapping_mode_np_to_cv2.get(mode, None) is None
-
-        # these datatypes all simply generate a "TypeError: src data type = X
-        # is not supported" error
-        bad_datatype_cv2 = (
-            arr.dtype.name
-            in ["uint32", "uint64", "int64", "float16", "float128", "bool"]
-        )
-
-        # OpenCV turns the channel axis for arrays with 0 channels to 512
-        # TODO add direct test for this. indirectly tested via Pad
-        bad_shape_cv2 = (arr.ndim == 3 and arr.shape[-1] == 0)
-
-        if not bad_datatype_cv2 and not bad_mode_cv2 and not bad_shape_cv2:
-            cval = (
-                float(cval)
-                if arr.dtype.kind == "f"
-                else int(cval)
-            )  # results in TypeError otherwise for np inputs
-
-            if arr.ndim == 2 or arr.shape[2] <= 4:
-                # without this, only the first channel is padded with the cval,
-                # all following channels with 0
-                if arr.ndim == 3:
-                    cval = tuple([cval] * arr.shape[2])
-
-                arr_pad = cv2.copyMakeBorder(
-                    arr, top=top, bottom=bottom, left=left, right=right,
-                    borderType=mapping_mode_np_to_cv2[mode], value=cval)
-                if arr.ndim == 3 and arr_pad.ndim == 2:
-                    arr_pad = arr_pad[..., np.newaxis]
-            else:
-                result = []
-                channel_start_idx = 0
-                while channel_start_idx < arr.shape[2]:
-                    arr_c = arr[..., channel_start_idx:channel_start_idx+4]
-                    cval_c = tuple([cval] * arr_c.shape[2])
-                    arr_pad_c = cv2.copyMakeBorder(
-                        arr_c, top=top, bottom=bottom, left=left, right=right,
-                        borderType=mapping_mode_np_to_cv2[mode], value=cval_c)
-                    arr_pad_c = np.atleast_3d(arr_pad_c)
-                    result.append(arr_pad_c)
-                    channel_start_idx += 4
-                arr_pad = np.concatenate(result, axis=2)
-        else:
-            # paddings for 2d case
-            paddings_np = [(top, bottom), (left, right)]
-
-            # add paddings for 3d case
-            if arr.ndim == 3:
-                paddings_np.append((0, 0))
-
-            if mode == "constant":
-                arr_pad = np.pad(arr, paddings_np, mode=mode,
-                                 constant_values=cval)
-            elif mode == "linear_ramp":
-                arr_pad = np.pad(arr, paddings_np, mode=mode,
-                                 end_values=cval)
-            else:
-                arr_pad = np.pad(arr, paddings_np, mode=mode)
-
-        return arr_pad
-    return np.copy(arr)
-
-
-# TODO allow shape as input instead of array
-def compute_paddings_for_aspect_ratio(arr, aspect_ratio):
-    """Compute pad amounts required to fulfill an aspect ratio.
-
-    "Pad amounts" here denotes the number of pixels that have to be added to
-    each side to fulfill the desired constraint.
-
-    The aspect ratio is given as ``ratio = width / height``.
-    Depending on which dimension is smaller (height or width), only the
-    corresponding sides (top/bottom or left/right) will be padded.
-
-    The axis-wise padding amounts are always distributed equally over the
-    sides of the respective axis (i.e. left and right, top and bottom). For
-    odd pixel amounts, one pixel will be left over after the equal
-    distribution and could be added to either side of the axis. This function
-    will always add such a left over pixel to the bottom (y-axis) or
-    right (x-axis) side.
-
-    Parameters
-    ----------
-    arr : (H,W) ndarray or (H,W,C) ndarray
-        Image-like array for which to compute pad amounts.
-
-    aspect_ratio : float
-        Target aspect ratio, given as width/height. E.g. ``2.0`` denotes the
-        image having twice as much width as height.
-
-    Returns
-    -------
-    tuple of int
-        Required padding amounts to reach the target aspect ratio, given as a
-        ``tuple`` of the form ``(top, right, bottom, left)``.
-
-    """
-    _assert_two_or_three_dims(arr)
-    assert aspect_ratio > 0, (
-        "Expected to get an aspect ratio >0, got %.4f." % (aspect_ratio,))
-    assert arr.shape[0] > 0, (
-        "Expected to get an array with height >0, got shape %s." % (
-            arr.shape,))
-
-    height, width = arr.shape[0:2]
-    aspect_ratio_current = width / height
-
-    pad_top = 0
-    pad_right = 0
-    pad_bottom = 0
-    pad_left = 0
-
-    if aspect_ratio_current < aspect_ratio:
-        # vertical image, height > width
-        diff = (aspect_ratio * height) - width
-        pad_right = int(np.ceil(diff / 2))
-        pad_left = int(np.floor(diff / 2))
-    elif aspect_ratio_current > aspect_ratio:
-        # horizontal image, width > height
-        diff = ((1/aspect_ratio) * width) - height
-        pad_top = int(np.floor(diff / 2))
-        pad_bottom = int(np.ceil(diff / 2))
-
-    return pad_top, pad_right, pad_bottom, pad_left
-
-
-def pad_to_aspect_ratio(arr, aspect_ratio, mode="constant", cval=0,
-                        return_pad_amounts=False):
-    """Pad an image array on its sides so that it matches a target aspect ratio.
-
-    See :func:`imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
-    explanation of how the required padding amounts are distributed per
-    image axis.
-
-    dtype support::
-
-        See :func:`imgaug.imgaug.pad`.
-
-    Parameters
-    ----------
-    arr : (H,W) ndarray or (H,W,C) ndarray
-        Image-like array to pad.
-
-    aspect_ratio : float
-        Target aspect ratio, given as width/height. E.g. ``2.0`` denotes the
-        image having twice as much width as height.
-
-    mode : str, optional
-        Padding mode to use. See :func:`imgaug.imgaug.pad` for details.
-
-    cval : number, optional
-        Value to use for padding if `mode` is ``constant``.
-        See :func:`numpy.pad` for details.
-
-    return_pad_amounts : bool, optional
-        If ``False``, then only the padded image will be returned. If
-        ``True``, a ``tuple`` with two entries will be returned, where the
-        first entry is the padded image and the second entry are the amounts
-        by which each image side was padded. These amounts are again a
-        ``tuple`` of the form ``(top, right, bottom, left)``, with each value
-        being an ``int``.
-
-    Returns
-    -------
-    (H',W') ndarray or (H',W',C) ndarray
-        Padded image as ``(H',W')`` or ``(H',W',C)`` ndarray, fulfilling the
-        given `aspect_ratio`.
-
-    tuple of int
-        Amounts by which the image was padded on each side, given as a
-        ``tuple`` ``(top, right, bottom, left)``.
-        This ``tuple`` is only returned if `return_pad_amounts` was set to
-        ``True``.
-
-    """
-    pad_top, pad_right, pad_bottom, pad_left = \
-        compute_paddings_for_aspect_ratio(arr, aspect_ratio)
-    arr_padded = pad(
-        arr,
-        top=pad_top,
-        right=pad_right,
-        bottom=pad_bottom,
-        left=pad_left,
-        mode=mode,
-        cval=cval
-    )
-
-    if return_pad_amounts:
-        return arr_padded, (pad_top, pad_right, pad_bottom, pad_left)
-    return arr_padded
-
-
-# TODO allow shape as input instead of array
-def compute_paddings_to_reach_multiples_of(arr, height_multiple,
-                                           width_multiple):
-    """Compute pad amounts until img height/width are multiples of given values.
-
-    See :func:`imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
-    explanation of how the required padding amounts are distributed per
-    image axis.
-
-    Parameters
-    ----------
-    arr : (H,W) ndarray or (H,W,C) ndarray
-        Image-like array for which to compute pad amounts.
-
-    height_multiple : None or int
-        The desired multiple of the height. The computed padding amount will
-        reflect a padding that increases the y axis size until it is a multiple
-        of this value.
-
-    width_multiple : None or int
-        The desired multiple of the width. The computed padding amount will
-        reflect a padding that increases the x axis size until it is a multiple
-        of this value.
-
-    Returns
-    -------
-    tuple of int
-        Required padding amounts to reach multiples of the provided values,
-        given as a ``tuple`` of the form ``(top, right, bottom, left)``.
-
-    """
-    def _compute_axis_value(axis_size, multiple):
-        if multiple is None:
-            return 0, 0
-        if axis_size == 0:
-            to_pad = multiple
-        elif axis_size % multiple == 0:
-            to_pad = 0
-        else:
-            to_pad = multiple - (axis_size % multiple)
-        return int(np.floor(to_pad/2)), int(np.ceil(to_pad/2))
-
-    _assert_two_or_three_dims(arr)
-
-    if height_multiple is not None:
-        assert height_multiple > 0, (
-            "Can only pad to multiples of 1 or larger, got %d." % (
-                height_multiple,))
-    if width_multiple is not None:
-        assert width_multiple > 0, (
-            "Can only pad to multiples of 1 or larger, got %d." % (
-                height_multiple,))
-
-    height, width = arr.shape[0:2]
-
-    pad_top, pad_bottom = _compute_axis_value(height, height_multiple)
-    pad_left, pad_right = _compute_axis_value(width, width_multiple)
-
-    return pad_top, pad_right, pad_bottom, pad_left
-
-
-def pad_to_multiples_of(arr, height_multiple, width_multiple, mode="constant",
-                        cval=0, return_pad_amounts=False):
-    """Pad an image array until its side lengths are multiples of given values.
-
-    See :func:`imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
-    explanation of how the required padding amounts are distributed per
-    image axis.
-
-    dtype support::
-
-        See :func:`imgaug.imgaug.pad`.
-
-    Parameters
-    ----------
-    arr : (H,W) ndarray or (H,W,C) ndarray
-        Image-like array to pad.
-
-    height_multiple : None or int
-        The desired multiple of the height. The computed padding amount will
-        reflect a padding that increases the y axis size until it is a multiple
-        of this value.
-
-    width_multiple : None or int
-        The desired multiple of the width. The computed padding amount will
-        reflect a padding that increases the x axis size until it is a multiple
-        of this value.
-
-    mode : str, optional
-        Padding mode to use. See :func:`imgaug.imgaug.pad` for details.
-
-    cval : number, optional
-        Value to use for padding if `mode` is ``constant``.
-        See :func:`numpy.pad` for details.
-
-    return_pad_amounts : bool, optional
-        If ``False``, then only the padded image will be returned. If
-        ``True``, a ``tuple`` with two entries will be returned, where the
-        first entry is the padded image and the second entry are the amounts
-        by which each image side was padded. These amounts are again a
-        ``tuple`` of the form ``(top, right, bottom, left)``, with each value
-        being an integer.
-
-    Returns
-    -------
-    (H',W') ndarray or (H',W',C) ndarray
-        Padded image as ``(H',W')`` or ``(H',W',C)`` ndarray.
-
-    tuple of int
-        Amounts by which the image was padded on each side, given as a
-        ``tuple`` ``(top, right, bottom, left)``.
-        This ``tuple`` is only returned if `return_pad_amounts` was set to
-        ``True``.
-
-    """
-    pad_top, pad_right, pad_bottom, pad_left = \
-        compute_paddings_to_reach_multiples_of(
-            arr, height_multiple, width_multiple)
-    arr_padded = pad(
-        arr,
-        top=pad_top,
-        right=pad_right,
-        bottom=pad_bottom,
-        left=pad_left,
-        mode=mode,
-        cval=cval
-    )
-
-    if return_pad_amounts:
-        return arr_padded, (pad_top, pad_right, pad_bottom, pad_left)
-    return arr_padded
 
 
 def pool(arr, block_size, func, pad_mode="constant", pad_cval=0,
@@ -2106,11 +1683,13 @@ def pool(arr, block_size, func, pad_mode="constant", pad_cval=0,
         Array after pooling.
 
     """
+    # TODO find better way to avoid circular import
+    from . import dtypes as iadt
+    from .augmenters import size as iasize
+
     if arr.size == 0:
         return np.copy(arr)
 
-    # TODO find better way to avoid circular import
-    from . import dtypes as iadt
     iadt.gate_dtypes(arr,
                      allowed=["bool",
                               "uint8", "uint16", "uint32",
@@ -2144,7 +1723,7 @@ def pool(arr, block_size, func, pad_mode="constant", pad_cval=0,
     # We use custom padding here instead of the one from block_reduce(),
     # because (1) it is expected to be faster and (2) it allows us more
     # flexibility wrt to padding modes.
-    arr = pad_to_multiples_of(
+    arr = iasize.pad_to_multiples_of(
         arr,
         height_multiple=block_size[0],
         width_multiple=block_size[1],
@@ -2409,10 +1988,10 @@ def draw_grid(images, rows=None, cols=None):
         assert all([image.ndim == 3 for image in images]), (
             "Expected to get images with three dimensions. Got shapes %s." % (
                 ", ".join([str(image.shape) for image in images])))
-        assert len(set([image.dtype.name for image in images])) == 1, (
+        assert len({image.dtype.name for image in images}) == 1, (
             "Expected to get images with the same dtypes, got dtypes %s." % (
                 ", ".join([image.dtype.name for image in images])))
-        assert len(set([image.shape[-1] for image in images])) == 1, (
+        assert len({image.shape[-1] for image in images}) == 1, (
             "Expected to get images with the same number of channels, "
             "got shapes %s." % (
                 ", ".join([str(image.shape) for image in images])))
@@ -2434,8 +2013,8 @@ def draw_grid(images, rows=None, cols=None):
 
     width = cell_width * cols
     height = cell_height * rows
-    dt = images.dtype if is_np_array(images) else images[0].dtype
-    grid = np.zeros((height, width, nb_channels), dtype=dt)
+    dtype = images.dtype if is_np_array(images) else images[0].dtype
+    grid = np.zeros((height, width, nb_channels), dtype=dtype)
     cell_idx = 0
     for row_idx in sm.xrange(rows):
         for col_idx in sm.xrange(cols):
@@ -2713,7 +2292,6 @@ class HooksHeatmaps(HooksImages):
     not change in the future.
 
     """
-    pass
 
 
 class HooksKeypoints(HooksImages):
@@ -2725,7 +2303,6 @@ class HooksKeypoints(HooksImages):
     not change in the future.
 
     """
-    pass
 
 
 #####################################################################
@@ -2735,6 +2312,7 @@ class HooksKeypoints(HooksImages):
 
 def _mark_moved_class_or_function(class_name_old, module_name_new,
                                   class_name_new):
+    # pylint: disable=redefined-outer-name
     class_name_new = (class_name_new
                       if class_name_new is not None
                       else class_name_old)
@@ -2770,7 +2348,14 @@ MOVED = [
      None),
     ("_interpolate_point_pair", "imgaug.augmentables.polys", None),
     ("_interpolate_points", "imgaug.augmentables.polys", None),
-    ("_interpolate_points_by_max_distance", "imgaug.augmentables.polys", None)
+    ("_interpolate_points_by_max_distance", "imgaug.augmentables.polys", None),
+    ("pad", "imgaug.augmenters.size", None),
+    ("pad_to_aspect_ratio", "imgaug.augmenters.size", None),
+    ("pad_to_multiples_of", "imgaug.augmenters.size", None),
+    ("compute_paddings_for_aspect_ratio", "imgaug.augmenters.size",
+     "compute_paddings_to_reach_aspect_ratio"),
+    ("compute_paddings_to_reach_multiples_of", "imgaug.augmenters.size", None),
+    ("compute_paddings_to_reach_exponents_of", "imgaug.augmenters.size", None)
 ]
 
 for class_name_old, module_name_new, class_name_new in MOVED:
