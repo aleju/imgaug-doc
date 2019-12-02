@@ -141,7 +141,7 @@ def checkerboard(size):
     return ia.imresize_single_image(img3d, size)
 
 
-def run_and_save_augseq(filename, augseq, images, cols, rows, quality=75,
+def run_and_save_augseq(filename, augseq, images, cols, rows, quality=95,
                         seed=1, image_colorspace="RGB"):
     ia.seed(seed)
     # augseq may be a single seq (applied to all images) or a list (one seq per
