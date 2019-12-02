@@ -10,10 +10,17 @@ from .utils import run_and_save_augseq, checkerboard, save
 
 def main():
     chapter_augmenters_affine()
+    chapter_augmenters_scalex()
+    chapter_augmenters_scaley()
+    chapter_augmenters_translatex()
+    chapter_augmenters_translatey()
+    chapter_augmenters_rotate()
     chapter_augmenters_piecewiseaffine()
     chapter_augmenters_perspectivetransform()
     chapter_augmenters_elastictransformation()
     chapter_augmenters_rot90()
+    chapter_augmenters_withpolarwarping()
+    chapter_augmenters_jigsaw()
 
 
 def chapter_augmenters_affine():
@@ -58,6 +65,71 @@ def chapter_augmenters_affine():
         "geometric/affine_fill.jpg", aug,
         [ia.quokka(size=(64, 64)) for _ in range(16)], cols=8, rows=2
     )
+
+
+def chapter_augmenters_scalex():
+    fn_start = "geometric/scalex"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.ScaleX((0.5, 1.5))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+
+def chapter_augmenters_scaley():
+    fn_start = "geometric/scaley"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.ScaleY((0.5, 1.5))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+
+def chapter_augmenters_translatex():
+    fn_start = "geometric/translatex"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.TranslateX(px=(-20, 20))
+    run_and_save_augseq(
+        fn_start + "_absolute.jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.TranslateX(percent=(-0.1, 0.1))
+    run_and_save_augseq(
+        fn_start + "_relative.jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+
+def chapter_augmenters_translatey():
+    fn_start = "geometric/translatey"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.TranslateY(px=(-20, 20))
+    run_and_save_augseq(
+        fn_start + "_absolute.jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.TranslateY(percent=(-0.1, 0.1))
+    run_and_save_augseq(
+        fn_start + "_relative.jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+
+def chapter_augmenters_rotate():
+    fn_start = "geometric/rotate"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.Rotate((-45, 45))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
 
 
 def chapter_augmenters_piecewiseaffine():
@@ -148,6 +220,55 @@ def chapter_augmenters_rot90():
     aug = iaa.Rot90((1, 3), keep_size=False)
     run_and_save_augseq(
         fn_start + "_keep_size_false.jpg", aug,
+        [image for _ in range(4*2)], cols=4, rows=2)
+
+
+def chapter_augmenters_withpolarwarping():
+    fn_start = "geometric/withpolarwarping"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.WithPolarWarping(iaa.CropAndPad(percent=(-0.1, 0.1)))
+    run_and_save_augseq(
+        fn_start + "_cropandpad.jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.WithPolarWarping(
+        iaa.Affine(
+            translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
+            rotate=(-35, 35),
+            scale=(0.8, 1.2),
+            shear={"x": (-15, 15), "y": (-15, 15)}
+        )
+    )
+    run_and_save_augseq(
+        fn_start + "_affine.jpg", aug,
+        [image for _ in range(4*4)], cols=4, rows=4)
+
+    aug = iaa.WithPolarWarping(iaa.AveragePooling((2, 8)))
+    run_and_save_augseq(
+        fn_start + "_averagepooling.jpg", aug,
+        [image for _ in range(4*2)], cols=4, rows=2)
+
+
+def chapter_augmenters_jigsaw():
+    fn_start = "geometric/jigsaw"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.Jigsaw(nb_rows=10, nb_cols=10)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+    aug = iaa.Jigsaw(nb_rows=(1, 4), nb_cols=(1, 4))
+    run_and_save_augseq(
+        fn_start + "_random_grid.jpg", aug,
+        [image for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.Jigsaw(nb_rows=10, nb_cols=10, max_steps=(1, 5))
+    run_and_save_augseq(
+        fn_start + "_random_max_steps.jpg", aug,
         [image for _ in range(4*2)], cols=4, rows=2)
 
 

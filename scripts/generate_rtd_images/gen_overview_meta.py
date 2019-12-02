@@ -3,6 +3,7 @@ from __future__ import print_function, division
 import imgaug as ia
 import imgaug.augmenters as iaa
 
+from . import utils
 from .utils import run_and_save_augseq
 
 
@@ -17,6 +18,8 @@ def main():
     chapter_augmenters_assertlambda()
     chapter_augmenters_assertshape()
     chapter_augmenters_channelshuffle()
+    chapter_augmenters_removecbasbyoutofimagefraction()
+    chapter_augmenters_clipcbastoimageplanes()
 
 
 def chapter_augmenters_sequential():
@@ -165,6 +168,82 @@ def chapter_augmenters_channelshuffle():
     run_and_save_augseq(
         fn_start + "_limited_channels.jpg", aug,
         [ia.quokka(size=(64, 64)) for _ in range(8*3)], cols=8, rows=3
+    )
+
+
+def chapter_augmenters_removecbasbyoutofimagefraction():
+    fn_start = "meta/removecbasbyoutofimagefraction"
+
+    image = ia.quokka_square((100, 100))
+    bb = ia.BoundingBox(x1=50-25, y1=0, x2=50+25, y2=100)
+    bbsoi = ia.BoundingBoxesOnImage([bb], shape=image.shape)
+
+    # example 1
+    aug = iaa.Sequential([
+        iaa.Affine(translate_px={"x": (-100, 100)}),
+        iaa.RemoveCBAsByOutOfImageFraction(0.5)
+    ])
+
+    images_aug, bbsois_aug = aug(images=[image] * (2*4),
+                                 bounding_boxes=[bbsoi] * (2*4))
+    images_drawn = [bbsoi_aug.draw_on_image(image_aug)
+                    for image_aug, bbsoi_aug in zip(images_aug, bbsois_aug)]
+
+    utils.save(
+        "overview_of_augmenters",
+        fn_start + ".jpg",
+        utils.grid(images_drawn, cols=6, rows=3),
+        quality=95
+    )
+
+    # example 2
+    aug_without = iaa.Affine(translate_px={"x": 51})
+    aug_with = iaa.Sequential([
+        iaa.Affine(translate_px={"x": 51}),
+        iaa.RemoveCBAsByOutOfImageFraction(0.5)
+    ])
+
+    image_without, bbsoi_without = aug_without(
+        image=image, bounding_boxes=bbsoi)
+    image_with, bbsoi_with = aug_with(
+        image=image, bounding_boxes=bbsoi)
+
+    assert len(bbsoi_without.bounding_boxes) == 1
+    assert len(bbsoi_with.bounding_boxes) == 0
+
+    images_aug = [bbsoi_without.draw_on_image(image_without),
+                  bbsoi_with.draw_on_image(image_with)]
+
+    utils.save(
+        "overview_of_augmenters",
+        fn_start + "_comparison.jpg",
+        utils.grid(images_aug, cols=2, rows=1),
+        quality=95
+    )
+
+
+def chapter_augmenters_clipcbastoimageplanes():
+    fn_start = "meta/clipcbastoimageplanes"
+
+    image = ia.quokka_square((100, 100))
+    bb = ia.BoundingBox(x1=50-25, y1=0, x2=50+25, y2=100)
+    bbsoi = ia.BoundingBoxesOnImage([bb], shape=image.shape)
+
+    aug = iaa.Sequential([
+        iaa.Affine(translate_px={"x": (-100, 100)}),
+        iaa.ClipCBAsToImagePlanes()
+    ])
+
+    images_aug, bbsois_aug = aug(images=[image] * (2*4),
+                                 bounding_boxes=[bbsoi] * (2*4))
+    images_drawn = [bbsoi_aug.draw_on_image(image_aug)
+                    for image_aug, bbsoi_aug in zip(images_aug, bbsois_aug)]
+
+    utils.save(
+        "overview_of_augmenters",
+        fn_start + ".jpg",
+        utils.grid(images_drawn, cols=4, rows=2),
+        quality=95
     )
 
 
