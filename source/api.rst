@@ -10,6 +10,7 @@ API
    api_dtypes
    api_random
    api_validation
+   api_augmentables_base
    api_augmentables_batches
    api_augmentables_bbs
    api_augmentables_heatmaps
@@ -21,11 +22,13 @@ API
    api_augmentables_utils
    api_augmenters_meta
    api_augmenters_arithmetic
+   api_augmenters_artistic
    api_augmenters_blend
    api_augmenters_blur
    api_augmenters_color
    api_augmenters_contrast
    api_augmenters_convolutional
+   api_augmenters_debug
    api_augmenters_edges
    api_augmenters_flip
    api_augmenters_geometric
