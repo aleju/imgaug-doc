@@ -338,6 +338,80 @@ to 0 while others remain untouched::
     :alt: CoarseDropout per channel
 
 
+Dropout2D
+---------
+
+Drop random channels from images.
+
+For image data, dropped channels will be filled with zeros.
+
+.. note::
+
+    This augmenter may also set the arrays of heatmaps and segmentation
+    maps to zero and remove all coordinate-based data (e.g. it removes
+    all bounding boxes on images that were filled with zeros).
+    It does so if and only if *all* channels of an image are dropped.
+    If ``nb_keep_channels >= 1`` then that never happens.
+
+API link: :func:`~imgaug.augmenters.arithmetic.Dropout2d`
+
+**Example.**
+Create a dropout augmenter that drops on average half of all image
+channels. Dropped channels will be filled with zeros. At least one
+channel is kept unaltered in each image (default setting). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Dropout2d(p=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/dropout2d.jpg
+    :alt: Dropout2d
+
+**Example.**
+Create a dropout augmenter that drops on average half of all image
+channels *and* may drop *all* channels in an image (i.e. images may
+contain nothing but zeros)::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Dropout2d(p=0.5, nb_keep_channels=0)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/dropout2d_keep_no_channels.jpg
+    :alt: Dropout2d with nb_keep_channels=0
+
+
+TotalDropout
+------------
+
+Drop all channels of a defined fraction of all images.
+
+For image data, all components of dropped images will be filled with zeros.
+
+.. note::
+
+    This augmenter also sets the arrays of heatmaps and segmentation
+    maps to zero and removes all coordinate-based data (e.g. it removes
+    all bounding boxes on images that were filled with zeros).
+
+API link: :func:`~imgaug.augmenters.arithmetic.TotalDropout`
+
+**Example.**
+Create an augmenter that sets *all* components of all images to zero::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.TotalDropout(1.0)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/totaldropout_100_percent.jpg
+    :alt: TotalDropout at 100%
+
+**Example.**
+Create an augmenter that sets *all* components of ``50%`` of all images to
+zero::
+
+    aug = iaa.TotalDropout(0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/totaldropout_50_percent.jpg
+    :alt: TotalDropout at 50%
+
+
 ReplaceElementwise
 ------------------
 
@@ -608,6 +682,29 @@ For 50% of all images, invert all pixels in these images with 25% probability
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/invert_per_channel.jpg
     :alt: Invert per channel
+
+
+Solarize
+--------
+
+Invert all values above a threshold in images.
+
+This is the same as :class:`Invert`, but sets a default threshold around
+``128`` (+/- 64, decided per image) and default `invert_above_threshold`
+to ``True`` (i.e. only values above the threshold will be inverted).
+
+API link: :class:`~imgaug.augmenters.arithmetic.Solarize`
+
+**Example.**
+Invert the colors in ``50`` percent of all images for pixels with a
+value between ``32`` and ``128`` or more. The threshold is sampled once
+per image. The thresholding operation happens per channel. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Solarize(0.5, threshold=(32, 128))
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/solarize.jpg
+    :alt: Solarize
 
 
 ContrastNormalization

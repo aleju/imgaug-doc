@@ -125,6 +125,58 @@ Same as in the previous example, but ``alpha`` is sampled once per image
     :alt: LinearContrast per_channel
 
 
+Equalize
+--------
+
+Equalize the image histogram.
+
+This augmenter is identical in inputs and outputs to
+:func:`PIL.ImageOps.equalize`.
+
+API link: :func:`~imgaug.augmenters.contrast.Equalize`
+
+**Example.**
+Equalize the histograms of all input images::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Equalize()
+
+.. figure:: ../../images/overview_of_augmenters/contrast/equalize.jpg
+    :alt: Equalize
+
+
+Autocontrast
+------------
+
+Adjust contrast by cutting off ``p%`` of lowest/highest histogram values.
+
+This augmenter is analogous to :func:`PIL.ImageOps.autocontrast`.
+
+See :func:`imgaug.augmenters.contrast.autocontrast` for more details.
+
+API link: :func:`~imgaug.augmenters.contrast.Autocontrast`
+
+**Example.**
+Modify the contrast of images by cutting off the ``0`` to ``20%`` lowest
+and highest values from the histogram, then stretching it to full length::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Autocontrast()
+
+.. figure:: ../../images/overview_of_augmenters/contrast/autocontrast.jpg
+    :alt: Autocontrast
+
+**Example.**
+Modify the contrast of images by cutting off the ``10`` to ``20%`` lowest
+and highest values from the histogram, then stretching it to full length.
+The cutoff value is sampled per *channel* instead of per *image*. ::
+
+    aug = iaa.Autocontrast((10, 20), per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/contrast/autocontrast_cutoff_per_channel.jpg
+    :alt: Autocontrast with custom cutoff and per_channel
+
+
 AllChannelsCLAHE
 ----------------
 

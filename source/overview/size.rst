@@ -52,7 +52,7 @@ Crop/pad images by pixel amounts or fractions of image sizes.
 Cropping removes pixels at the sides (i.e. extracts a subimage from
 a given full image). Padding adds pixels to the sides (e.g. black pixels).
 
-.. note ::
+.. note::
 
     This augmenter automatically resizes images back to their original size
     after it has augmented them. To deactivate this, add the
@@ -266,6 +266,428 @@ distorted appearance. ::
 
 .. figure:: ../../images/overview_of_augmenters/size/padtofixedsize_with_croptofixedsize.jpg
     :alt: Pad and crop to 100x100
+
+
+PadToMultiplesOf
+----------------
+
+Pad images until their height/width is a multiple of a value.
+
+API link: :class:`~imgaug.augmenters.size.PadToMultiplesOf`
+
+**Example.**
+Create an augmenter that pads images to multiples of ``10`` along
+the y-axis (i.e. 10, 20, 30, ...) and to multiples of ``6`` along the
+x-axis (i.e. 6, 12, 18, ...).
+The rows to be padded will be spread *randomly* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.PadToMultiplesOf(height_multiple=10, width_multiple=6)
+
+
+CropToMultiplesOf
+-----------------
+
+Crop images down until their height/width is a multiple of a value.
+
+.. note::
+
+    For a given axis size ``A`` and multiple ``M``, if ``A`` is in the
+    interval ``[0 .. M]``, the axis will not be changed.
+    As a result, this augmenter can still produce axis sizes that are
+    not multiples of the given values.
+
+API link: :class:`~imgaug.augmenters.size.CropToMultiplesOf`
+
+**Example.**
+Create an augmenter that crops images to multiples of ``10`` along
+the y-axis (i.e. 10, 20, 30, ...) and to multiples of ``6`` along the
+x-axis (i.e. 6, 12, 18, ...).
+The rows to be cropped will be spread *randomly* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CropToMultiplesOf(height_multiple=10, width_multiple=6)
+
+
+CropToPowersOf
+--------------
+
+Crop images until their height/width is a power of a base.
+
+This augmenter removes pixels from an axis with size ``S`` leading to the
+new size ``S'`` until ``S' = B^E`` is fulfilled, where ``B`` is a
+provided base (e.g. ``2``) and ``E`` is an exponent from the discrete
+interval ``[1 .. inf)``.
+
+.. note::
+
+    This augmenter does nothing for axes with size less than ``B^1 = B``.
+    If you have images with ``S < B^1``, it is recommended
+    to combine this augmenter with a padding augmenter that pads each
+    axis up to ``B``.
+
+API link: :class:`~imgaug.augmenters.size.CropToPowersOf`
+
+**Example.**
+Create an augmenter that crops each image down to powers of ``3`` along
+the y-axis (i.e. 3, 9, 27, ...) and powers of ``2`` along the x-axis (i.e.
+2, 4, 8, 16, ...).
+The rows to be cropped will be spread *randomly* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CropToPowersOf(height_base=3, width_base=2)
+
+
+PadToPowersOf
+-------------
+
+Pad images until their height/width is a power of a base.
+
+This augmenter adds pixels to an axis with size ``S`` leading to the
+new size ``S'`` until ``S' = B^E`` is fulfilled, where ``B`` is a
+provided base (e.g. ``2``) and ``E`` is an exponent from the discrete
+interval ``[1 .. inf)``.
+
+API link: :class:`~imgaug.augmenters.size.PadToPowersOf`
+
+**Example.**
+Create an augmenter that pads each image to powers of ``3`` along the
+y-axis (i.e. 3, 9, 27, ...) and powers of ``2`` along the x-axis (i.e. 2,
+4, 8, 16, ...).
+The rows to be padded will be spread *randomly* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.PadToPowersOf(height_base=3, width_base=2)
+
+
+CropToAspectRatio
+-----------------
+
+Crop images until their width/height matches an aspect ratio.
+
+This augmenter removes either rows or columns until the image reaches
+the desired aspect ratio given in ``width / height``. The cropping
+operation is stopped once the desired aspect ratio is reached or the image
+side to crop reaches a size of ``1``. If any side of the image starts
+with a size of ``0``, the image will not be changed.
+
+API link: :class:`~imgaug.augmenters.size.CropToAspectRatio`
+
+**Example.**
+Create an augmenter that crops each image until its aspect ratio is as
+close as possible to ``2.0`` (i.e. two times as many pixels along the
+x-axis than the y-axis).
+The rows to be cropped will be spread *randomly* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CropToAspectRatio(2.0)
+
+
+PadToAspectRatio
+----------------
+
+Pad images until their width/height matches an aspect ratio.
+
+This augmenter adds either rows or columns until the image reaches
+the desired aspect ratio given in ``width / height``.
+
+API link: :class:`~imgaug.augmenters.size.PadToAspectRatio`
+
+**Example.**
+Create an augmenter that pads each image until its aspect ratio is as
+close as possible to ``2.0`` (i.e. two times as many pixels along the
+x-axis than the y-axis).
+The rows to be padded will be spread *randomly* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.PadToAspectRatio(2.0)
+
+
+CropToSquare
+------------
+
+Crop images until their width and height are identical.
+
+This is identical to :class:`imgaug.augmenters.size.CropToAspectRatio` with
+``aspect_ratio=1.0``.
+
+Images with axis sizes of ``0`` will not be altered.
+
+API link: :class:`~imgaug.augmenters.size.CropToSquare`
+
+**Example.**
+Create an augmenter that crops each image until its square, i.e. height
+and width match.
+The rows to be cropped will be spread *randomly* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CropToSquare()
+
+
+PadToSquare
+-----------
+
+Pad images until their height and width are identical.
+
+This augmenter is identical to :class:`imgaug.augmenters.size.PadToAspectRatio`
+with ``aspect_ratio=1.0``.
+
+API link: :class:`~imgaug.augmenters.size.PadToSquare`
+
+**Example.**
+Create an augmenter that pads each image until its square, i.e. height
+and width match.
+The rows to be padded will be spread *randomly* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.PadToSquare()
+
+
+CenterPadToFixedSize
+--------------------
+
+Pad images equally on all sides up to given minimum heights/widths.
+
+This is an alias for :class:`imgaug.augmenters.size.PadToFixedSize` with
+``position="center"``.
+It spreads the pad amounts equally over all image sides, while
+:class:`imgaug.augmenters.size.PadToFixedSize` by defaults spreads them
+randomly.
+
+API link: :class:`~imgaug.augmenters.size.CenterPadToFixedSize`
+
+**Example.**
+Create an augmenter that pads images up to ``20x30``, with the padded
+rows added *equally* on the top and bottom (analogous for the padded
+columns). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CenterPadToFixedSize(height=20, width=30)
+
+
+CenterCropToFixedSize
+---------------------
+
+Take a crop from the center of each image.
+
+This is an alias for :class:`imgaug.augmenters.size.CropToFixedSize` with
+``position="center"``.
+
+.. note::
+
+    If images already have a width and/or height below the provided
+    width and/or height then this augmenter will do nothing for the
+    respective axis. Hence, resulting images can be smaller than the
+    provided axis sizes.
+
+API link: :class:`~imgaug.augmenters.size.CenterCropToFixedSize`
+
+**Example.**
+Create an augmenter that takes ``20x10`` sized crops from the center of
+images::
+
+    import imgaug.augmenters as iaa
+    crop = iaa.CenterCropToFixedSize(height=20, width=10)
+
+
+CenterCropToMultiplesOf
+-----------------------
+
+Crop images equally on all sides until H/W are multiples of given values.
+
+This is the same as :class:`imgaug.augmenters.size.CropToMultiplesOf`, but uses
+``position="center"`` by default, which spreads the crop amounts equally
+over all image sides, while :class:`imgaug.augmenters.size.CropToMultiplesOf`
+by default spreads them randomly.
+
+API link: :class:`~imgaug.augmenters.size.CenterCropToMultiplesOf`
+
+**Example.**
+Create an augmenter that crops images to multiples of ``10`` along
+the y-axis (i.e. 10, 20, 30, ...) and to multiples of ``6`` along the
+x-axis (i.e. 6, 12, 18, ...).
+The rows to be cropped will be spread *equally* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CenterCropToMultiplesOf(height_multiple=10, width_multiple=6)
+
+
+CenterPadToMultiplesOf
+----------------------
+
+Pad images equally on all sides until H/W are multiples of given values.
+
+This is the same as :class:`imgaug.augmenters.size.PadToMultiplesOf`, but uses
+``position="center"`` by default, which spreads the pad amounts equally
+over all image sides, while :class:`imgaug.augmenters.size.PadToMultiplesOf`
+by default spreads them randomly.
+
+API link: :class:`~imgaug.augmenters.size.CenterPadToMultiplesOf`
+
+**Example.**
+Create an augmenter that pads images to multiples of ``10`` along
+the y-axis (i.e. 10, 20, 30, ...) and to multiples of ``6`` along the
+x-axis (i.e. 6, 12, 18, ...).
+The rows to be padded will be spread *equally* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CenterPadToMultiplesOf(height_multiple=10, width_multiple=6)
+
+
+CenterCropToPowersOf
+--------------------
+
+Crop images equally on all sides until H/W is a power of a base.
+
+This is the same as :class:`imgaug.augmenters.size.CropToPowersOf`, but uses
+``position="center"`` by default, which spreads the crop amounts equally
+over all image sides, while :class:`imgaug.augmenters.size.CropToPowersOf`
+by default spreads them randomly.
+
+API link: :class:`~imgaug.augmenters.size.CenterCropToPowersOf`
+
+**Example.**
+Create an augmenter that crops each image down to powers of ``3`` along
+the y-axis (i.e. 3, 9, 27, ...) and powers of ``2`` along the x-axis (i.e.
+2, 4, 8, 16, ...).
+The rows to be cropped will be spread *equally* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CropToPowersOf(height_base=3, width_base=2)
+
+
+CenterPadToPowersOf
+-------------------
+
+Pad images equally on all sides until H/W is a power of a base.
+
+This is the same as :class:`imgaug.augmenters.size.PadToPowersOf`, but uses
+``position="center"`` by default, which spreads the pad amounts equally
+over all image sides, while :class:`imgaug.augmenters.size.PadToPowersOf` by
+default spreads them randomly.
+
+API link: :class:`~imgaug.augmenters.size.CenterPadToPowersOf`
+
+**Example.**
+Create an augmenter that pads each image to powers of ``3`` along the
+y-axis (i.e. 3, 9, 27, ...) and powers of ``2`` along the x-axis (i.e. 2,
+4, 8, 16, ...).
+The rows to be padded will be spread *equally* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CenterPadToPowersOf(height_base=3, width_base=2)
+
+
+CenterCropToAspectRatio
+-----------------------
+
+Crop images equally on all sides until they reach an aspect ratio.
+
+This is the same as :class:`imgaug.augmenters.size.CropToAspectRatio`, but uses
+``position="center"`` by default, which spreads the crop amounts equally
+over all image sides, while :class:`imgaug.augmenters.size.CropToAspectRatio`
+by default spreads them randomly.
+
+API link: :class:`~imgaug.augmenters.size.CenterCropToAspectRatio`
+
+**Example.**
+Create an augmenter that crops each image until its aspect ratio is as
+close as possible to ``2.0`` (i.e. two times as many pixels along the
+x-axis than the y-axis).
+The rows to be cropped will be spread *equally* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CenterCropToAspectRatio(2.0)
+
+
+CenterPadToAspectRatio
+----------------------
+
+Pad images equally on all sides until H/W matches an aspect ratio.
+
+This is the same as :class:`imgaug.augmenters.size.PadToAspectRatio`, but uses
+``position="center"`` by default, which spreads the pad amounts equally
+over all image sides, while :class:`imgaug.augmenters.size.PadToAspectRatio`
+by default spreads them randomly.
+
+API link: :class:`~imgaug.augmenters.size.CenterPadToAspectRatio`
+
+**Example.**
+Create am augmenter that pads each image until its aspect ratio is as
+close as possible to ``2.0`` (i.e. two times as many pixels along the
+x-axis than the y-axis).
+The rows to be padded will be spread *equally* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.PadToAspectRatio(2.0)
+
+
+CenterCropToSquare
+------------------
+
+Crop images equally on all sides until their height/width are identical.
+
+In contrast to :class:`imgaug.augmenters.size.CropToSquare`, this augmenter
+always tries to spread the columns/rows to remove equally over both sides of
+the respective axis to be cropped.
+:class:`imgaug.augmenters.size.CropToAspectRatio` by default spreads the
+croppings randomly.
+
+This augmenter is identical to :class:`imgaug.augmenters.size.CropToSquare`
+with ``position="center"``, and thereby the same as
+:class:`imgaug.augmenters.size.CropToAspectRatio` with
+``aspect_ratio=1.0, position="center"``.
+
+Images with axis sizes of ``0`` will not be altered.
+
+API link: :class:`~imgaug.augmenters.size.CenterCropToSquare`
+
+**Example.**
+Create an augmenter that crops each image until its square, i.e. height
+and width match.
+The rows to be cropped will be spread *equally* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CenterCropToSquare()
+
+
+CenterPadToSquare
+-----------------
+
+Pad images equally on all sides until their height & width are identical.
+
+This is the same as :class:`imgaug.augmenters.size.PadToSquare`, but uses
+``position="center"`` by default, which spreads the pad amounts equally
+over all image sides, while :class:`imgaug.augmenters.size.PadToSquare` by
+default spreads them randomly. This augmenter is thus also identical to
+:class:`imgaug.augmenters.size.PadToAspectRatio` with
+``aspect_ratio=1.0, position="center"``.
+
+API link: :class:`~imgaug.augmenters.size.CenterPadToSquare`
+
+**Example.**
+Create an augmenter that pads each image until its square, i.e. height
+and width match.
+The rows to be padded will be spread *equally* over the top and bottom
+sides (analogous for the left/right sides). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.CenterPadToSquare()
 
 
 KeepSizeByResize

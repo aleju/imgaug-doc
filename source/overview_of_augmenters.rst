@@ -7,11 +7,13 @@ Overview of Augmenters
 
    overview/meta.rst
    overview/arithmetic.rst
+   overview/artistic.rst
    overview/blend.rst
    overview/blur.rst
    overview/color.rst
    overview/contrast.rst
    overview/convolutional.rst
+   overview/debug.rst
    overview/edges.rst
    overview/flip.rst
    overview/geometric.rst

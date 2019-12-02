@@ -74,6 +74,129 @@ between 0 and 255 is used::
     :alt: Affine fill modes
 
 
+ScaleX
+------
+
+Apply affine scaling on the x-axis to input data.
+
+This is a wrapper around :class:`imgaug.augmenters.geometric.Affine`.
+
+API link: :class:`~imgaug.augmenters.geometric.ScaleX`
+
+**Example.**
+Create an augmenter that scales images along the width to sizes between
+``50%`` and ``150%``. This does not change the image shape (i.e. height
+and width), only the pixels within the image are remapped and potentially
+new ones are filled in. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.ScaleX((0.5, 1.5))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/scalex.jpg
+    :alt: ScaleX
+
+
+ScaleY
+------
+
+Apply affine scaling on the y-axis to input data.
+
+This is a wrapper around :class:`imgaug.augmenters.geometric.Affine`.
+
+API link: :class:`~imgaug.augmenters.geometric.ScaleY`
+
+**Example.**
+Create an augmenter that scales images along the height to sizes between
+``50%`` and ``150%``. This does not change the image shape (i.e. height
+and width), only the pixels within the image are remapped and potentially
+new ones are filled in. ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.ScaleY((0.5, 1.5))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/scaley.jpg
+    :alt: ScaleY
+
+
+TranslateX
+----------
+
+Apply affine translation on the x-axis to input data.
+
+This is a wrapper around :class:`imgaug.augmenters.geometric.Affine`.
+
+API link: :class:`~imgaug.augmenters.geometric.TranslateX`
+
+**Example.**
+Create an augmenter that translates images along the x-axis by
+``-20`` to ``20`` pixels::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.TranslateX(px=(-20, 20))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/translatex_absolute.jpg
+    :alt: TranslateX with absolute translation amounts
+
+**Example.**
+Create an augmenter that translates images along the x-axis by
+``-10%`` to ``10%`` (relative to the x-axis size)::
+
+    aug = iaa.TranslateX(percent=(-0.1, 0.1))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/translatex_relative.jpg
+    :alt: TranslateX with relative translation amounts
+
+
+TranslateY
+----------
+
+Apply affine translation on the y-axis to input data.
+
+This is a wrapper around :class:`imgaug.augmenters.geometric.Affine`.
+
+API link: :class:`~imgaug.augmenters.geometric.TranslateY`
+
+**Example.**
+Create an augmenter that translates images along the y-axis by
+``-20`` to ``20`` pixels::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.TranslateY(px=(-20, 20))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/translatey_absolute.jpg
+    :alt: TranslateY with absolute translation amounts
+
+**Example.**
+Create an augmenter that translates images along the y-axis by
+``-10%`` to ``10%`` (relative to the y-axis size)::
+
+    aug = iaa.TranslateY(percent=(-0.1, 0.1))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/translatey_relative.jpg
+    :alt: TranslateY with relative translation amounts
+
+
+Rotate
+------
+
+Apply affine rotation on the y-axis to input data.
+
+This is a wrapper around :class:`imgaug.augmenters.geometric.Affine`.
+It is the same as ``Affine(rotate=<value>)``.
+
+API link: :class:`~imgaug.augmenters.geometric.Rotate`
+
+**Example.**
+Create an augmenter that rotates images by a random value between ``-45``
+and ``45`` degress::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Rotate((-45, 45))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/rotate.jpg
+    :alt: Rotate
+
+
 PiecewiseAffine
 ---------------
 
@@ -298,3 +421,147 @@ size may change. ::
     Note that the individual images are here padded after augmentation in
     order to align them in a grid (i.e. purely for visualization purposes).
 
+
+WithPolarWarping
+----------------
+
+Augmenter that applies other augmenters in a polar-transformed space.
+
+This augmenter first transforms an image into a polar representation,
+then applies its child augmenter, then transforms back to cartesian
+space. The polar representation is still in the image's input dtype
+(i.e. ``uint8`` stays ``uint8``) and can be visualized. It can be thought
+of as an "unrolled" version of the image, where previously circular lines
+appear straight. Hence, applying child augmenters in that space can lead
+to circular effects. E.g. replacing rectangular pixel areas in the polar
+representation with black pixels will lead to curved black areas in
+the cartesian result.
+
+This augmenter can create new pixels in the image. It will fill these
+with black pixels. For segmentation maps it will fill with class
+id ``0``. For heatmaps it will fill with ``0.0``.
+
+This augmenter is limited to arrays with a height and/or width of
+``32767`` or less.
+
+.. warning::
+
+    When augmenting coordinates in polar representation, it is possible
+    that these are shifted outside of the polar image, but are inside the
+    image plane after transforming back to cartesian representation,
+    usually on newly created pixels (i.e. black backgrounds).
+    These coordinates are currently not removed. It is recommended to
+    not use very strong child transformations when also augmenting
+    coordinate-based augmentables.
+
+.. warning::
+
+    For bounding boxes, this augmenter suffers from the same problem as
+    affine rotations applied to bounding boxes, i.e. the resulting
+    bounding boxes can have unintuitive (seemingly wrong) appearance.
+    This is due to coordinates being "rotated" that are inside the
+    bounding box, but do not fall on the object and actually are
+    background.
+    It is recommended to use this augmenter with caution when augmenting
+    bounding boxes.
+
+.. warning::
+
+    For polygons, this augmenter should not be combined with
+    augmenters that perform automatic polygon recovery for invalid
+    polygons, as the polygons will frequently appear broken in polar
+    representation and their "fixed" version will be very broken in
+    cartesian representation. Augmenters that perform such polygon
+    recovery are currently ``PerspectiveTransform``, ``PiecewiseAffine``
+    and ``ElasticTransformation``.
+
+API link: :class:`~imgaug.augmenters.geometric.WithPolarWarping`
+
+**Example.**
+Apply cropping and padding in polar representation, then warp back to
+cartesian representation::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.WithPolarWarping(iaa.CropAndPad(percent=(-0.1, 0.1)))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/withpolarwarping_cropandpad.jpg
+    :alt: WithPolarWarping and CropAndPad
+
+**Example.**
+Apply affine translations in polar representation::
+
+    aug = iaa.WithPolarWarping(
+        iaa.Affine(
+            translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)}
+        )
+    )
+
+.. figure:: ../../images/overview_of_augmenters/geometric/withpolarwarping_affine.jpg
+    :alt: WithPolarWarping and Affine
+
+**Example.**
+Apply average pooling in polar representation. This leads to circular
+bins::
+
+    aug = iaa.WithPolarWarping(iaa.AveragePooling((2, 8)))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/withpolarwarping_averagepooling.jpg
+    :alt: WithPolarWarping with AveragePooling
+
+
+Jigsaw
+------
+
+Move cells within images similar to jigsaw patterns.
+
+.. note::
+
+    This augmenter will by default pad images until their height is a
+    multiple of `nb_rows`. Analogous for `nb_cols`.
+
+.. note::
+
+    This augmenter will resize heatmaps and segmentation maps to the
+    image size, then apply similar padding as for the corresponding images
+    and resize back to the original map size. That also means that images
+    may change in shape (due to padding), but heatmaps/segmaps will not
+    change. For heatmaps/segmaps, this deviates from pad augmenters that
+    will change images and heatmaps/segmaps in corresponding ways and then
+    keep the heatmaps/segmaps at the new size.
+
+.. warning::
+
+    This augmenter currently only supports augmentation of images,
+    heatmaps, segmentation maps and keypoints. Other augmentables,
+    i.e. bounding boxes, polygons and line strings, will result in errors.
+
+API link: :class:`~imgaug.augmenters.geometric.Jigsaw`
+
+**Example.**
+Create a jigsaw augmenter that splits images into ``10x10`` cells
+and shifts them around by ``0`` to ``2`` steps (default setting)::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Jigsaw(nb_rows=10, nb_cols=10)
+
+.. figure:: ../../images/overview_of_augmenters/geometric/jigsaw.jpg
+    :alt: Jigsaw
+
+**Example.**
+Create a jigsaw augmenter that splits each image into ``1`` to ``4``
+cells along each axis::
+
+    aug = iaa.Jigsaw(nb_rows=(1, 4), nb_cols=(1, 4))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/jigsaw_random_grid.jpg
+    :alt: Jigsaw with random-sized grid
+
+**Example.**
+Create a jigsaw augmenter that moves the cells in each image by a random
+amount between ``1`` and ``5`` times (decided per image). Some images will
+be barely changed, some will be fairly distorted. ::
+
+    aug = iaa.Jigsaw(nb_rows=10, nb_cols=10, max_steps=(1, 5))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/jigsaw_random_max_steps.jpg
+    :alt: Jigsaw with random number of max_steps
