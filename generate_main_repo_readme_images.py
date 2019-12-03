@@ -18,6 +18,8 @@ np.random.seed(44)
 ia.seed(44)
 
 IMAGES_DIR = "readme_images"
+INPUT_IMAGES_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)),
+                                "images", "input_images")
 
 
 def main():
@@ -61,7 +63,7 @@ def draw_small_overview():
         result = list(aug.augment_batches([batch]))[0]
         image_aug = result.images_aug[0]
         image_aug_heatmap = result.heatmaps_aug[0].draw(cmap=None)[0]
-        image_aug_segmap = result.segmentation_maps_aug[0].draw_on_image(image_aug, alpha=0.8)
+        image_aug_segmap = result.segmentation_maps_aug[0].draw_on_image(image_aug, alpha=0.8)[0]
         image_aug_kps = result.keypoints_aug[0].draw_on_image(image_aug, color=[0, 255, 0], size=7)
         image_aug_bbs = result.bounding_boxes_aug[0].clip_out_of_image().draw_on_image(image_aug, size=3)
         # add polys for now to BBs image to save (screen) space
@@ -379,9 +381,18 @@ def slugify(s):
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
 
 
+def generate_augmenter_url(module, name):
+    module = module.lower()
+    name = name.lower()
+    return (
+        "https://imgaug.readthedocs.io/en/latest/source/"
+        "overview/%s.html#%s" % (module, name)
+    )
+
+
 def draw_per_augmenter_videos():
     class _Descriptor(object):
-        def __init__(self, module, title, augmenters, subtitles, seed=0, affects_geometry=False, comment=None):
+        def __init__(self, module, title, augmenters, subtitles, seed=0, affects_geometry=False, comment=None, url=None):
             self.module = module
             self.title = title
             self.augmenters = augmenters
@@ -389,6 +400,7 @@ def draw_per_augmenter_videos():
             self.seed = seed
             self.affects_geometry = affects_geometry
             self.comment = comment
+            self._url = url
 
         @property
         def title_markup(self):
@@ -398,11 +410,22 @@ def draw_per_augmenter_videos():
                              .replace(")", "")
 
         @classmethod
-        def from_augsubs(cls, module, title, augsubs, seed=0, affects_geometry=False, comment=None):
+        def from_augsubs(cls, module, title, augsubs, seed=0, affects_geometry=False, comment=None, url=None):
             return _Descriptor(module=module, title=title,
                                augmenters=[el[1] for el in augsubs],
                                subtitles=[el[0] for el in augsubs],
-                               seed=seed, affects_geometry=affects_geometry, comment=comment)
+                               seed=seed,
+                               affects_geometry=affects_geometry,
+                               comment=comment,
+                               url=url)
+
+        @property
+        def url(self):
+            if self._url is None:
+                module = self.module
+                name = self.title.replace(":", "\n").split("\n")[0]
+                return generate_augmenter_url(module, name)
+            return self._url
 
         def generate_frames(self, image, keypoints, bounding_boxes, polygons, heatmap, segmap, subtitle_height):
             frames_images = []
@@ -414,7 +437,7 @@ def draw_per_augmenter_videos():
             for i, (augmenter, subtitle) in enumerate(zip(self.augmenters, self.subtitles)):
                 # print("seeding", augmenter.name, self.seed+i)
                 augmenter.localize_random_state_(recursive=True)
-                augmenter.reseed(random_state=self.seed+i)
+                augmenter.seed_(self.seed+i)
 
                 def _subt(img, toptitle):
                     if self.affects_geometry:
@@ -425,25 +448,40 @@ def draw_per_augmenter_videos():
                         return self._draw_cell(img, subtitle, subtitle_height, "", 16)
                 aug_det = augmenter.to_deterministic()
                 image_aug = aug_det.augment_image(image)
-                kps_aug = aug_det.augment_keypoints([keypoints])[0]
-                bbs_aug = aug_det.augment_bounding_boxes([bounding_boxes])[0]
-                polys_aug = aug_det.augment_polygons([polygons])[0]
-                heatmap_aug = aug_det.augment_heatmaps([heatmap])[0]
-                segmap_aug = aug_det.augment_segmentation_maps([segmap])[0]
 
-                if self.affects_geometry:
-                    image_with_coordsaug = _subt(
-                        polys_aug.draw_on_image(
-                            bbs_aug.draw_on_image(
-                                kps_aug.draw_on_image(image_aug, size=5)
-                            ),
+                if self.affects_geometry is not False:
+                    affects_geometry = self.affects_geometry
+                    if affects_geometry is True:
+                        affects_geometry = ["keypoints", "bounding_boxes",
+                                            "polygons", "heatmaps",
+                                            "segmentation_maps"]
+                    kps_aug = aug_det.augment_keypoints([keypoints])[0] if "keypoints" in affects_geometry else None
+                    bbs_aug = aug_det.augment_bounding_boxes([bounding_boxes])[0] if "bounding_boxes" in affects_geometry else None
+                    polys_aug = aug_det.augment_polygons([polygons])[0] if "polygons" in affects_geometry else None
+                    heatmap_aug = aug_det.augment_heatmaps([heatmap])[0] if "heatmaps" in affects_geometry else None
+                    segmap_aug = aug_det.augment_segmentation_maps([segmap])[0] if "segmentation_maps" in affects_geometry else None
+
+                    coords_subt = ["IMG"]
+                    image_with_coords = image_aug
+                    if kps_aug is not None:
+                        image_with_coords = kps_aug.draw_on_image(image_aug, size=5)
+                        coords_subt.append("KPs")
+                    if bbs_aug is not None:
+                        image_with_coords = bbs_aug.draw_on_image(image_with_coords)
+                        coords_subt.append("BBs")
+                    if polys_aug is not None:
+                        image_with_coords = polys_aug.draw_on_image(
+                            image_with_coords,
                             color_lines=(0, 128, 0),
                             color_points=(0, 128, 0),
                             alpha=0,
                             alpha_lines=0.5,
-                            alpha_points=1.0
-                        ),
-                        "IMG, KPs, BBs, Polys"
+                            alpha_points=1.0)
+                        coords_subt.append("Polys")
+
+                    image_with_coordsaug = _subt(
+                        image_with_coords,
+                        ", ".join(coords_subt)
                     )
                     frames_images.append(image_with_coordsaug)
                     #frames_kps.append(_subt(kps_aug.draw_on_image(image_aug, size=5), "keypoints"))
@@ -485,8 +523,18 @@ def draw_per_augmenter_videos():
             return 1 if only_images else 2
 
         def render_title(self):
-            #return '<td colspan="%d">\n<small>\n%s\n</small>\n</td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
-            return '<td colspan="%d"><sub>%s</sub></td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
+            url = self.descriptor.url
+            if url is None:
+                return '<td colspan="%d"><sub>%s</sub></td>' % (self.colspan, self.descriptor.title.replace("\n", "<br/>"))
+            else:
+                title1 = self.descriptor.title
+                title2 = ""
+                if "\n" in title1:
+                    title1 = self.descriptor.title.split("\n")[0]
+                    title2 = "<br/>" + "<br/>".join(self.descriptor.title.split("\n")[1:])
+
+                return '<td colspan="%d"><sub><a href=\"%s\">%s</a>%s</sub></td>' % (
+                    self.colspan, url, title1, title2)
 
         def render_main(self):
             #return '<td colspan="%d">\n\n%s%s%s%s%s\n\n</td>' % (self.colspan, self.markup_images, self.markup_kps, self.markup_bbs, self.markup_hm, self.markup_segmap)
@@ -498,6 +546,37 @@ def draw_per_augmenter_videos():
                 return '<td colspan="%d"><sub>%s</sub></td>' % (self.colspan, self.descriptor.comment,)
             else:
                 return '<td colspan="%d">&nbsp;</td>' % (self.colspan,)
+
+    class _MarkdownTableSeeAlsoUrl(object):
+        def __init__(self, url, linktext):
+            self.url = url
+            self.linktext = linktext
+
+        def render(self):
+            return "<a href=\"%s\">%s</a>" % (self.url, self.linktext)
+
+        @classmethod
+        def from_augmenter(cls, module, name):
+            return _MarkdownTableSeeAlsoUrl(
+                generate_augmenter_url(module, name), name)
+
+    class _MarkdownTableSeeAlsoUrlList(object):
+        def __init__(self, urls):
+            self.urls = urls
+
+        @property
+        def colspan(self):
+            return 5
+
+        def render_title(self):
+            return ""
+
+        def render_main(self):
+            urls_str = ", ".join([url.render() for url in self.urls])
+            return "See also: %s" % (urls_str,)
+
+        def render_comment(self):
+            return ""
 
     class _MarkdownTable(object):
         ROW_SIZE = 5  # in columns
@@ -518,7 +597,9 @@ def draw_per_augmenter_videos():
                 any_comment = False
                 while current_row_size < self.ROW_SIZE and len(cells) > 0:
                     cell = cells[0]
-                    if current_module is None:
+                    if isinstance(cell, _MarkdownTableSeeAlsoUrlList):
+                        pass  # should always be at the end of a module
+                    elif current_module is None:
                         current_module = cell.descriptor.module
                     elif current_module != cell.descriptor.module:
                         if current_row_size == 0:
@@ -531,7 +612,9 @@ def draw_per_augmenter_videos():
                     row_title.append(cell.render_title())
                     row_main.append(cell.render_main())
                     row_comment.append(cell.render_comment())
-                    if cell.descriptor.comment is not None and len(cell.descriptor.comment) > 0:
+                    if (not isinstance(cell, _MarkdownTableSeeAlsoUrlList)
+                            and cell.descriptor.comment is not None
+                            and len(cell.descriptor.comment) > 0):
                         any_comment = True
                     current_row_size += cell.colspan
                     cells = cells[1:]
@@ -554,8 +637,8 @@ def draw_per_augmenter_videos():
 
             return "<table>\n\n%s\n\n</table>" % ("\n".join(markup),)
 
-        def append(self, descriptor, markup_images, markup_kps, markup_bbs, markup_hm, markup_segmap):
-            self.cells.append(_MarkdownTableCell(descriptor, markup_images, markup_kps, markup_bbs, markup_hm, markup_segmap))
+        def append(self, cell):
+            self.cells.append(cell)
 
     print("[draw_per_augmenter_videos] Loading image...")
     # image = ia.imresize_single_image(imageio.imread("quokka.jpg", pilmode="RGB")[0:643, 0:643], (128, 128))
@@ -571,6 +654,10 @@ def draw_per_augmenter_videos():
     image_landscape = imageio.imread("https://upload.wikimedia.org/wikipedia/commons/8/89/Kukle%2CCzech_Republic..jpg", format="jpg")
     # os.path.join(os.path.dirname(os.path.abspath(__file__)), "landscape.jpg")
     image_landscape = ia.imresize_single_image(image_landscape, (96, 128))
+    image_valley = imageio.imread(os.path.join(INPUT_IMAGES_DIR, "Pahalgam_Valley.jpg"))
+    image_valley = ia.imresize_single_image(image_valley, (96, 128))
+    image_vangogh = imageio.imread(os.path.join(INPUT_IMAGES_DIR, "1280px-Vincent_Van_Gogh_-_Wheatfield_with_Crows.jpg"))
+    image_vangogh = ia.imresize_single_image(image_vangogh, (96, 128))
 
     print("[draw_per_augmenter_videos] Initializing...")
     descriptors = []
@@ -578,24 +665,27 @@ def draw_per_augmenter_videos():
     # meta
     # ###
     descriptors.extend([
-        # Augmenter (base class for all augmenters)
-        # Sequential
-        # SomeOf
-        # OneOf
-        # Sometimes
-        # WithChannels
         _Descriptor.from_augsubs(
             "meta",
-            "Noop",
-            [("", iaa.Noop()) for _ in sm.xrange(1)]),
-        # Lambda
-        # AssertLambda
-        # AssertShape
+            "Identity",
+            [("", iaa.Identity()) for _ in sm.xrange(1)]),
         _Descriptor.from_augsubs(
             "meta",
             "ChannelShuffle",
             [("p=1.0", iaa.ChannelShuffle(p=1.0)) for _ in sm.xrange(5)]
-        )
+        ),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "Sequential"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "SomeOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "OneOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "Sometimes"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "WithChannels"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "Lambda"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "AssertLambda"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "AssertShape"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "RemoveCBAsByOutOfImageFraction"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("meta", "ClipCBAsToImagePlanes"),
+        ])
     ])
 
     # ###
@@ -613,7 +703,6 @@ def draw_per_augmenter_videos():
             [("value=(%d, %d)" % (vals[0], vals[1],), iaa.Add(vals, per_channel=True))
              for vals in [(-55, -35), (-35, -15), (-10, 10), (15, 35), (35, 55)]]
         ),
-        # AddElementwise
         _Descriptor.from_augsubs(
             "arithmetic",
             "AdditiveGaussianNoise",
@@ -626,30 +715,30 @@ def draw_per_augmenter_videos():
             [("scale=%.2f*255" % (scale,), iaa.AdditiveGaussianNoise(scale=scale * 255, per_channel=True))
              for scale in [0.025, 0.05, 0.1, 0.2, 0.3]]
         ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
-            "AdditiveLaplaceNoise",
-            [("scale=%.2f*255" % (scale,), iaa.AdditiveLaplaceNoise(scale=scale * 255))
-             for scale in [0.025, 0.05, 0.1, 0.2, 0.3]]
-        ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
-            "AdditiveLaplaceNoise\n(per_channel=True)",
-            [("scale=%.2f*255" % (scale,), iaa.AdditiveLaplaceNoise(scale=scale * 255, per_channel=True))
-             for scale in [0.025, 0.05, 0.1, 0.2, 0.3]]
-        ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
-            "AdditivePoissonNoise",
-            [("lam=%.2f" % (lam,), iaa.AdditivePoissonNoise(lam=lam))
-             for lam in [4.0, 8.0, 16.0, 32.0, 64.0]]
-        ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
-            "AdditivePoissonNoise\n(per_channel=True)",
-            [("lam=%.2f" % (lam,), iaa.AdditivePoissonNoise(lam=lam, per_channel=True))
-             for lam in [4.0, 8.0, 16.0, 32.0, 64.0]]
-        ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "AdditiveLaplaceNoise",
+        #     [("scale=%.2f*255" % (scale,), iaa.AdditiveLaplaceNoise(scale=scale * 255))
+        #      for scale in [0.025, 0.05, 0.1, 0.2, 0.3]]
+        # ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "AdditiveLaplaceNoise\n(per_channel=True)",
+        #     [("scale=%.2f*255" % (scale,), iaa.AdditiveLaplaceNoise(scale=scale * 255, per_channel=True))
+        #      for scale in [0.025, 0.05, 0.1, 0.2, 0.3]]
+        # ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "AdditivePoissonNoise",
+        #     [("lam=%.2f" % (lam,), iaa.AdditivePoissonNoise(lam=lam))
+        #      for lam in [4.0, 8.0, 16.0, 32.0, 64.0]]
+        # ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "AdditivePoissonNoise\n(per_channel=True)",
+        #     [("lam=%.2f" % (lam,), iaa.AdditivePoissonNoise(lam=lam, per_channel=True))
+        #      for lam in [4.0, 8.0, 16.0, 32.0, 64.0]]
+        # ),
         _Descriptor.from_augsubs(
             "arithmetic",
             "Multiply",
@@ -687,12 +776,17 @@ def draw_per_augmenter_videos():
             [("size_percent=%.2f" % (size_percent,), iaa.CoarseDropout(p=0.2, size_percent=size_percent, per_channel=True, min_size=2))
              for size_percent in [0.3, 0.2, 0.1, 0.05, 0.02]]
         ),
-        # ReplaceElementwise
         _Descriptor.from_augsubs(
             "arithmetic",
-            "ImpulseNoise",
-            [("p=%.2f" % (p,), iaa.ImpulseNoise(p=p)) for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
+            "Dropout2d",
+            [("p=%.2f" % (p,), iaa.Dropout2d(p=p))
+             for p in [0.5, 0.5, 0.5, 0.5, 0.5]]
         ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "ImpulseNoise",
+        #     [("p=%.2f" % (p,), iaa.ImpulseNoise(p=p)) for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
+        # ),
         _Descriptor.from_augsubs(
             "arithmetic",
             "SaltAndPepper",
@@ -700,32 +794,32 @@ def draw_per_augmenter_videos():
         ),
         _Descriptor.from_augsubs(
             "arithmetic",
-            "Salt",
-            [("p=%.2f" % (p,), iaa.Salt(p=p)) for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
-        ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
-            "Pepper",
-            [("p=%.2f" % (p,), iaa.Pepper(p=p)) for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
-        ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
             "CoarseSaltAndPepper\n(p=0.2)",
             [("size_percent=%.2f" % (size_percent,), iaa.CoarseSaltAndPepper(p=0.2, size_percent=size_percent, min_size=2))
              for size_percent in [0.3, 0.2, 0.1, 0.05, 0.02]]
         ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
-            "CoarseSalt\n(p=0.2)",
-            [("size_percent=%.2f" % (size_percent,), iaa.CoarseSalt(p=0.2, size_percent=size_percent, min_size=2))
-             for size_percent in [0.3, 0.2, 0.1, 0.05, 0.02]]
-        ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
-            "CoarsePepper\n(p=0.2)",
-            [("size_percent=%.2f" % (size_percent,), iaa.CoarsePepper(p=0.2, size_percent=size_percent, min_size=2))
-             for size_percent in [0.3, 0.2, 0.1, 0.05, 0.02]]
-        ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "Salt",
+        #     [("p=%.2f" % (p,), iaa.Salt(p=p)) for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
+        # ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "Pepper",
+        #     [("p=%.2f" % (p,), iaa.Pepper(p=p)) for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
+        # ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "CoarseSalt\n(p=0.2)",
+        #     [("size_percent=%.2f" % (size_percent,), iaa.CoarseSalt(p=0.2, size_percent=size_percent, min_size=2))
+        #      for size_percent in [0.3, 0.2, 0.1, 0.05, 0.02]]
+        # ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "CoarsePepper\n(p=0.2)",
+        #     [("size_percent=%.2f" % (size_percent,), iaa.CoarsePepper(p=0.2, size_percent=size_percent, min_size=2))
+        #      for size_percent in [0.3, 0.2, 0.1, 0.05, 0.02]]
+        # ),
         _Descriptor.from_augsubs(
             "arithmetic",
             "Invert",
@@ -752,7 +846,34 @@ def draw_per_augmenter_videos():
             "JpegCompression",
             [("compression=%d" % (compression,), iaa.JpegCompression(compression=compression))
              for compression in np.linspace(50, 100, num=5)]
-        )
+        ),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "AddElementwise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "AdditiveLaplaceNoise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "AdditivePoissonNoise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "MultiplyElementwise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "ReplaceElementwise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "TotalDropout"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "ReplaceElementwise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "ImpulseNoise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "Salt"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "Pepper"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "CoarseSalt"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "CoarsePepper"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "Solarize"),
+        ])
+    ])
+
+    # ###
+    # artistic
+    # ###
+    descriptors.extend([
+        _Descriptor.from_augsubs(
+            "artistic",
+            "Cartoon",
+            [("off", iaa.Identity()),
+             ("on", iaa.Cartoon())]
+        ),
     ])
 
     # ###
@@ -832,7 +953,13 @@ def draw_per_augmenter_videos():
     # color
     # ####
     descriptors.extend([
-        # WithColorspace
+        _Descriptor.from_augsubs(
+            "color",
+            "MultiplyAndAddToBrightness",
+            [("mul=%.1f, add=%d" % (mul, add),
+              iaa.MultiplyHueAndSaturation(mul=mul))
+             for mul, add in [(1.0, 0), (1.0, -30), (1.0, 30), (0.5, 0), (1.5, 0)]]
+        ),
         _Descriptor.from_augsubs(
             "color",
             "MultiplyHueAndSaturation",
@@ -851,24 +978,44 @@ def draw_per_augmenter_videos():
         _Descriptor.from_augsubs(
             "color",
             "AddToHueAndSaturation",
-            [("value=%d" % (val,), iaa.AddToHueAndSaturation(val)) for val in [-45, -25, 0, 25, 45]]
+            [("hue=%d, sat=%d" % (hue, sat), iaa.AddToHueAndSaturation(value_hue=hue, value_saturation=sat))
+             for hue, sat in [(0, 0), (-45, 0), (45, 0), (0, -45), (0, 45)]]
         ),
-        _Descriptor.from_augsubs(
-            "color",
-            "AddToHue",
-            [("value=%d" % (val,), iaa.AddToHue(val)) for val in [-45, -25, 0, 25, 45]]
-        ),
-        _Descriptor.from_augsubs(
-            "color",
-            "AddToSaturation",
-            [("value=%d" % (val,), iaa.AddToSaturation(val)) for val in [-45, -25, 0, 25, 45]]
-        ),
+        # _Descriptor.from_augsubs(
+        #     "color",
+        #     "AddToHue",
+        #     [("value=%d" % (val,), iaa.AddToHue(val)) for val in [-45, -25, 0, 25, 45]]
+        # ),
+        # _Descriptor.from_augsubs(
+        #     "color",
+        #     "AddToSaturation",
+        #     [("value=%d" % (val,), iaa.AddToSaturation(val)) for val in [-45, -25, 0, 25, 45]]
+        # ),
         _Descriptor.from_augsubs(
             "color",
             "Grayscale",
-            [("alpha=%.1f" % (alpha,), iaa.Grayscale(alpha=alpha)) for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]]
+            [("alpha=%.2f" % (alpha,), iaa.Grayscale(alpha=alpha)) for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]]
         ),
-        # ChangeColorspace
+        _Descriptor.from_augsubs(
+            "color",
+            "RemoveSaturation",
+            [("mul=%.2f" % (mul,), iaa.RemoveSaturation(mul=0.0)) for mul in [0.0, 0.25, 0.5, 0.75, 1.0]]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
+            "GrayscaleColorwise",
+            [("", iaa.GrayscaleColorwise()) for _ in np.arange(8)]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
+            "RemoveSaturationColorwise",
+            [("", iaa.RemoveSaturationColorwise()) for _ in np.arange(8)]
+        ),
+        _Descriptor.from_augsubs(
+            "color",
+            "ChangeColorTemperature",
+            [("kelvin=%d", iaa.ChangeColorTemperature(kelvin)) for kelvin in [1000, 2000, 4000, 8000, 16000]]
+        ),
         _Descriptor.from_augsubs(
             "color",
             "KMeansColorQuantization\n(to_colorspace=RGB)",
@@ -879,6 +1026,17 @@ def draw_per_augmenter_videos():
             "UniformColorQuantization\n(to_colorspace=RGB)",
             [("n_colors=%d" % (n_colors,), iaa.UniformColorQuantization(n_colors=n_colors, to_colorspace=iaa.CSPACE_RGB)) for n_colors in [2, 4, 8, 16, 32]]
         ),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "WithColorspace"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "WithBrightnessChannels"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "MultiplyBrightness"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "AddToBrightness"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "WithHueAndSaturation"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "AddToHue"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "AddToSaturation"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "ChangeColorspace"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "Posterize"),
+        ])
     ])
 
     # ####
@@ -935,8 +1093,14 @@ def draw_per_augmenter_videos():
         ),
         _Descriptor.from_augsubs(
             "contrast",
+            "Autocontrast",
+            [("cutoff=%d" % (cutoff,), iaa.Autocontrast(cutoff)) for cutoff in [0, 5, 10, 15, 20]]
+        ),
+        _Descriptor.from_augsubs(
+            "contrast",
             "AllChannels-\nHistogramEqualization",
-            [("", iaa.AllChannelsHistogramEqualization()) for _ in range(1)]
+            [("", iaa.AllChannelsHistogramEqualization()) for _ in range(1)],
+            url=generate_augmenter_url("contrast", "AllChannelsHistogramEqualization")
         ),
         _Descriptor.from_augsubs(
             "contrast",
@@ -966,6 +1130,9 @@ def draw_per_augmenter_videos():
              for to_colorspace, clip_limit
              in zip([iaa.CLAHE.Lab] * 5, np.linspace(1, 20, num=5))]
         ),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("contrast", "Equalize"),
+        ])
     ])
 
     # ###
@@ -977,22 +1144,29 @@ def draw_per_augmenter_videos():
             "convolutional",
             "Sharpen\n(alpha=1)",
             [("lightness=%.2f" % (lightness,), iaa.Sharpen(alpha=1, lightness=lightness))
-             for lightness in [0, 0.5, 1.0, 1.5, 2.0]]),
+             for lightness in [0, 0.5, 1.0, 1.5, 2.0]]
+        ),
         _Descriptor.from_augsubs(
             "convolutional",
             "Emboss\n(alpha=1)",
             [("strength=%.2f" % (strength,), iaa.Emboss(alpha=1, strength=strength))
-             for strength in [0, 0.5, 1.0, 1.5, 2.0]]),
+             for strength in [0, 0.5, 1.0, 1.5, 2.0]]
+        ),
         _Descriptor.from_augsubs(
             "convolutional",
             "EdgeDetect",
             [("alpha=%.2f" % (alpha,), iaa.EdgeDetect(alpha=alpha))
-             for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]]),
+             for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]]
+        ),
         _Descriptor.from_augsubs(
             "convolutional",
             "DirectedEdgeDetect\n(alpha=1)",
             [("direction=%.2f" % (direction,), iaa.DirectedEdgeDetect(alpha=1, direction=direction))
-             for direction in [0.0, 1*(360/5)/360, 2*(360/5)/360, 3*(360/5)/360, 4*(360/5)/360]])
+             for direction in [0.0, 1*(360/5)/360, 2*(360/5)/360, 3*(360/5)/360, 4*(360/5)/360]]
+        ),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("convolutional", "Convolve"),
+        ])
     ])
 
     # ###
@@ -1019,7 +1193,11 @@ def draw_per_augmenter_videos():
             "flip",
             "Flipud",
             [("p=%.1f" % (p,), iaa.Flipud(p)) for p in [0, 1]],
-            affects_geometry=True)
+            affects_geometry=True),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "HorizontalFlip"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("color", "VerticalFlip"),
+        ])
     ])
 
     # ###
@@ -1058,7 +1236,7 @@ def draw_per_augmenter_videos():
             "geometric",
             "Affine: Modes",
             [("mode=%s" % (mode,), iaa.Affine(translate_px=-32, mode=mode)) for mode in ["constant", "edge", "symmetric", "reflect", "wrap"]],
-            affects_geometry=True
+            affects_geometry=True,
             #comment='Augmentation of heatmaps and segmentation maps is currently always done with mode="constant" '
             #        + 'for consistency with keypoint and bounding box augmentation. It may be resonable to use '
             #        + 'mode="constant" for images too when augmenting heatmaps or segmentation maps.'
@@ -1070,7 +1248,8 @@ def draw_per_augmenter_videos():
              for cval in [0.0, 0.25, 0.5, 0.75, 1.0]],
             affects_geometry=True),
 
-        # AffineCv2
+        # AffineCV2
+
         _Descriptor.from_augsubs(
             "geometric",
             "PiecewiseAffine",
@@ -1106,7 +1285,34 @@ def draw_per_augmenter_videos():
             "Rot90",
             [("k=%d" % (k,), iaa.Rot90(k=k)) for k in [0, 1, 2, 3]],
             affects_geometry=True
-        )
+        ),
+        _Descriptor.from_augsubs(
+            "geometric",
+            "WithPolarWarping\n+Affine",
+            [("",
+              iaa.WithPolarWarping(
+                  iaa.Affine(
+                      rotate=(-15, 15),
+                      translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)},
+                      scale=(0.9, 1.1),
+                      shear=(-5, 5)
+                  )
+              )) for _ in np.arange(5)],
+            affects_geometry=True
+        ),
+        _Descriptor.from_augsubs(
+            "geometric",
+            "Jigsaw\n(5x5 grid)",
+            [("", iaa.Jigsaw(nb_rows=5, nb_cols=5, max_steps=1)) for _ in np.arange(5)],
+            affects_geometry=["heatmaps", "segmentation_maps", "keypoints"]
+        ),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("geometric", "ScaleX"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("geometric", "ScaleY"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("geometric", "TranslateX"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("geometric", "TranslateY"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("geometric", "Rotate")
+        ])
     ])
 
     # ###
@@ -1172,13 +1378,16 @@ def draw_per_augmenter_videos():
             [("p_replace=%.2f" % (p_replace,),
               iaa.RegularGridVoronoi(n_rows=16, n_cols=16, p_drop_points=0, p_replace=p_replace))
              for p_replace in [1.0, 0.8, 0.6, 0.4, 0.2]]),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "Voronoi"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "RelativeRegularGridVoronoi"),
+        ])
     ])
 
     # ###
     # size
     # ###
     descriptors.extend([
-        # TODO Resize
         _Descriptor.from_augsubs(
             "size",
             "CropAndPad",
@@ -1216,7 +1425,28 @@ def draw_per_augmenter_videos():
                               "uniform", "uniform", "uniform", "uniform",
                               "normal", "normal", "normal", "normal"]],
             affects_geometry=True),
-        # KeepSizeByResize
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "Resize"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToMultiplesOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CropToMultiplesOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToPowersOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CropToPowersOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToAspectRatio"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CropToAspectRatio"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToSquare"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CropToSquare"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToFixedSize"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToFixedSize"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToMultiplesOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToMultiplesOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToPowersOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToPowersOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToAspectRatio"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToAspectRatio"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToSquare"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToSquare"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "KeepSizeByResize"),
+        ])
     ])
 
     # ###
@@ -1245,8 +1475,11 @@ def draw_per_augmenter_videos():
             "weather",
             "Snowflakes",
             [("", iaa.Snowflakes()) for _ in range(5)]
-        )
-        # SnowflakesLayer
+        ),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("weather", "CloudLayer"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("weather", "SnowflakesLayer")
+        ])
     ])
 
     def mimwrite_if_changed(fp, frames, duration):
@@ -1287,11 +1520,23 @@ def draw_per_augmenter_videos():
     table = _MarkdownTable()
 
     for descriptor in descriptors:
+        if isinstance(descriptor, _MarkdownTableSeeAlsoUrlList):
+            table.append(descriptor)
+            continue
+
         print(descriptor.title)
+
+        image_to_use = image
+        if descriptor.module in ["weather"]:
+            image_to_use = image_landscape
+        elif descriptor.module in ["artistic"]:
+            image_to_use = image_valley
+        elif "Colorwise" in descriptor.title:
+            image_to_use = image_vangogh
 
         frames_images, frames_kps, frames_bbs, frames_hm, frames_segmap = \
             descriptor.generate_frames(
-                image if descriptor.module != "weather" else image_landscape,
+                image_to_use,
                 keypoints, bbs, polygons, heatmap, segmap, h_subtitle)
 
         if descriptor.affects_geometry:
@@ -1342,7 +1587,9 @@ def draw_per_augmenter_videos():
 
         #table.append(descriptor, markup_images, markup_kps, markup_bbs, markup_hm, markup_segmap)
         #table.append(descriptor, markup_images, markup_kps_bbs, "", markup_hm, markup_segmap)
-        table.append(descriptor, markup_images, "", "", markup_hm, markup_segmap)
+        cell = _MarkdownTableCell(
+            descriptor, markup_images, "", "", markup_hm, markup_segmap)
+        table.append(cell)
 
     fp = os.path.join(os.path.dirname(os.path.realpath(__file__)), "readme_example_images_code.txt")
     with open(fp, "w") as f:
