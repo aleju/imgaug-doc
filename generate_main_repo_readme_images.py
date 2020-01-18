@@ -23,8 +23,8 @@ INPUT_IMAGES_DIR = os.path.join(os.path.realpath(os.path.dirname(__file__)),
 
 
 def main():
-    draw_small_overview()
-    draw_single_sequential_images()
+    #draw_small_overview()
+    #draw_single_sequential_images()
     draw_per_augmenter_videos()
 
 
@@ -411,7 +411,8 @@ def draw_per_augmenter_videos():
 
         @classmethod
         def from_augsubs(cls, module, title, augsubs, seed=0, affects_geometry=False, comment=None, url=None):
-            return _Descriptor(module=module, title=title,
+            return _Descriptor(module=module,
+                               title=title,
                                augmenters=[el[1] for el in augsubs],
                                subtitles=[el[0] for el in augsubs],
                                seed=seed,
@@ -745,25 +746,41 @@ def draw_per_augmenter_videos():
             [("value=%.2f" % (val,), iaa.Multiply(val))
              for val in [0.25, 0.5, 1.0, 1.25, 1.5]]
         ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "Multiply\n(per_channel=True)",
+        #     [("value=(%.2f, %.2f)" % (vals[0], vals[1],), iaa.Multiply(vals, per_channel=True))
+        #      for vals in [(0.15, 0.35), (0.4, 0.6), (0.9, 1.1), (1.15, 1.35), (1.4, 1.6)]]
+        # ),
+        # MultiplyElementwise
         _Descriptor.from_augsubs(
             "arithmetic",
-            "Multiply\n(per_channel=True)",
-            [("value=(%.2f, %.2f)" % (vals[0], vals[1],), iaa.Multiply(vals, per_channel=True))
-             for vals in [(0.15, 0.35), (0.4, 0.6), (0.9, 1.1), (1.15, 1.35), (1.4, 1.6)]]
+            "Cutout",
+            [
+                ("nb_iterations=1", iaa.Cutout(nb_iterations=1, size=(0.1, 0.3), fill_mode="constant")),
+                ("nb_iterations=1", iaa.Cutout(nb_iterations=1, size=(0.1, 0.3), fill_mode="constant")),
+                ("nb_iterations=2", iaa.Cutout(nb_iterations=2, size=(0.1, 0.3), fill_mode="constant")),
+                ("nb_iterations=2", iaa.Cutout(nb_iterations=2, size=(0.1, 0.3), fill_mode="constant")),
+                ("non-squared", iaa.Cutout(nb_iterations=2, size=(0.1, 0.3), fill_mode="constant", squared=False)),
+                ("non-squared", iaa.Cutout(nb_iterations=2, size=(0.1, 0.3), fill_mode="constant", squared=False)),
+                ("RGB colors", iaa.Cutout(nb_iterations=2, size=(0.1, 0.3), cval=(0, 255), fill_mode="constant", fill_per_channel=True)),
+                ("RGB colors", iaa.Cutout(nb_iterations=2, size=(0.1, 0.3), cval=(0, 255), fill_mode="constant", fill_per_channel=True)),
+                ("gaussian", iaa.Cutout(nb_iterations=2, size=(0.1, 0.3), fill_mode="gaussian")),
+                ("gaussian", iaa.Cutout(nb_iterations=2, size=(0.1, 0.3), fill_mode="gaussian"))
+            ]
         ),
-        # MultiplyElementwise
         _Descriptor.from_augsubs(
             "arithmetic",
             "Dropout",
             [("p=%.2f" % (p,), iaa.Dropout(p=p))
              for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
         ),
-        _Descriptor.from_augsubs(
-            "arithmetic",
-            "Dropout\n(per_channel=True)",
-            [("p=%.2f" % (p,), iaa.Dropout(p=p, per_channel=True))
-             for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
-        ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "Dropout\n(per_channel=True)",
+        #     [("p=%.2f" % (p,), iaa.Dropout(p=p, per_channel=True))
+        #      for p in [0.025, 0.05, 0.1, 0.2, 0.4]]
+        # ),
         _Descriptor.from_augsubs(
             "arithmetic",
             "CoarseDropout\n(p=0.2)",
@@ -782,6 +799,8 @@ def draw_per_augmenter_videos():
             [("p=%.2f" % (p,), iaa.Dropout2d(p=p))
              for p in [0.5, 0.5, 0.5, 0.5, 0.5]]
         ),
+        # TotalDropout -> see also
+        # ReplaceElementwise -> see also
         # _Descriptor.from_augsubs(
         #     "arithmetic",
         #     "ImpulseNoise",
@@ -825,10 +844,15 @@ def draw_per_augmenter_videos():
             "Invert",
             [("p=%d" % (p,), iaa.Invert(p=p)) for p in [0, 1]]
         ),
+        # _Descriptor.from_augsubs(
+        #     "arithmetic",
+        #     "Invert\n(per_channel=True)",
+        #     [("p=%.2f" % (p,), iaa.Invert(p=p, per_channel=True)) for p in [0.5, 0.5, 0.5, 0.5, 0.5]]
+        # ),
         _Descriptor.from_augsubs(
             "arithmetic",
-            "Invert\n(per_channel=True)",
-            [("p=%.2f" % (p,), iaa.Invert(p=p, per_channel=True)) for p in [0.5, 0.5, 0.5, 0.5, 0.5]]
+            "Solarize",
+            [("p=%d" % (p,), iaa.Solarize(p=p)) for p in [0, 1]]
         ),
         #_Descriptor.from_augsubs(
         #    "arithmetic",
@@ -852,7 +876,6 @@ def draw_per_augmenter_videos():
             _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "AdditiveLaplaceNoise"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "AdditivePoissonNoise"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "MultiplyElementwise"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "ReplaceElementwise"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "TotalDropout"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "ReplaceElementwise"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("arithmetic", "ImpulseNoise"),
@@ -882,30 +905,69 @@ def draw_per_augmenter_videos():
     descriptors.extend([
         _Descriptor.from_augsubs(
             "blend",
-            "Alpha\nwith EdgeDetect(1.0)",
-            [("factor=%.1f" % (factor,), iaa.Alpha(factor=factor, first=iaa.EdgeDetect(1.0)))
+            "BlendAlpha\nwith EdgeDetect(1.0)",
+            [("factor=%.1f" % (factor,), iaa.BlendAlpha(factor=factor, foreground=iaa.EdgeDetect(1.0)))
              for factor in [0.0, 0.25, 0.5, 0.75, 1.0]]
         ),
-        _Descriptor.from_augsubs(
-            "blend",
-            "Alpha\nwith EdgeDetect(1.0)\n(per_channel=True)",
-            [("factor=(%.2f, %.2f)" % (factor[0], factor[1]), iaa.Alpha(factor=factor, first=iaa.EdgeDetect(1.0), per_channel=0.5))
-             for factor in [(0.0, 0.2), (0.15, 0.35), (0.4, 0.6), (0.65, 0.85), (0.8, 1.0)]],
-            seed=4
-        ),
+        # _Descriptor.from_augsubs(
+        #     "blend",
+        #     "Alpha\nwith EdgeDetect(1.0)\n(per_channel=True)",
+        #     [("factor=(%.2f, %.2f)" % (factor[0], factor[1]), iaa.Alpha(factor=factor, first=iaa.EdgeDetect(1.0), per_channel=0.5))
+        #      for factor in [(0.0, 0.2), (0.15, 0.35), (0.4, 0.6), (0.65, 0.85), (0.8, 1.0)]],
+        #     seed=4
+        # ),
         # AlphaElementwise
         _Descriptor.from_augsubs(
             "blend",
-            "SimplexNoiseAlpha\nwith EdgeDetect(1.0)",
-            [("", iaa.SimplexNoiseAlpha(first=iaa.EdgeDetect(1.0))) for _ in range(7)],
+            "BlendAlphaSimplexNoise\nwith EdgeDetect(1.0)",
+            [("", iaa.BlendAlphaSimplexNoise(foreground=iaa.EdgeDetect(1.0))) for _ in range(7)],
             seed=15
         ),
         _Descriptor.from_augsubs(
             "blend",
-            "FrequencyNoiseAlpha\nwith EdgeDetect(1.0)",
-            [("exponent=%.1f" % (exponent,), iaa.FrequencyNoiseAlpha(exponent=exponent, first=iaa.EdgeDetect(1.0), size_px_max=16, upscale_method="linear", sigmoid=False))
+            "BlendAlphaFrequencyNoise\nwith EdgeDetect(1.0)",
+            [("exponent=%.1f" % (exponent,), iaa.BlendAlphaFrequencyNoise(exponent=exponent, foreground=iaa.EdgeDetect(1.0), size_px_max=16, upscale_method="linear", sigmoid=False))
              for exponent in [-4, -2, 0, 2, 4]]
-        )
+        ),
+        _Descriptor.from_augsubs(
+            "blend",
+            "BlendAlphaSomeColors\nwith RemoveSaturation(1.0)",
+            [("", iaa.BlendAlphaSomeColors(iaa.RemoveSaturation(1.0), seed=2))
+             for _ in range(8)]
+        ),
+        # _Descriptor.from_augsubs(
+        #     "blend",
+        #     "BlendAlphaVerticalLinearGradient\nwith Clouds()",
+        #     [("", iaa.BlendAlphaVerticalLinearGradient(iaa.Clouds()))
+        #      for _ in range(5)]
+        # ),
+        _Descriptor.from_augsubs(
+            "blend",
+            "BlendAlphaRegularGrid\nwith Multiply((0.0, 0.5))",
+            [("", iaa.BlendAlphaRegularGrid(
+                nb_rows=(2, 8),
+                nb_cols=(2, 8),
+                foreground=iaa.Multiply((0.0, 0.5)),
+                alpha=(0.0, 1.0)))
+             for _ in range(5)]
+        ),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "BlendAlphaMask"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "BlendAlphaElementwise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "BlendAlphaVerticalLinearGradient"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "BlendAlphaHorizontalLinearGradient"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "BlendAlphaSegMapClassIds"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "BlendAlphaBoundingBoxes"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "BlendAlphaCheckerboard"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "SomeColorsMaskGen"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "HorizontalLinearGradientMaskGen"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "VerticalLinearGradientMaskGen"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "RegularGridMaskGen"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "CheckerboardMaskGen"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "SegMapClassIdsMaskGen"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "BoundingBoxesMaskGen"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("blend", "InvertMaskGen")
+        ])
     ])
 
     # ###
@@ -946,6 +1008,26 @@ def draw_per_augmenter_videos():
             "MotionBlur\n(k=5)",
             [("angle=%d" % (angle,), iaa.MotionBlur(k=5, angle=angle))
              for angle in np.linspace(0, 360-360/5, num=5)]
+        ),
+        _Descriptor.from_augsubs(
+            "blur",
+            "MeanShiftBlur",
+            [("",
+              iaa.MeanShiftBlur())
+             for _ in range(5)]
+        ),
+    ])
+
+    # ####
+    # collections
+    # ####
+    descriptors.extend([
+        _Descriptor.from_augsubs(
+            "collections",
+            "RandAugment",
+            [("n=2, m=(6, 12)",
+              iaa.RandAugment(n=2, m=(6, 12)))
+             for _ in range(5)]
         )
     ])
 
@@ -953,13 +1035,18 @@ def draw_per_augmenter_videos():
     # color
     # ####
     descriptors.extend([
+        # WithColorspace -> see also
+        # WithBrightnessChannels -> see also
         _Descriptor.from_augsubs(
             "color",
             "MultiplyAndAddToBrightness",
             [("mul=%.1f, add=%d" % (mul, add),
-              iaa.MultiplyHueAndSaturation(mul=mul))
+              iaa.MultiplyAndAddToBrightness(mul=mul, add=add))
              for mul, add in [(1.0, 0), (1.0, -30), (1.0, 30), (0.5, 0), (1.5, 0)]]
         ),
+        # MultiplyBrightness -> see also
+        # AddToBrightness -> see also
+        # WithHueAndSaturation -> see also
         _Descriptor.from_augsubs(
             "color",
             "MultiplyHueAndSaturation",
@@ -975,6 +1062,7 @@ def draw_per_augmenter_videos():
             "MultiplySaturation",
             [("mul=%.2f" % (mul,), iaa.MultiplySaturation(mul=mul)) for mul in [0.0, 0.5, 1.0, 1.5, 2.0]]
         ),
+        # RemoveSaturation -> further below
         _Descriptor.from_augsubs(
             "color",
             "AddToHueAndSaturation",
@@ -991,6 +1079,7 @@ def draw_per_augmenter_videos():
         #     "AddToSaturation",
         #     [("value=%d" % (val,), iaa.AddToSaturation(val)) for val in [-45, -25, 0, 25, 45]]
         # ),
+        # ChangeColorspace -> see also
         _Descriptor.from_augsubs(
             "color",
             "Grayscale",
@@ -999,22 +1088,12 @@ def draw_per_augmenter_videos():
         _Descriptor.from_augsubs(
             "color",
             "RemoveSaturation",
-            [("mul=%.2f" % (mul,), iaa.RemoveSaturation(mul=0.0)) for mul in [0.0, 0.25, 0.5, 0.75, 1.0]]
-        ),
-        _Descriptor.from_augsubs(
-            "color",
-            "GrayscaleColorwise",
-            [("", iaa.GrayscaleColorwise()) for _ in np.arange(8)]
-        ),
-        _Descriptor.from_augsubs(
-            "color",
-            "RemoveSaturationColorwise",
-            [("", iaa.RemoveSaturationColorwise()) for _ in np.arange(8)]
+            [("mul=%.2f" % (mul,), iaa.RemoveSaturation(mul=mul)) for mul in [0.0, 0.25, 0.5, 0.75, 1.0]]
         ),
         _Descriptor.from_augsubs(
             "color",
             "ChangeColorTemperature",
-            [("kelvin=%d", iaa.ChangeColorTemperature(kelvin)) for kelvin in [1000, 2000, 4000, 8000, 16000]]
+            [("kelvin=%d" % (kelvin,), iaa.ChangeColorTemperature(kelvin)) for kelvin in [1000, 2000, 4000, 8000, 16000]]
         ),
         _Descriptor.from_augsubs(
             "color",
@@ -1026,6 +1105,7 @@ def draw_per_augmenter_videos():
             "UniformColorQuantization\n(to_colorspace=RGB)",
             [("n_colors=%d" % (n_colors,), iaa.UniformColorQuantization(n_colors=n_colors, to_colorspace=iaa.CSPACE_RGB)) for n_colors in [2, 4, 8, 16, 32]]
         ),
+        # Posterize -> see also
         _MarkdownTableSeeAlsoUrlList([
             _MarkdownTableSeeAlsoUrl.from_augmenter("color", "WithColorspace"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("color", "WithBrightnessChannels"),
@@ -1065,37 +1145,32 @@ def draw_per_augmenter_videos():
             [("cutoff=%.2f" % (cutoff,), iaa.SigmoidContrast(gain=10, cutoff=cutoff))
              for cutoff in np.linspace(0.0, 1.0, num=5)]
         ),
-        _Descriptor.from_augsubs(
-            "contrast",
-            "SigmoidContrast\n(per_channel=True)",
-            [("gain=(5, 15),\ncutoff=(0.0, 1.0)", iaa.SigmoidContrast(gain=(5, 15), cutoff=(0.0, 1.0), per_channel=True))
-             for _ in range(5)]
-        ),
+        # _Descriptor.from_augsubs(
+        #     "contrast",
+        #     "SigmoidContrast\n(per_channel=True)",
+        #     [("gain=(5, 15),\ncutoff=(0.0, 1.0)", iaa.SigmoidContrast(gain=(5, 15), cutoff=(0.0, 1.0), per_channel=True))
+        #      for _ in range(5)]
+        # ),
         _Descriptor.from_augsubs(
             "contrast",
             "LogContrast",
             [("gain=%.2f" % (gain,), iaa.LogContrast(gain=gain)) for gain in np.linspace(0.5, 1.0, num=5)]
         ),
-        _Descriptor.from_augsubs(
-            "contrast",
-            "LogContrast\n(per_channel=True)",
-            [("gain=(0.5, 1.0)", iaa.LogContrast(gain=(0.5, 1.0), per_channel=True)) for _ in range(5)]
-        ),
+        # _Descriptor.from_augsubs(
+        #     "contrast",
+        #     "LogContrast\n(per_channel=True)",
+        #     [("gain=(0.5, 1.0)", iaa.LogContrast(gain=(0.5, 1.0), per_channel=True)) for _ in range(5)]
+        # ),
         _Descriptor.from_augsubs(
             "contrast",
             "LinearContrast",
             [("alpha=%.2f" % (alpha,), iaa.LinearContrast(alpha=alpha)) for alpha in np.linspace(0.25, 1.75, num=5)]
         ),
-        _Descriptor.from_augsubs(
-            "contrast",
-            "LinearContrast\n(per_channel=True)",
-            [("alpha=(0.25, 1.75)", iaa.LinearContrast(alpha=(0.25, 1.75), per_channel=True)) for _ in range(5)]
-        ),
-        _Descriptor.from_augsubs(
-            "contrast",
-            "Autocontrast",
-            [("cutoff=%d" % (cutoff,), iaa.Autocontrast(cutoff)) for cutoff in [0, 5, 10, 15, 20]]
-        ),
+        # _Descriptor.from_augsubs(
+        #     "contrast",
+        #     "LinearContrast\n(per_channel=True)",
+        #     [("alpha=(0.25, 1.75)", iaa.LinearContrast(alpha=(0.25, 1.75), per_channel=True)) for _ in range(5)]
+        # ),
         _Descriptor.from_augsubs(
             "contrast",
             "AllChannels-\nHistogramEqualization",
@@ -1112,23 +1187,23 @@ def draw_per_augmenter_videos():
         _Descriptor.from_augsubs(
             "contrast",
             "AllChannelsCLAHE",
-            [("clip_limit=%d" % (int(clip_limit),), iaa.AllChannelsCLAHE(clip_limit=int(clip_limit)))
+            [("clip_limit=%.1f" % (clip_limit,), iaa.AllChannelsCLAHE(clip_limit=clip_limit))
              for clip_limit
-             in np.linspace(1, 20, num=5)]
+             in np.linspace(0.1, 8.0, num=5)]
         ),
-        _Descriptor.from_augsubs(
-            "contrast",
-            "AllChannelsCLAHE\n(per_channel=True)",
-            [("clip_limit=(1, 20)", iaa.AllChannelsCLAHE(clip_limit=(1, 20), per_channel=True)) for _ in range(5)],
-            seed=4
-        ),
+        # _Descriptor.from_augsubs(
+        #     "contrast",
+        #     "AllChannelsCLAHE\n(per_channel=True)",
+        #     [("clip_limit=(1, 20)", iaa.AllChannelsCLAHE(clip_limit=(1, 20), per_channel=True)) for _ in range(5)],
+        #     seed=4
+        # ),
         _Descriptor.from_augsubs(
             "contrast",
             "CLAHE",
-            [("clip_limit=%d,\nto_colorspace=%s" % (int(clip_limit), to_colorspace),
-              iaa.CLAHE(clip_limit=int(clip_limit), to_colorspace=to_colorspace))
+            [("clip_limit=%.1f,\nto_colorspace=%s" % (clip_limit, to_colorspace),
+              iaa.CLAHE(clip_limit=clip_limit, to_colorspace=to_colorspace))
              for to_colorspace, clip_limit
-             in zip([iaa.CLAHE.Lab] * 5, np.linspace(1, 20, num=5))]
+             in zip([iaa.CLAHE.Lab] * 5, np.linspace(0.1, 8.0, num=5))]
         ),
         _MarkdownTableSeeAlsoUrlList([
             _MarkdownTableSeeAlsoUrl.from_augmenter("contrast", "Equalize"),
@@ -1166,6 +1241,15 @@ def draw_per_augmenter_videos():
         ),
         _MarkdownTableSeeAlsoUrlList([
             _MarkdownTableSeeAlsoUrl.from_augmenter("convolutional", "Convolve"),
+        ])
+    ])
+
+    # ###
+    # debug
+    # ###
+    descriptors.extend([
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("debug", "SaveDebugImageEveryNBatches"),
         ])
     ])
 
@@ -1248,7 +1332,14 @@ def draw_per_augmenter_videos():
              for cval in [0.0, 0.25, 0.5, 0.75, 1.0]],
             affects_geometry=True),
 
-        # AffineCV2
+        # ScaleX -> see also
+        # ScaleY -> see also
+        # TranslateX -> see also
+        # TranslateY -> see also
+        # Rotate -> see also
+        # ShearX -> see also
+        # ShearY -> see also
+        # AffineCV2 -> deprecated
 
         _Descriptor.from_augsubs(
             "geometric",
@@ -1267,9 +1358,9 @@ def draw_per_augmenter_videos():
         ),
         _Descriptor.from_augsubs(
             "geometric",
-            "ElasticTransformation\n(sigma=0.2)",
-            [("alpha=%.1f" % (alpha,), iaa.ElasticTransformation(alpha=alpha, sigma=0.2))
-             for alpha in np.linspace(0.1, 9.0, num=5)],
+            "ElasticTransformation\n(sigma=1.0)",
+            [("alpha=%.1f" % (alpha,), iaa.ElasticTransformation(alpha=alpha, sigma=1.0))
+             for alpha in np.linspace(1.0, 20.0, num=5)],
             affects_geometry=True,
             seed=1
         ),
@@ -1277,7 +1368,7 @@ def draw_per_augmenter_videos():
             "geometric",
             "ElasticTransformation\n(sigma=5.0)",
             [("alpha=%.1f" % (alpha,), iaa.ElasticTransformation(alpha=alpha, sigma=5.0))
-             for alpha in np.linspace(0.1, 60.0, num=5)],
+             for alpha in np.linspace(1.0, 60.0, num=5)],
             affects_geometry=True
         ),
         _Descriptor.from_augsubs(
@@ -1312,6 +1403,105 @@ def draw_per_augmenter_videos():
             _MarkdownTableSeeAlsoUrl.from_augmenter("geometric", "TranslateX"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("geometric", "TranslateY"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("geometric", "Rotate")
+        ])
+    ])
+
+    # ###
+    # imgcorruptlike
+    # ###
+    descriptors.extend([
+        _Descriptor.from_augsubs(
+            "imgcorruptlike",
+            "GlassBlur",
+            [("severity=%d" % (severity,),
+              iaa.imgcorruptlike.GlassBlur(severity=severity))
+             for severity in [1, 2, 3, 4, 5]]),
+        _Descriptor.from_augsubs(
+            "imgcorruptlike",
+            "DefocusBlur",
+            [("severity=%d" % (severity,),
+              iaa.imgcorruptlike.DefocusBlur(severity=severity))
+             for severity in [1, 2, 3, 4, 5]]),
+        _Descriptor.from_augsubs(
+            "imgcorruptlike",
+            "ZoomBlur",
+            [("severity=%d" % (severity,),
+              iaa.imgcorruptlike.ZoomBlur(severity=severity))
+             for severity in [1, 2, 3, 4, 5]]),
+        _Descriptor.from_augsubs(
+            "imgcorruptlike",
+            "Snow",
+            [("severity=%d" % (severity,),
+              iaa.imgcorruptlike.Snow(severity=severity))
+             for severity in [1, 2, 3, 4, 5]]),
+        _Descriptor.from_augsubs(
+            "imgcorruptlike",
+            "Spatter",
+            [("severity=%d" % (severity,),
+              iaa.imgcorruptlike.Spatter(severity=severity))
+             for severity in [1, 2, 3, 4, 5]]),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "GaussianNoise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "ShotNoise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "ImpulseNoise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "SpeckleNoise"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "GaussianBlur"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "MotionBlur"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "Fog"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "Frost"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "Contrast"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "Brightness"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "Saturate"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "JpegCompression"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "Pixelate"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("imgcorruptlike", "ElasticTransform")
+        ])
+    ])
+
+    # ###
+    # pillike
+    # ###
+    descriptors.extend([
+        _Descriptor.from_augsubs(
+            "pillike",
+            "Autocontrast",
+            [("cutoff=%d" % (cutoff,),
+              iaa.pillike.Autocontrast(cutoff)) for cutoff in [0, 5, 10, 15, 20]]),
+        _Descriptor.from_augsubs(
+            "pillike",
+            "EnhanceColor",
+            [("factor=%.1f" % (factor,),
+              iaa.pillike.EnhanceColor(factor)) for factor in np.linspace(0.0, 3.0, 5)]),
+        _Descriptor.from_augsubs(
+            "pillike",
+            "EnhanceSharpness",
+            [("factor=%.1f" % (factor,),
+              iaa.pillike.EnhanceSharpness(factor)) for factor in np.linspace(0.0, 3.0, 5)]),
+        _Descriptor.from_augsubs(
+            "pillike",
+            "FilterEdgeEnhanceMore",
+            [("off", iaa.Identity()),
+             ("on", iaa.pillike.FilterEdgeEnhanceMore())]),
+        _Descriptor.from_augsubs(
+            "pillike",
+            "FilterContour",
+            [("off", iaa.Identity()),
+             ("on", iaa.pillike.FilterContour())]),
+        _MarkdownTableSeeAlsoUrlList([
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "Solarize"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "Posterize"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "Equalize"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "EnhanceContrast"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "EnhanceBrightness"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "FilterBlur"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "FilterSmooth"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "FilterSmoothMore"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "FilterEdgeEnhance"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "FilterFindEdges"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "FilterEmboss"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "FilterSharpen"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "FilterDetail"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("pillike", "Affine"),
         ])
     ])
 
@@ -1377,10 +1567,15 @@ def draw_per_augmenter_videos():
             "RegularGridVoronoi: p_replace\n(n_rows=n_cols=16)",
             [("p_replace=%.2f" % (p_replace,),
               iaa.RegularGridVoronoi(n_rows=16, n_cols=16, p_drop_points=0, p_replace=p_replace))
-             for p_replace in [1.0, 0.8, 0.6, 0.4, 0.2]]),
+             for p_replace in [0, 0.25, 0.5, 0.75, 1.0]]),
         _MarkdownTableSeeAlsoUrlList([
             _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "Voronoi"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "RelativeRegularGridVoronoi"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "RegularGridPointsSampler"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "RelativeRegularGridPointsSampler"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "DropoutPointsSampler"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "UniformPointsSampler"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("segmentation", "SubsamplingPointsSampler")
         ])
     ])
 
@@ -1427,24 +1622,24 @@ def draw_per_augmenter_videos():
             affects_geometry=True),
         _MarkdownTableSeeAlsoUrlList([
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "Resize"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToMultiplesOf"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CropToMultiplesOf"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToPowersOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToMultiplesOf"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CropToPowersOf"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToAspectRatio"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToPowersOf"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CropToAspectRatio"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToSquare"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToAspectRatio"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CropToSquare"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToFixedSize"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "PadToSquare"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToFixedSize"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToMultiplesOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToFixedSize"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToMultiplesOf"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToPowersOf"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToMultiplesOf"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToPowersOf"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToAspectRatio"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToPowersOf"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToAspectRatio"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToSquare"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToAspectRatio"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterCropToSquare"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("size", "CenterPadToSquare"),
             _MarkdownTableSeeAlsoUrl.from_augmenter("size", "KeepSizeByResize"),
         ])
     ])
@@ -1459,6 +1654,7 @@ def draw_per_augmenter_videos():
             [("lightness_threshold=%d" % (lthresh,), iaa.FastSnowyLandscape(lightness_threshold=lthresh, lightness_multiplier=2.0))
              for lthresh in [0, 50, 100, 150, 200]]
         ),
+        # CloudLayer -> see also
         _Descriptor.from_augsubs(
             "weather",
             "Clouds",
@@ -1469,16 +1665,22 @@ def draw_per_augmenter_videos():
             "Fog",
             [("", iaa.Fog()) for _ in range(5)]
         ),
-        # CloudLayer
-        # CloudLayer
+        # SnowflakesLayer -> see also
         _Descriptor.from_augsubs(
             "weather",
             "Snowflakes",
             [("", iaa.Snowflakes()) for _ in range(5)]
         ),
+        # RainLayer -> see also
+        _Descriptor.from_augsubs(
+            "weather",
+            "Rain",
+            [("", iaa.Rain()) for _ in range(5)]
+        ),
         _MarkdownTableSeeAlsoUrlList([
             _MarkdownTableSeeAlsoUrl.from_augmenter("weather", "CloudLayer"),
-            _MarkdownTableSeeAlsoUrl.from_augmenter("weather", "SnowflakesLayer")
+            _MarkdownTableSeeAlsoUrl.from_augmenter("weather", "SnowflakesLayer"),
+            _MarkdownTableSeeAlsoUrl.from_augmenter("weather", "RainLayer")
         ])
     ])
 
@@ -1531,7 +1733,7 @@ def draw_per_augmenter_videos():
             image_to_use = image_landscape
         elif descriptor.module in ["artistic"]:
             image_to_use = image_valley
-        elif "Colorwise" in descriptor.title:
+        elif "SomeColors" in descriptor.title:
             image_to_use = image_vangogh
 
         frames_images, frames_kps, frames_bbs, frames_hm, frames_segmap = \
@@ -1544,7 +1746,10 @@ def draw_per_augmenter_videos():
                              for frame_image, frame_hm, frame_segmap in zip(frames_images, frames_hm, frames_segmap)]
 
         aug_name = slugify(descriptor.title)
-        fp_all = os.path.join(IMAGES_DIR, "augmenter_videos/%s.gif" % (aug_name,))
+        fp_all = os.path.join(IMAGES_DIR, "augmenter_videos/%s/%s.gif" % (descriptor.module, aug_name,))
+
+        _makedirs(fp_all)
+
         #fp_images = os.path.join(IMAGES_DIR, "augmenter_videos/augment_images_with_coordsaug/%s.gif" % (aug_name,))
         #fp_kps = os.path.join(IMAGES_DIR, "augmenter_videos/augment_keypoints/%s.gif" % (aug_name,))
         #fp_bbs = os.path.join(IMAGES_DIR, "augmenter_videos/augment_bounding_boxes/%s.gif" % (aug_name,))
