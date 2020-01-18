@@ -1360,15 +1360,15 @@ def draw_per_augmenter_videos():
             "geometric",
             "ElasticTransformation\n(sigma=1.0)",
             [("alpha=%.1f" % (alpha,), iaa.ElasticTransformation(alpha=alpha, sigma=1.0))
-             for alpha in np.linspace(1.0, 20.0, num=5)],
+             for alpha in np.linspace(1.0, 7.5, num=5)],
             affects_geometry=True,
             seed=1
         ),
         _Descriptor.from_augsubs(
             "geometric",
-            "ElasticTransformation\n(sigma=5.0)",
-            [("alpha=%.1f" % (alpha,), iaa.ElasticTransformation(alpha=alpha, sigma=5.0))
-             for alpha in np.linspace(1.0, 60.0, num=5)],
+            "ElasticTransformation\n(sigma=4.0)",
+            [("alpha=%.1f" % (alpha,), iaa.ElasticTransformation(alpha=alpha, sigma=4.0))
+             for alpha in np.linspace(1.0, 30.0, num=5)],
             affects_geometry=True
         ),
         _Descriptor.from_augsubs(
