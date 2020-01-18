@@ -1,9 +1,9 @@
 """
-Augmenters that perform apply artistic image filters.
+Augmenters that apply artistic image filters.
 
 List of augmenters:
 
-    * Cartoon
+    * :class:`Cartoon`
 
 """
 
@@ -12,6 +12,7 @@ from __future__ import print_function, division, absolute_import
 import numpy as np
 import cv2
 
+from imgaug.imgaug import _normalize_cv2_input_arr_
 from . import meta
 from . import color as colorlib
 from .. import dtypes as iadt
@@ -107,7 +108,7 @@ def stylize_cartoon(image, blur_ksize=3, segmentation_size=1.0,
     if segmentation_size <= 0:
         image_seg = image
     else:
-        cv2.pyrMeanShiftFiltering(image,
+        cv2.pyrMeanShiftFiltering(_normalize_cv2_input_arr_(image),
                                   sp=spatial_window_radius,
                                   sr=color_window_radius,
                                   dst=image_seg)
@@ -144,7 +145,7 @@ def _find_edges_canny(image, edge_multiplier, from_colorspace):
                                              from_colorspace=from_colorspace)
     image_gray = image_gray[..., 0]
     thresh = min(int(200 * (1/edge_multiplier)), 254)
-    edges = cv2.Canny(image_gray, thresh, thresh)
+    edges = cv2.Canny(_normalize_cv2_input_arr_(image_gray), thresh, thresh)
     return edges
 
 
@@ -153,7 +154,8 @@ def _find_edges_laplacian(image, edge_multiplier, from_colorspace):
                                              to_colorspace=colorlib.CSPACE_GRAY,
                                              from_colorspace=from_colorspace)
     image_gray = image_gray[..., 0]
-    edges_f = cv2.Laplacian(image_gray / 255.0, cv2.CV_64F)
+    edges_f = cv2.Laplacian(_normalize_cv2_input_arr_(image_gray / 255.0),
+                            cv2.CV_64F)
     edges_f = np.abs(edges_f)
     edges_f = edges_f ** 2
     vmax = np.percentile(edges_f, min(int(90 * (1/edge_multiplier)), 99))
@@ -170,7 +172,7 @@ def _blur_median(image, ksize):
         ksize += 1
     if ksize <= 1:
         return image
-    return cv2.medianBlur(image, ksize)
+    return cv2.medianBlur(_normalize_cv2_input_arr_(image), ksize)
 
 
 def _threshold(image, thresh):
@@ -182,7 +184,7 @@ def _threshold(image, thresh):
 
 def _suppress_edge_blobs(edges, size, thresh, inverse):
     kernel = np.ones((size, size), dtype=np.float32)
-    counts = cv2.filter2D(edges / 255.0, -1, kernel)
+    counts = cv2.filter2D(_normalize_cv2_input_arr_(edges / 255.0), -1, kernel)
 
     if inverse:
         mask = (counts < thresh)
@@ -231,11 +233,16 @@ class Cartoon(meta.Augmenter):
     edges or also too many detected edges are probably the most significant
     drawbacks.
 
+    Supported dtypes
+    ----------------
+
+    See :func:`~imgaug.augmenters.artistic.stylize_cartoon`.
+
     Parameters
     ----------
     blur_ksize : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
         Median filter kernel size.
-        See :func:`imgaug.augmenters.artistic.stylize_cartoon` for details.
+        See :func:`~imgaug.augmenters.artistic.stylize_cartoon` for details.
 
             * If ``number``: That value will be used for all images.
             * If ``tuple (a, b) of number``: A random value will be uniformly
@@ -248,7 +255,7 @@ class Cartoon(meta.Augmenter):
 
     segmentation_size : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
         Mean-Shift segmentation size multiplier.
-        See :func:`imgaug.augmenters.artistic.stylize_cartoon` for details.
+        See :func:`~imgaug.augmenters.artistic.stylize_cartoon` for details.
 
             * If ``number``: That value will be used for all images.
             * If ``tuple (a, b) of number``: A random value will be uniformly
@@ -261,7 +268,7 @@ class Cartoon(meta.Augmenter):
 
     saturation : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
         Saturation multiplier.
-        See :func:`imgaug.augmenters.artistic.stylize_cartoon` for details.
+        See :func:`~imgaug.augmenters.artistic.stylize_cartoon` for details.
 
             * If ``number``: That value will be used for all images.
             * If ``tuple (a, b) of number``: A random value will be uniformly
@@ -274,7 +281,7 @@ class Cartoon(meta.Augmenter):
 
     edge_prevalence : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
         Multiplier for the prevalence of edges.
-        See :func:`imgaug.augmenters.artistic.stylize_cartoon` for details.
+        See :func:`~imgaug.augmenters.artistic.stylize_cartoon` for details.
 
             * If ``number``: That value will be used for all images.
             * If ``tuple (a, b) of number``: A random value will be uniformly
@@ -289,14 +296,14 @@ class Cartoon(meta.Augmenter):
         The source colorspace. Use one of ``imgaug.augmenters.color.CSPACE_*``.
         Defaults to ``RGB``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -315,9 +322,9 @@ class Cartoon(meta.Augmenter):
     def __init__(self, blur_ksize=(1, 5), segmentation_size=(0.8, 1.2),
                  saturation=(1.5, 2.5), edge_prevalence=(0.9, 1.1),
                  from_colorspace=colorlib.CSPACE_RGB,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(Cartoon, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.blur_ksize = iap.handle_continuous_param(
             blur_ksize, "blur_ksize", value_range=(0, None),
@@ -333,7 +340,7 @@ class Cartoon(meta.Augmenter):
             tuple_to_uniform=True, list_to_choice=True)
         self.from_colorspace = from_colorspace
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is not None:
             samples = self._draw_samples(batch, random_state)
             for i, image in enumerate(batch.images):
@@ -359,6 +366,6 @@ class Cartoon(meta.Augmenter):
         )
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.blur_ksize, self.segmentation_size, self.saturation,
                 self.edge_prevalence, self.from_colorspace]

@@ -156,14 +156,15 @@ def handle_discrete_param(param, name, value_range=None, tuple_to_uniform=True,
             allowed_type, allowed_type, list_str, name, type(param),))
 
 
-def handle_categorical_string_param(param, name, valid_values):
-    if param == ia.ALL:
+def handle_categorical_string_param(param, name, valid_values=None):
+    if param == ia.ALL and valid_values is not None:
         return Choice(list(valid_values))
 
     if ia.is_string(param):
-        assert param in valid_values, (
-            "Expected parameter '%s' to be one of: %s. Got: %s." % (
-                name, ", ".join(list(valid_values)), param))
+        if valid_values is not None:
+            assert param in valid_values, (
+                "Expected parameter '%s' to be one of: %s. Got: %s." % (
+                    name, ", ".join(list(valid_values)), param))
         return Deterministic(param)
 
     if isinstance(param, list):
@@ -171,20 +172,23 @@ def handle_categorical_string_param(param, name, valid_values):
             "Expected list provided for parameter '%s' to only contain "
             "strings, got types: %s." % (
                 name, ", ".join([type(v).__name__ for v in param])))
-        assert all([val in valid_values for val in param]), (
-            "Expected list provided for parameter '%s' to only contain "
-            "the following allowed strings: %s. Got strings: %s." % (
-                name, ", ".join(valid_values), ", ".join(param)
-            ))
+        if valid_values is not None:
+            assert all([val in valid_values for val in param]), (
+                "Expected list provided for parameter '%s' to only contain "
+                "the following allowed strings: %s. Got strings: %s." % (
+                    name, ", ".join(valid_values), ", ".join(param)
+                ))
         return Choice(param)
 
     if isinstance(param, StochasticParameter):
         return param
 
     raise Exception(
-        "Expected parameter '%s' to be imgaug.ALL, a string, a list of "
+        "Expected parameter '%s' to be%s a string, a list of "
         "strings or StochasticParameter, got %s." % (
-            name, type(param).__name__,))
+            name,
+            " imgaug.ALL," if valid_values is not None else "",
+            type(param).__name__,))
 
 
 def handle_discrete_kernel_size_param(param, name, value_range=(1, None),
@@ -367,10 +371,10 @@ class StochasticParameter(object):
 
         Parameters
         ----------
-        random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
             A seed or random number generator to use during the sampling
             process. If ``None``, the global RNG will be used.
-            See also :func:`imgaug.augmenters.meta.Augmenter.__init__`
+            See also :func:`~imgaug.augmenters.meta.Augmenter.__init__`
             for a similar parameter with more details.
 
         Returns
@@ -389,10 +393,10 @@ class StochasticParameter(object):
         size : tuple of int or int
             Number of samples by dimension.
 
-        random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
             A seed or random number generator to use during the sampling
             process. If ``None``, the global RNG will be used.
-            See also :func:`imgaug.augmenters.meta.Augmenter.__init__`
+            See also :func:`~imgaug.augmenters.meta.Augmenter.__init__`
             for a similar parameter with more details.
 
         Returns
@@ -570,7 +574,7 @@ class StochasticParameter(object):
             Number of points to sample. This is always expected to have at
             least two values. The first defines the number of sampling runs,
             the second (and further) dimensions define the size assigned
-            to each :func:`imgaug.parameters.StochasticParameter.draw_samples`
+            to each :func:`~imgaug.parameters.StochasticParameter.draw_samples`
             call. E.g. ``(10, 20, 15)`` will lead to ``10`` calls of
             ``draw_samples(size=(20, 15))``. The results will be merged to a
             single 1d array.
@@ -1493,7 +1497,7 @@ class FromLowerResolution(StochasticParameter):
         Upsampling/interpolation method to use. This is used after the sampling
         is finished and the low resolution plane has to be upsampled to the
         requested `size` in ``draw_samples(size, ...)``. The method may be
-        the same as in :func:`imgaug.imgaug.imresize_many_images`. Usually
+        the same as in :func:`~imgaug.imgaug.imresize_many_images`. Usually
         ``nearest`` or ``linear`` are good choices. ``nearest`` will result
         in rectangles with sharp edges and ``linear`` in rectangles with
         blurry and round edges. The method may be provided as a
@@ -1737,6 +1741,9 @@ class Discretize(StochasticParameter):
     other_param : imgaug.parameters.StochasticParameter
         The other parameter, which's values are to be discretized.
 
+    round : bool, optional
+        Whether to round before converting to integer dtype.
+
     Examples
     --------
     >>> import imgaug.parameters as iap
@@ -1745,10 +1752,12 @@ class Discretize(StochasticParameter):
     Create a discrete standard gaussian distribution.
 
     """
-    def __init__(self, other_param):
+    def __init__(self, other_param, round=True):
+        # pylint: disable=redefined-builtin
         super(Discretize, self).__init__()
         _assert_arg_is_stoch_param("other_param", other_param)
         self.other_param = other_param
+        self.round = round
 
     def _draw_samples(self, size, random_state):
         samples = self.other_param.draw_samples(size, random_state=random_state)
@@ -1768,14 +1777,16 @@ class Discretize(StochasticParameter):
         # lower bound here -- shouldn't happen though
         bitsize = max(bitsize, 8)
         dtype = np.dtype("int%d" % (bitsize,))
-        return np.round(samples).astype(dtype)
+        if self.round:
+            samples = np.round(samples)
+        return samples.astype(dtype)
 
     def __repr__(self):
         return self.__str__()
 
     def __str__(self):
         opstr = str(self.other_param)
-        return "Discretize(%s)" % (opstr,)
+        return "Discretize(%s, round=%s)" % (opstr, str(self.round))
 
 
 class Multiply(StochasticParameter):
@@ -2734,13 +2745,13 @@ class Sigmoid(StochasticParameter):
         Parameters
         ----------
         other_param : imgaug.parameters.StochasticParameter
-            See :func:`imgaug.parameters.Sigmoid.__init__`.
+            See :func:`~imgaug.parameters.Sigmoid.__init__`.
 
         threshold : number or tuple of number or iterable of number or imgaug.parameters.StochasticParameter, optional
-            See :func:`imgaug.parameters.Sigmoid.__init__`.
+            See :func:`~imgaug.parameters.Sigmoid.__init__`.
 
         activated : bool or number, optional
-            See :func:`imgaug.parameters.Sigmoid.__init__`.
+            See :func:`~imgaug.parameters.Sigmoid.__init__`.
 
         Returns
         -------
@@ -2782,7 +2793,7 @@ class SimplexNoise(StochasticParameter):
     """Parameter that generates simplex noise of varying resolutions.
 
     This parameter expects to sample noise for 2d planes, i.e. for
-    sizes ``(H, W)`` and will return a value in the range ``[0.0, 1.0]``
+    sizes ``(H, W, [C])`` and will return a value in the range ``[0.0, 1.0]``
     per spatial location in that plane.
 
     The noise is sampled from low resolution planes and
@@ -2815,7 +2826,7 @@ class SimplexNoise(StochasticParameter):
         After generating the noise maps in low resolution environments, they
         have to be upscaled to the originally requested shape (i.e. usually
         the image size). This parameter controls the interpolation method to
-        use. See also :func:`imgaug.imgaug.imresize_many_images` for a
+        use. See also :func:`~imgaug.imgaug.imresize_many_images` for a
         description of possible values.
 
             * If ``imgaug.ALL``, then either ``nearest`` or ``linear`` or
@@ -2872,19 +2883,29 @@ class SimplexNoise(StochasticParameter):
                 "StochasticParameter, got %s." % (type(upscale_method),))
 
     def _draw_samples(self, size, random_state):
-        assert len(size) == 2, (
-            "Expected requested noise to have shape (H, W), "
+        assert len(size) in [2, 3], (
+            "Expected requested noise to have shape (H, W) or (H, W, C), "
             "got shape %s." % (size,))
-        h, w = size
+        height, width = size[0:2]
+        nb_channels = 1 if len(size) == 2 else size[2]
+
+        channels = [self._draw_samples_hw(height, width, random_state)
+                    for _ in np.arange(nb_channels)]
+
+        if len(size) == 2:
+            return channels[0]
+        return np.stack(channels, axis=-1)
+
+    def _draw_samples_hw(self, height, width, random_state):
         iterations = 1
         rngs = random_state.duplicate(1+iterations)
         aggregation_method = "max"
         upscale_methods = self.upscale_method.draw_samples(
             (iterations,), random_state=rngs[0])
-        result = np.zeros((h, w), dtype=np.float32)
+        result = np.zeros((height, width), dtype=np.float32)
         for i in sm.xrange(iterations):
             noise_iter = self._draw_samples_iteration(
-                h, w, rngs[1+i], upscale_methods[i])
+                height, width, rngs[1+i], upscale_methods[i])
             if aggregation_method == "avg":
                 result += noise_iter
             elif aggregation_method == "min":
@@ -2903,22 +2924,22 @@ class SimplexNoise(StochasticParameter):
 
         return result
 
-    def _draw_samples_iteration(self, h, w, rng, upscale_method):
+    def _draw_samples_iteration(self, height, width, rng, upscale_method):
         opensimplex_seed = rng.generate_seed_()
 
         # we have to use int(.) here, otherwise we can get warnings about
         # value overflows in OpenSimplex L103
         generator = OpenSimplex(seed=int(opensimplex_seed))
 
-        maxlen = max(h, w)
+        maxlen = max(height, width)
         size_px_max = self.size_px_max.draw_sample(random_state=rng)
         if maxlen > size_px_max:
             downscale_factor = size_px_max / maxlen
-            h_small = int(h * downscale_factor)
-            w_small = int(w * downscale_factor)
+            h_small = int(height * downscale_factor)
+            w_small = int(width * downscale_factor)
         else:
-            h_small = h
-            w_small = w
+            h_small = height
+            w_small = width
 
         # don't go below Hx1 or 1xW
         h_small = max(h_small, 1)
@@ -2936,12 +2957,12 @@ class SimplexNoise(StochasticParameter):
         noise_0to1 = (noise + 1.0) / 2
         noise_0to1 = np.clip(noise_0to1, 0.0, 1.0)
 
-        if noise_0to1.shape != (h, w):
+        if noise_0to1.shape != (height, width):
             noise_0to1_uint8 = (noise_0to1 * 255).astype(np.uint8)
             noise_0to1_3d = np.tile(
                 noise_0to1_uint8[..., np.newaxis], (1, 1, 3))
             noise_0to1 = ia.imresize_single_image(
-                noise_0to1_3d, (h, w), interpolation=upscale_method)
+                noise_0to1_3d, (height, width), interpolation=upscale_method)
             noise_0to1 = (noise_0to1[..., 0] / 255.0).astype(np.float32)
 
         return noise_0to1
@@ -2960,8 +2981,8 @@ class FrequencyNoise(StochasticParameter):
     """Parameter to generate noise of varying frequencies.
 
     This parameter expects to sample noise for 2d planes, i.e. for
-    sizes ``(H, W)`` and will return a value in the range ``[0.0, 1.0]`` per
-    spatial location in that plane.
+    sizes ``(H, W, [C])`` and will return a value in the range ``[0.0, 1.0]``
+    per spatial location in that plane.
 
     The exponent controls the frequencies and therefore noise patterns.
     Small values (around ``-4.0``) will result in large blobs. Large values
@@ -3011,7 +3032,7 @@ class FrequencyNoise(StochasticParameter):
         After generating the noise maps in low resolution environments, they
         have to be upscaled to the originally requested shape (i.e. usually
         the image size). This parameter controls the interpolation method to
-        use. See also :func:`imgaug.imgaug.imresize_many_images` for a
+        use. See also :func:`~imgaug.imgaug.imresize_many_images` for a
         description of possible values.
 
             * If ``imgaug.ALL``, then either ``nearest`` or ``linear`` or
@@ -3064,27 +3085,36 @@ class FrequencyNoise(StochasticParameter):
                 "Expected upscale_method to be string or list of strings or "
                 "StochasticParameter, got %s." % (type(upscale_method),))
 
+    # TODO this is the same as in SimplexNoise, make DRY
     def _draw_samples(self, size, random_state):
         # code here is similar to:
         #   http://www.redblobgames.com/articles/noise/2d/
         #   http://www.redblobgames.com/articles/noise/2d/2d-noise.js
 
-        assert len(size) == 2, (
-            "Expected requested noise to have shape (H, W), "
+        assert len(size) in [2, 3], (
+            "Expected requested noise to have shape (H, W) or (H, W, C), "
             "got shape %s." % (size,))
+        height, width = size[0:2]
+        nb_channels = 1 if len(size) == 2 else size[2]
 
+        channels = [self._draw_samples_hw(height, width, random_state)
+                    for _ in np.arange(nb_channels)]
+
+        if len(size) == 2:
+            return channels[0]
+        return np.stack(channels, axis=-1)
+
+    def _draw_samples_hw(self, height, width, random_state):
         rngs = random_state.duplicate(5)
-
-        h, w = size
-        maxlen = max(h, w)
+        maxlen = max(height, width)
         size_px_max = self.size_px_max.draw_sample(random_state=rngs[0])
         if maxlen > size_px_max:
             downscale_factor = size_px_max / maxlen
-            h_small = int(h * downscale_factor)
-            w_small = int(w * downscale_factor)
+            h_small = int(height * downscale_factor)
+            w_small = int(width * downscale_factor)
         else:
-            h_small = h
-            w_small = w
+            h_small = height
+            w_small = width
 
         # don't go below Hx4 or 4xW
         h_small = max(h_small, 4)
@@ -3125,13 +3155,13 @@ class FrequencyNoise(StochasticParameter):
 
         # upscale from low resolution to image size
         upscale_method = self.upscale_method.draw_sample(random_state=rngs[4])
-        if noise_0to1.shape != (size[0], size[1]):
+        if noise_0to1.shape != (height, width):
             noise_0to1_uint8 = (noise_0to1 * 255).astype(np.uint8)
             noise_0to1_3d = np.tile(
                 noise_0to1_uint8[..., np.newaxis], (1, 1, 3))
             noise_0to1 = ia.imresize_single_image(
                 noise_0to1_3d,
-                (size[0], size[1]),
+                (height, width),
                 interpolation=upscale_method)
             noise_0to1 = (noise_0to1[..., 0] / 255.0).astype(np.float32)
 
@@ -3146,7 +3176,7 @@ class FrequencyNoise(StochasticParameter):
             wdist = np.minimum(xx, w-xx)
             return np.sqrt(hdist**2 + wdist**2)
 
-        return scipy.fromfunction(_freq, (h, w))
+        return np.fromfunction(_freq, (h, w))
 
     def __repr__(self):
         return self.__str__()

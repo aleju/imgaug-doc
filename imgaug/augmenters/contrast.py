@@ -1,25 +1,16 @@
 """
 Augmenters that perform contrast changes.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([iaa.GammaContrast((0.5, 1.5))])
-
 List of augmenters:
 
-    * GammaContrast
-    * SigmoidContrast
-    * LogContrast
-    * LinearContrast
-    * AllChannelsHistogramEqualization
-    * HistogramEqualization
-    * AllChannelsCLAHE
-    * CLAHE
+    * :class:`GammaContrast`
+    * :class:`SigmoidContrast`
+    * :class:`LogContrast`
+    * :class:`LinearContrast`
+    * :class:`AllChannelsHistogramEqualization`
+    * :class:`HistogramEqualization`
+    * :class:`AllChannelsCLAHE`
+    * :class:`CLAHE`
 
 """
 from __future__ import print_function, division, absolute_import
@@ -30,6 +21,7 @@ import skimage.exposure as ski_exposure
 import cv2
 
 import imgaug as ia
+from imgaug.imgaug import _normalize_cv2_input_arr_
 from . import meta
 from . import color as color_lib
 from .. import parameters as iap
@@ -37,15 +29,12 @@ from .. import dtypes as iadt
 from ..augmentables import batches as iabatches
 
 
-_EQUALIZE_USE_PIL_BELOW = 64*64  # H*W
-
-
 class _ContrastFuncWrapper(meta.Augmenter):
     def __init__(self, func, params1d, per_channel, dtypes_allowed=None,
                  dtypes_disallowed=None,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(_ContrastFuncWrapper, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.func = func
         self.params1d = params1d
         self.per_channel = iap.handle_probability_param(per_channel,
@@ -53,7 +42,7 @@ class _ContrastFuncWrapper(meta.Augmenter):
         self.dtypes_allowed = dtypes_allowed
         self.dtypes_disallowed = dtypes_disallowed
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -98,7 +87,7 @@ class _ContrastFuncWrapper(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return self.params1d
 
 
@@ -107,7 +96,8 @@ def adjust_contrast_gamma(arr, gamma):
     """
     Adjust image contrast by scaling pixel values to ``255*((v/255)**gamma)``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested (1) (2) (3)
         * ``uint16``: yes; tested (2) (3)
@@ -158,8 +148,8 @@ def adjust_contrast_gamma(arr, gamma):
         return np.copy(arr)
 
     # int8 is also possible according to docs
-    # https://docs.opencv.org/3.0-beta/modules/core/doc/operations_on_arrays.html#cv2.LUT , but here it seemed
-    # like `d` was 0 for CV_8S, causing that to fail
+    # https://docs.opencv.org/3.0-beta/modules/core/doc/operations_on_arrays.html#cv2.LUT ,
+    # but here it seemed like `d` was 0 for CV_8S, causing that to fail
     if arr.dtype.name == "uint8":
         min_value, _center_value, max_value = \
             iadt.get_value_range_of_dtype(arr.dtype)
@@ -174,10 +164,8 @@ def adjust_contrast_gamma(arr, gamma):
         table = (min_value
                  + (value_range ** np.float32(gamma))
                  * dynamic_range)
-        arr_aug = cv2.LUT(
-            arr, np.clip(table, min_value, max_value).astype(arr.dtype))
-        if arr.ndim == 3 and arr_aug.ndim == 2:
-            return arr_aug[..., np.newaxis]
+        table = np.clip(table, min_value, max_value).astype(arr.dtype)
+        arr_aug = ia.apply_lut(arr, table)
         return arr_aug
     return ski_exposure.adjust_gamma(arr, gamma)
 
@@ -187,7 +175,8 @@ def adjust_contrast_sigmoid(arr, gain, cutoff):
     """
     Adjust image contrast to ``255*1/(1+exp(gain*(cutoff-I_ij/255)))``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested (1) (2) (3)
         * ``uint16``: yes; tested (2) (3)
@@ -244,8 +233,8 @@ def adjust_contrast_sigmoid(arr, gain, cutoff):
         return np.copy(arr)
 
     # int8 is also possible according to docs
-    # https://docs.opencv.org/3.0-beta/modules/core/doc/operations_on_arrays.html#cv2.LUT , but here it seemed
-    # like `d` was 0 for CV_8S, causing that to fail
+    # https://docs.opencv.org/3.0-beta/modules/core/doc/operations_on_arrays.html#cv2.LUT ,
+    # but here it seemed like `d` was 0 for CV_8S, causing that to fail
     if arr.dtype.name == "uint8":
         min_value, _center_value, max_value = \
             iadt.get_value_range_of_dtype(arr.dtype)
@@ -262,10 +251,8 @@ def adjust_contrast_sigmoid(arr, gain, cutoff):
         table = (min_value
                  + dynamic_range
                  * 1/(1 + np.exp(gain * (cutoff - value_range))))
-        arr_aug = cv2.LUT(
-            arr, np.clip(table, min_value, max_value).astype(arr.dtype))
-        if arr.ndim == 3 and arr_aug.ndim == 2:
-            return arr_aug[..., np.newaxis]
+        table = np.clip(table, min_value, max_value).astype(arr.dtype)
+        arr_aug = ia.apply_lut(arr, table)
         return arr_aug
     return ski_exposure.adjust_sigmoid(arr, cutoff=cutoff, gain=gain)
 
@@ -276,7 +263,8 @@ def adjust_contrast_log(arr, gain):
     """
     Adjust image contrast by scaling pixels to ``255*gain*log_2(1+v/255)``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested (1) (2) (3)
         * ``uint16``: yes; tested (2) (3)
@@ -331,8 +319,8 @@ def adjust_contrast_log(arr, gain):
         return np.copy(arr)
 
     # int8 is also possible according to docs
-    # https://docs.opencv.org/3.0-beta/modules/core/doc/operations_on_arrays.html#cv2.LUT , but here it seemed
-    # like `d` was 0 for CV_8S, causing that to fail
+    # https://docs.opencv.org/3.0-beta/modules/core/doc/operations_on_arrays.html#cv2.LUT ,
+    # but here it seemed like `d` was 0 for CV_8S, causing that to fail
     if arr.dtype.name == "uint8":
         min_value, _center_value, max_value = \
             iadt.get_value_range_of_dtype(arr.dtype)
@@ -346,10 +334,8 @@ def adjust_contrast_log(arr, gain):
         # of size 1
         gain = np.float32(gain)
         table = min_value + dynamic_range * gain * np.log2(1 + value_range)
-        arr_aug = cv2.LUT(
-            arr, np.clip(table, min_value, max_value).astype(arr.dtype))
-        if arr.ndim == 3 and arr_aug.ndim == 2:
-            return arr_aug[..., np.newaxis]
+        table = np.clip(table, min_value, max_value).astype(arr.dtype)
+        arr_aug = ia.apply_lut(arr, table)
         return arr_aug
     return ski_exposure.adjust_log(arr, gain=gain)
 
@@ -358,7 +344,8 @@ def adjust_contrast_log(arr, gain):
 def adjust_contrast_linear(arr, alpha):
     """Adjust contrast by scaling each pixel to ``127 + alpha*(v-127)``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested (1) (2)
         * ``uint16``: yes; tested (2)
@@ -403,8 +390,8 @@ def adjust_contrast_linear(arr, alpha):
         return np.copy(arr)
 
     # int8 is also possible according to docs
-    # https://docs.opencv.org/3.0-beta/modules/core/doc/operations_on_arrays.html#cv2.LUT , but here it seemed
-    # like `d` was 0 for CV_8S, causing that to fail
+    # https://docs.opencv.org/3.0-beta/modules/core/doc/operations_on_arrays.html#cv2.LUT ,
+    # but here it seemed like `d` was 0 for CV_8S, causing that to fail
     if arr.dtype.name == "uint8":
         min_value, center_value, max_value = \
             iadt.get_value_range_of_dtype(arr.dtype)
@@ -418,10 +405,8 @@ def adjust_contrast_linear(arr, alpha):
         # of size 1
         alpha = np.float32(alpha)
         table = center_value + alpha * (value_range - center_value)
-        arr_aug = cv2.LUT(
-            arr, np.clip(table, min_value, max_value).astype(arr.dtype))
-        if arr.ndim == 3 and arr_aug.ndim == 2:
-            return arr_aug[..., np.newaxis]
+        table = np.clip(table, min_value, max_value).astype(arr.dtype)
+        arr_aug = ia.apply_lut(arr, table)
         return arr_aug
     else:
         input_dtype = arr.dtype
@@ -437,329 +422,16 @@ def adjust_contrast_linear(arr, alpha):
         return image_aug
 
 
-def equalize(image, mask=None):
-    """Equalize the image histogram.
-
-    See :func:`equalize_` for details.
-
-    This function is identical in inputs and outputs to
-    :func:`PIL.ImageOps.equalize`.
-
-    dtype support::
-
-        See :func:`imgaug.augmenters.contrast.equalize_`.
-
-    Parameters
-    ----------
-    image : ndarray
-        ``uint8`` ``(H,W,[C])`` image to equalize.
-
-    mask : None or ndarray, optional
-        An optional mask. If given, only the pixels selected by the mask are
-        included in the analysis.
-
-    Returns
-    -------
-    ndarray
-        Equalized image.
-
-    """
-    # internally used method works in-place by default and hence needs a copy
-    size = image.size
-    if size == 0:
-        return np.copy(image)
-    if size >= _EQUALIZE_USE_PIL_BELOW:
-        image = np.copy(image)
-    return equalize_(image, mask)
-
-
-def equalize_(image, mask=None):
-    """Equalize the image histogram in-place.
-
-    This function applies a non-linear mapping to the input image, in order
-    to create a uniform distribution of grayscale values in the output image.
-
-    This function is identical in inputs and outputs to
-    :func:`PIL.ImageOps.equalize`, except that it is allowed to modify the
-    input image in-place.
-
-    dtype support::
-
-        * ``uint8``: yes; fully tested
-        * ``uint16``: no
-        * ``uint32``: no
-        * ``uint64``: no
-        * ``int8``: no
-        * ``int16``: no
-        * ``int32``: no
-        * ``int64``: no
-        * ``float16``: no
-        * ``float32``: no
-        * ``float64``: no
-        * ``float128``: no
-        * ``bool``: no
-
-    Parameters
-    ----------
-    image : ndarray
-        ``uint8`` ``(H,W,[C])`` image to equalize.
-
-    mask : None or ndarray, optional
-        An optional mask. If given, only the pixels selected by the mask are
-        included in the analysis.
-
-    Returns
-    -------
-    ndarray
-        Equalized image. *Might* have been modified in-place.
-
-    """
-    nb_channels = 1 if image.ndim == 2 else image.shape[-1]
-    if nb_channels not in [1, 3]:
-        result = [equalize_(image[:, :, c]) for c in np.arange(nb_channels)]
-        return np.stack(result, axis=-1)
-
-    assert image.dtype.name == "uint8", (
-        "Expected image of dtype uint8, got dtype %s." % (image.dtype.name,))
-    if mask is not None:
-        assert mask.ndim == 2, (
-            "Expected 2-dimensional mask, got shape %s." % (mask.shape,))
-        assert mask.dtype.name == "uint8", (
-            "Expected mask of dtype uint8, got dtype %s." % (mask.dtype.name,))
-
-    size = image.size
-    if size == 0:
-        return image
-    if nb_channels == 3 and size < _EQUALIZE_USE_PIL_BELOW:
-        return _equalize_pil(image, mask)
-    return _equalize_no_pil_(image, mask)
-
-
-# note that this is supposed to be a non-PIL reimplementation of PIL's
-# equalize, which produces slightly different results from cv2.equalizeHist()
-def _equalize_no_pil_(image, mask=None):
-    flags = image.flags
-    if not flags["OWNDATA"]:
-        image = np.copy(image)
-    if not flags["C_CONTIGUOUS"]:
-        image = np.ascontiguousarray(image)
-
-    nb_channels = 1 if image.ndim == 2 else image.shape[-1]
-    lut = np.empty((1, 256, nb_channels), dtype=np.int32)
-
-    for c_idx in range(nb_channels):
-        if image.ndim == 2:
-            image_c = image[:, :, np.newaxis]
-        else:
-            image_c = image[:, :, c_idx:c_idx+1]
-        histo = cv2.calcHist([image_c], [0], mask, [256], [0, 256])
-        if len(histo.nonzero()[0]) <= 1:
-            lut[0, :, c_idx] = np.arange(256).astype(np.int32)
-            continue
-
-        step = np.sum(histo[:-1]) // 255
-        if not step:
-            lut[0, :, c_idx] = np.arange(256).astype(np.int32)
-            continue
-
-        n = step // 2
-        cumsum = np.cumsum(histo)
-        lut[0, 0, c_idx] = n
-        lut[0, 1:, c_idx] = n + cumsum[0:-1]
-        lut[0, :, c_idx] //= int(step)
-    lut = np.clip(lut, None, 255, out=lut).astype(np.uint8)
-    image = cv2.LUT(image, lut, dst=image)
-    if image.ndim == 2 and image.ndim == 3:
-        return image[..., np.newaxis]
-    return image
-
-
-def _equalize_pil(image, mask=None):
-    import PIL.Image
-    import PIL.ImageOps
-
-    if mask is not None:
-        mask = PIL.Image.fromarray(mask).convert("L")
-    return np.asarray(
-        PIL.ImageOps.equalize(
-            PIL.Image.fromarray(image),
-            mask=mask
-        )
-    )
-
-
-def autocontrast(image, cutoff=0, ignore=None):
-    """Maximize (normalize) image contrast.
-
-    This function calculates a histogram of the input image, removes
-    **cutoff** percent of the lightest and darkest pixels from the histogram,
-    and remaps the image so that the darkest pixel becomes black (``0``), and
-    the lightest becomes white (``255``).
-
-    This function has identical inputs and outputs to
-    :func:`PIL.ImageOps.autocontrast`. The speed almost identical.
-
-    dtype support::
-
-        * ``uint8``: yes; fully tested
-        * ``uint16``: no
-        * ``uint32``: no
-        * ``uint64``: no
-        * ``int8``: no
-        * ``int16``: no
-        * ``int32``: no
-        * ``int64``: no
-        * ``float16``: no
-        * ``float32``: no
-        * ``float64``: no
-        * ``float128``: no
-        * ``bool``: no
-
-    Parameters
-    ----------
-    image : ndarray
-        The image for which to enhance the contrast.
-
-    cutoff : number
-        How many percent to cut off at the low and high end of the
-        histogram. E.g. ``20`` will cut off the lowest and highest ``20%``
-        of values. Expected value range is ``[0, 100]``.
-
-    ignore : None or int or iterable of int
-        Intensity values to ignore, i.e. to treat as background. If ``None``,
-        no pixels will be ignored. Otherwise exactly the given intensity
-        value(s) will be ignored.
-
-    Returns
-    -------
-    ndarray
-        Contrast-enhanced image.
-
-    """
-    assert image.dtype.name == "uint8", (
-        "Can only apply autocontrast to uint8 images, got dtype %s." % (
-            image.dtype.name,))
-
-    if 0 in image.shape:
-        return np.copy(image)
-
-    standard_channels = (image.ndim == 2 or image.shape[2] == 3)
-
-    if cutoff and standard_channels:
-        return _autocontrast_pil(image, cutoff, ignore)
-    return _autocontrast(image, cutoff, ignore)
-
-
-def _autocontrast_pil(image, cutoff, ignore):
-    import PIL.Image
-    import PIL.ImageOps
-    return np.asarray(
-        PIL.ImageOps.autocontrast(
-            PIL.Image.fromarray(image),
-            cutoff=cutoff, ignore=ignore
-        )
-    )
-
-
-# This function is only faster than the corresponding PIL function if no
-# cutoff is used.
-# C901 is "<functionname> is too complex"
-def _autocontrast(image, cutoff, ignore):  # noqa: C901
-    # pylint: disable=invalid-name
-    if ignore is not None and not ia.is_iterable(ignore):
-        ignore = [ignore]
-
-    result = np.empty_like(image)
-    if result.ndim == 2:
-        result = result[..., np.newaxis]
-    nb_channels = image.shape[2] if image.ndim >= 3 else 1
-    for c_idx in sm.xrange(nb_channels):
-        # using [0] instead of [int(c_idx)] allows this to work with >4
-        # channels
-        if image.ndim == 2:
-            image_c = image
-        else:
-            image_c = image[:, :, c_idx:c_idx+1]
-        h = cv2.calcHist([image_c], [0], None, [256], [0, 256])
-        if ignore is not None:
-            h[ignore] = 0
-
-        if cutoff:
-            cs = np.cumsum(h)
-            n = cs[-1]
-            cut = n * cutoff // 100
-
-            # remove cutoff% pixels from the low end
-            lo_cut = cut - cs
-            lo_cut_nz = np.nonzero(lo_cut <= 0.0)[0]
-            if len(lo_cut_nz) == 0:
-                lo = 255
-            else:
-                lo = lo_cut_nz[0]
-            if lo > 0:
-                h[:lo] = 0
-            h[lo] = lo_cut[lo]
-
-            # remove cutoff% samples from the hi end
-            cs_rev = np.cumsum(h[::-1])
-            hi_cut = cs_rev - cut
-            hi_cut_nz = np.nonzero(hi_cut > 0.0)[0]
-            if len(hi_cut_nz) == 0:
-                hi = -1
-            else:
-                hi = 255 - hi_cut_nz[0]
-            h[hi+1:] = 0
-            if hi > -1:
-                h[hi] = hi_cut[255-hi]
-
-        # find lowest/highest samples after preprocessing
-        for lo, lo_val in enumerate(h):
-            if lo_val:
-                break
-        for hi in range(255, -1, -1):
-            if h[hi]:
-                break
-        if hi <= lo:
-            # don't bother
-            lut = np.arange(256)
-        else:
-            scale = 255.0 / (hi - lo)
-            offset = -lo * scale
-            ix = np.arange(256).astype(np.float64) * scale + offset
-            ix = np.clip(ix, 0, 255).astype(np.uint8)
-            lut = ix
-        lut = np.array(lut, dtype=np.uint8)
-
-        # Vectorized implementation of above block.
-        # This is overall slower.
-        # h_nz = np.nonzero(h)[0]
-        # if len(h_nz) <= 1:
-        #     lut = np.arange(256).astype(np.uint8)
-        # else:
-        #     lo = h_nz[0]
-        #     hi = h_nz[-1]
-        #
-        #     scale = 255.0 / (hi - lo)
-        #     offset = -lo * scale
-        #     ix = np.arange(256).astype(np.float64) * scale + offset
-        #     ix = np.clip(ix, 0, 255).astype(np.uint8)
-        #     lut = ix
-
-        result[:, :, c_idx] = cv2.LUT(image_c, lut)
-    if image.ndim == 2:
-        return result[..., 0]
-    return result
-
-
 class GammaContrast(_ContrastFuncWrapper):
     """
     Adjust image contrast by scaling pixel values to ``255*((v/255)**gamma)``.
 
     Values in the range ``gamma=(0.5, 2.0)`` seem to be sensible.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.contrast.adjust_contrast_gamma`.
+    See :func:`~imgaug.augmenters.contrast.adjust_contrast_gamma`.
 
     Parameters
     ----------
@@ -780,14 +452,14 @@ class GammaContrast(_ContrastFuncWrapper):
         float ``p``, then for ``p`` percent of all images `per_channel` will
         be treated as ``True``, otherwise as ``False``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -805,8 +477,8 @@ class GammaContrast(_ContrastFuncWrapper):
 
     """
 
-    def __init__(self, gamma=1, per_channel=False, name=None, deterministic=False,
-                 random_state=None):
+    def __init__(self, gamma=1, per_channel=False,
+                 seed=None, name=None, **old_kwargs):
         params1d = [iap.handle_continuous_param(
             gamma, "gamma", value_range=None, tuple_to_uniform=True,
             list_to_choice=True)]
@@ -817,10 +489,7 @@ class GammaContrast(_ContrastFuncWrapper):
                             "int8", "int16", "int32", "int64",
                             "float16", "float32", "float64"],
             dtypes_disallowed=["float96", "float128", "float256", "bool"],
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
 
 
 class SigmoidContrast(_ContrastFuncWrapper):
@@ -830,9 +499,10 @@ class SigmoidContrast(_ContrastFuncWrapper):
     Values in the range ``gain=(5, 20)`` and ``cutoff=(0.25, 0.75)`` seem to
     be sensible.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.contrast.adjust_contrast_sigmoid`.
+    See :func:`~imgaug.augmenters.contrast.adjust_contrast_sigmoid`.
 
     Parameters
     ----------
@@ -867,14 +537,14 @@ class SigmoidContrast(_ContrastFuncWrapper):
         float ``p``, then for ``p`` percent of all images `per_channel` will
         be treated as ``True``, otherwise as ``False``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -895,7 +565,7 @@ class SigmoidContrast(_ContrastFuncWrapper):
 
     """
     def __init__(self, gain=10, cutoff=0.5, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         # TODO add inv parameter?
         params1d = [
             iap.handle_continuous_param(
@@ -913,10 +583,7 @@ class SigmoidContrast(_ContrastFuncWrapper):
                             "int8", "int16", "int32", "int64",
                             "float16", "float32", "float64"],
             dtypes_disallowed=["float96", "float128", "float256", "bool"],
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
 
 
 class LogContrast(_ContrastFuncWrapper):
@@ -925,9 +592,10 @@ class LogContrast(_ContrastFuncWrapper):
     This augmenter is fairly similar to
     ``imgaug.augmenters.arithmetic.Multiply``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.contrast.adjust_contrast_log`.
+    See :func:`~imgaug.augmenters.contrast.adjust_contrast_log`.
 
     Parameters
     ----------
@@ -950,14 +618,14 @@ class LogContrast(_ContrastFuncWrapper):
         float ``p``, then for ``p`` percent of all images `per_channel` will
         be treated as ``True``, otherwise as ``False``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -975,7 +643,7 @@ class LogContrast(_ContrastFuncWrapper):
 
     """
     def __init__(self, gain=1, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         # TODO add inv parameter?
         params1d = [iap.handle_continuous_param(
             gain, "gain", value_range=(0, None), tuple_to_uniform=True,
@@ -988,18 +656,16 @@ class LogContrast(_ContrastFuncWrapper):
                             "int8", "int16", "int32", "int64",
                             "float16", "float32", "float64"],
             dtypes_disallowed=["float96", "float128", "float256", "bool"],
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
 
 
 class LinearContrast(_ContrastFuncWrapper):
     """Adjust contrast by scaling each pixel to ``127 + alpha*(v-127)``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.contrast.adjust_contrast_linear`.
+    See :func:`~imgaug.augmenters.contrast.adjust_contrast_linear`.
 
     Parameters
     ----------
@@ -1022,14 +688,14 @@ class LinearContrast(_ContrastFuncWrapper):
         float ``p``, then for ``p`` percent of all images `per_channel` will
         be treated as ``True``, otherwise as ``False``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1047,7 +713,7 @@ class LinearContrast(_ContrastFuncWrapper):
 
     """
     def __init__(self, alpha=1, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         params1d = [
             iap.handle_continuous_param(
                 alpha, "alpha", value_range=None, tuple_to_uniform=True,
@@ -1062,132 +728,7 @@ class LinearContrast(_ContrastFuncWrapper):
                             "float16", "float32", "float64"],
             dtypes_disallowed=["uint64", "int64", "float96", "float128",
                                "float256", "bool"],
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
-
-
-class Equalize(meta.Augmenter):
-    """Equalize the image histogram.
-
-    This augmenter is identical in inputs and outputs to
-    :func:`PIL.ImageOps.equalize`.
-
-    dtype support::
-
-        See :func:`imgaug.augmenters.contrast.equalize_`.
-
-    Parameters
-    ----------
-    name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    Examples
-    --------
-    >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.Equalize()
-
-    Equalize the histograms of all input images.
-
-    """
-    def __init__(self, name=None, deterministic=False, random_state=None):
-        super(Equalize, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
-
-    def _augment_batch(self, batch, random_state, parents, hooks):
-        # pylint: disable=no-self-use
-        if batch.images:
-            for image in batch.images:
-                image[...] = equalize_(image)
-        return batch
-
-    def get_parameters(self):
-        return []
-
-
-class Autocontrast(_ContrastFuncWrapper):
-    """Adjust contrast by cutting off ``p%`` of lowest/highest histogram values.
-
-    This augmenter is analogous to :func:`PIL.ImageOps.autocontrast`.
-
-    See :func:`imgaug.augmenters.contrast.autocontrast` for more details.
-
-    dtype support::
-
-        See :func:`imgaug.augmenters.contrast.autocontrast`.
-
-    Parameters
-    ----------
-    cutoff : int or tuple of int or list of int or imgaug.parameters.StochasticParameter, optional
-        Percentage of values to cut off from the low and high end of each
-        image's histogram, before stretching it to ``[0, 255]``.
-
-            * If ``int``: The value will be used for all images.
-            * If ``tuple`` ``(a, b)``: A value will be uniformly sampled from
-              the discrete interval ``[a..b]`` per image.
-            * If ``list``: A random value will be sampled from the list
-              per image.
-            * If ``StochasticParameter``: A value will be sampled from that
-              parameter per image.
-
-    per_channel :  bool or float, optional
-        Whether to use the same value for all channels (``False``) or to
-        sample a new value for each channel (``True``). If this value is a
-        float ``p``, then for ``p`` percent of all images `per_channel` will
-        be treated as ``True``, otherwise as ``False``.
-
-    name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    Examples
-    --------
-    >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.Autocontrast()
-
-    Modify the contrast of images by cutting off the ``0`` to ``20%`` lowest
-    and highest values from the histogram, then stretching it to full length.
-
-    >>> aug = iaa.Autocontrast((10, 20), per_channel=True)
-
-    Modify the contrast of images by cutting off the ``10`` to ``20%`` lowest
-    and highest values from the histogram, then stretching it to full length.
-    The cutoff value is sampled per *channel* instead of per *image*.
-
-    """
-    def __init__(self, cutoff=(0, 20), per_channel=False,
-                 name=None, deterministic=False, random_state=None):
-        params1d = [
-            iap.handle_discrete_param(
-                cutoff, "cutoff", value_range=(0, 49), tuple_to_uniform=True,
-                list_to_choice=True)
-        ]
-        func = autocontrast
-
-        super(Autocontrast, self).__init__(
-            func, params1d, per_channel,
-            dtypes_allowed=["uint8"],
-            dtypes_disallowed=["uint16", "uint32", "uint64",
-                               "int8", "int16", "int32", "int64",
-                               "float16", "float32", "float64",
-                               "float16", "float32", "float64", "float96",
-                               "float128", "float256", "bool"],
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
 
 
 # TODO maybe offer the other contrast augmenters also wrapped in this, similar
@@ -1205,7 +746,7 @@ class _IntensityChannelBasedApplier(object):
         Lab: 0
     }
 
-    def __init__(self, from_colorspace, to_colorspace, name):
+    def __init__(self, from_colorspace, to_colorspace):
         super(_IntensityChannelBasedApplier, self).__init__()
 
         # TODO maybe add CIE, Luv?
@@ -1319,7 +860,7 @@ class _IntensityChannelBasedApplier(object):
         return result
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.from_colorspace, self.to_colorspace]
 
 
@@ -1336,7 +877,8 @@ class AllChannelsCLAHE(meta.Augmenter):
     perform any colorspace transformations and does not focus on specific
     channels (e.g. ``L`` in ``Lab`` colorspace).
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -1376,14 +918,14 @@ class AllChannelsCLAHE(meta.Augmenter):
         float ``p``, then for ``p`` percent of all images `per_channel` will
         be treated as ``True``, otherwise as ``False``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1409,9 +951,9 @@ class AllChannelsCLAHE(meta.Augmenter):
 
     def __init__(self, clip_limit=40, tile_grid_size_px=8,
                  tile_grid_size_px_min=3, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(AllChannelsCLAHE, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.clip_limit = iap.handle_continuous_param(
             clip_limit, "clip_limit", value_range=(0+1e-4, None),
@@ -1423,7 +965,7 @@ class AllChannelsCLAHE(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(per_channel,
                                                         "per_channel")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -1476,7 +1018,9 @@ class AllChannelsCLAHE(meta.Augmenter):
                         clipLimit=clip_limit_i[c_param],
                         tileGridSize=(tgs_px_w_i[c_param], tgs_px_h_i[c_param])
                     )
-                    channel_warped = clahe.apply(image[..., c])
+                    channel_warped = clahe.apply(
+                        _normalize_cv2_input_arr_(image[..., c])
+                    )
                     image_warped.append(channel_warped)
                 else:
                     image_warped.append(image[..., c])
@@ -1490,7 +1034,7 @@ class AllChannelsCLAHE(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.clip_limit, self.tile_grid_size_px,
                 self.tile_grid_size_px_min, self.per_channel]
 
@@ -1519,7 +1063,8 @@ class CLAHE(meta.Augmenter):
     colorspace (without any colorspace conversion), use
     ``imgaug.augmenters.contrast.AllChannelsCLAHE`` instead.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no (1)
@@ -1535,8 +1080,9 @@ class CLAHE(meta.Augmenter):
         * ``float128``: no (1)
         * ``bool``: no (1)
 
-        - (1) This augmenter uses ChangeColorspace, which is currently
-              limited to ``uint8``.
+        - (1) This augmenter uses
+              :class:`~imgaug.augmenters.color.ChangeColorspace`, which is
+              currently limited to ``uint8``.
 
     Parameters
     ----------
@@ -1586,7 +1132,7 @@ class CLAHE(meta.Augmenter):
         be ignored and it will be assumed that the input is grayscale.
         If a fourth channel is present in an input image, it will be removed
         before the colorspace conversion and later re-added.
-        See also :func:`imgaug.augmenters.color.change_colorspace_` for
+        See also :func:`~imgaug.augmenters.color.change_colorspace_` for
         details.
 
     to_colorspace : {"Lab", "HLS", "HSV"}, optional
@@ -1596,14 +1142,14 @@ class CLAHE(meta.Augmenter):
         to all channels of an input image (without colorspace conversion),
         see ``imgaug.augmenters.contrast.AllChannelsCLAHE``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1659,9 +1205,9 @@ class CLAHE(meta.Augmenter):
                  tile_grid_size_px_min=3,
                  from_colorspace=color_lib.CSPACE_RGB,
                  to_colorspace=color_lib.CSPACE_Lab,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(CLAHE, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.all_channel_clahe = AllChannelsCLAHE(
             clip_limit=clip_limit,
@@ -1670,9 +1216,9 @@ class CLAHE(meta.Augmenter):
             name="%s_AllChannelsCLAHE" % (name,))
 
         self.intensity_channel_based_applier = _IntensityChannelBasedApplier(
-            from_colorspace, to_colorspace, name=name)
+            from_colorspace, to_colorspace)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -1693,7 +1239,7 @@ class CLAHE(meta.Augmenter):
             # pylint: disable=protected-access
             # TODO would .augment_batch() be sufficient here?
             batch_imgs = iabatches.BatchInAugmentation(images=images_normalized)
-            return self.all_channel_clahe._augment_batch(
+            return self.all_channel_clahe._augment_batch_(
                 batch_imgs, random_state_derived, parents + [self],
                 hooks
             ).images
@@ -1704,7 +1250,7 @@ class CLAHE(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         ac_clahe = self.all_channel_clahe
         intb_applier = self.intensity_channel_based_applier
         return [
@@ -1723,7 +1269,8 @@ class AllChannelsHistogramEqualization(meta.Augmenter):
     not perform any colorspace transformations and does not focus on specific
     channels (e.g. ``L`` in ``Lab`` colorspace).
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no (1)
@@ -1746,14 +1293,14 @@ class AllChannelsHistogramEqualization(meta.Augmenter):
 
     Parameters
     ----------
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1770,11 +1317,11 @@ class AllChannelsHistogramEqualization(meta.Augmenter):
     strengths. This leads to random strengths of the contrast adjustment.
 
     """
-    def __init__(self, name=None, deterministic=False, random_state=None):
+    def __init__(self, seed=None, name=None, **old_kwargs):
         super(AllChannelsHistogramEqualization, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -1794,8 +1341,9 @@ class AllChannelsHistogramEqualization(meta.Augmenter):
             if image.size == 0:
                 continue
 
-            image_warped = [cv2.equalizeHist(image[..., c])
-                            for c in sm.xrange(image.shape[2])]
+            image_warped = [
+                cv2.equalizeHist(_normalize_cv2_input_arr_(image[..., c]))
+                for c in sm.xrange(image.shape[2])]
             image_warped = np.array(image_warped, dtype=image_warped[0].dtype)
             image_warped = image_warped.transpose((1, 2, 0))
 
@@ -1803,7 +1351,7 @@ class AllChannelsHistogramEqualization(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []
 
 
@@ -1832,7 +1380,8 @@ class HistogramEqualization(meta.Augmenter):
     input image's colorspace (without any colorspace conversion), use
     ``imgaug.augmenters.contrast.AllChannelsHistogramEqualization`` instead.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no (1)
@@ -1848,7 +1397,8 @@ class HistogramEqualization(meta.Augmenter):
         * ``float128``: no (1)
         * ``bool``: no (1)
 
-        - (1) This augmenter uses AllChannelsHistogramEqualization, which only supports ``uint8``.
+        - (1) This augmenter uses :class:`AllChannelsHistogramEqualization`,
+              which only supports ``uint8``.
 
     Parameters
     ----------
@@ -1858,7 +1408,7 @@ class HistogramEqualization(meta.Augmenter):
         ignored and it will be assumed that the input is grayscale.
         If a fourth channel is present in an input image, it will be removed
         before the colorspace conversion and later re-added.
-        See also :func:`imgaug.augmenters.color.change_colorspace_` for
+        See also :func:`~imgaug.augmenters.color.change_colorspace_` for
         details.
 
     to_colorspace : {"Lab", "HLS", "HSV"}, optional
@@ -1869,14 +1419,14 @@ class HistogramEqualization(meta.Augmenter):
         (without colorspace conversion), see
         ``imgaug.augmenters.contrast.AllChannelsHistogramEqualization``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1910,18 +1460,18 @@ class HistogramEqualization(meta.Augmenter):
 
     def __init__(self, from_colorspace=color_lib.CSPACE_RGB,
                  to_colorspace=color_lib.CSPACE_Lab,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(HistogramEqualization, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.all_channel_histogram_equalization = \
             AllChannelsHistogramEqualization(
                 name="%s_AllChannelsHistogramEqualization" % (name,))
 
         self.intensity_channel_based_applier = _IntensityChannelBasedApplier(
-            from_colorspace, to_colorspace, name=name)
+            from_colorspace, to_colorspace)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -1942,7 +1492,7 @@ class HistogramEqualization(meta.Augmenter):
             # pylint: disable=protected-access
             # TODO would .augment_batch() be sufficient here
             batch_imgs = iabatches.BatchInAugmentation(images=images_normalized)
-            return self.all_channel_histogram_equalization._augment_batch(
+            return self.all_channel_histogram_equalization._augment_batch_(
                 batch_imgs, random_state_derived, parents + [self],
                 hooks
             ).images
@@ -1953,6 +1503,6 @@ class HistogramEqualization(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         icb_applier = self.intensity_channel_based_applier
         return icb_applier.get_parameters()

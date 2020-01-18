@@ -1,22 +1,10 @@
 """
 Augmenters that apply mirroring/flipping operations to images.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.Fliplr((0.0, 1.0)),
-        iaa.Flipud((0.0, 1.0))
-    ])
-
 List of augmenters:
 
-    * Fliplr
-    * Flipud
+    * :class:`Fliplr`
+    * :class:`Flipud`
 
 """
 from __future__ import print_function, division, absolute_import
@@ -25,6 +13,7 @@ import numpy as np
 import cv2
 import six.moves as sm
 
+from imgaug.imgaug import _normalize_cv2_input_arr_
 from . import meta
 from .. import parameters as iap
 
@@ -690,7 +679,8 @@ _FLIPLR_DTYPES_CV2 = {"uint8", "uint16", "int8", "int16"}
 def fliplr(arr):
     """Flip an image-like array horizontally.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -748,10 +738,24 @@ def _fliplr_cv2(arr):
     # cv2.flip() fails for more than 512 channels
     if arr.ndim == 3 and arr.shape[-1] > 512:
         # TODO this is quite inefficient right now
-        channels = [cv2.flip(arr[..., c], 1) for c in sm.xrange(arr.shape[-1])]
+        channels = [
+            cv2.flip(_normalize_cv2_input_arr_(arr[..., c]), 1)
+            for c
+            in sm.xrange(arr.shape[-1])
+        ]
         result = np.stack(channels, axis=-1)
     else:
-        result = cv2.flip(arr, 1)
+        # Normalization from imgaug.imgaug._normalize_cv2_input_arr_().
+        # Moved here for performance reasons. Keep this aligned.
+        # TODO recalculate timings, they were computed without this.
+        flags = arr.flags
+        if not flags["OWNDATA"]:
+            arr = np.copy(arr)
+            flags = arr.flags
+        if not flags["C_CONTIGUOUS"]:
+            arr = np.ascontiguousarray(arr)
+
+        result = cv2.flip(_normalize_cv2_input_arr_(arr), 1)
 
     if result.ndim == 2 and arr.ndim == 3:
         return result[..., np.newaxis]
@@ -761,7 +765,8 @@ def _fliplr_cv2(arr):
 def flipud(arr):
     """Flip an image-like array vertically.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -823,23 +828,24 @@ class Fliplr(meta.Augmenter):
         So, to flip *all* input images use ``Fliplr(1.0)`` and *not* just
         ``Fliplr()``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.flip.fliplr`.
+    See :func:`~imgaug.augmenters.flip.fliplr`.
 
     Parameters
     ----------
     p : number or imgaug.parameters.StochasticParameter, optional
         Probability of each image to get flipped.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -855,12 +861,12 @@ class Fliplr(meta.Augmenter):
 
     """
 
-    def __init__(self, p=0, name=None, deterministic=False, random_state=None):
+    def __init__(self, p=0, seed=None, name=None, **old_kwargs):
         super(Fliplr, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.p = iap.handle_probability_param(p, "p")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         samples = self.p.draw_samples((batch.nb_rows,),
                                       random_state=random_state)
         for i, sample in enumerate(samples):
@@ -910,7 +916,7 @@ class Fliplr(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p]
 
 
@@ -924,23 +930,24 @@ class Flipud(meta.Augmenter):
         So, to flip *all* input images use ``Flipud(1.0)`` and *not* just
         ``Flipud()``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.flip.flipud`.
+    See :func:`~imgaug.augmenters.flip.flipud`.
 
     Parameters
     ----------
     p : number or imgaug.parameters.StochasticParameter, optional
         Probability of each image to get flipped.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -955,12 +962,12 @@ class Flipud(meta.Augmenter):
 
     """
 
-    def __init__(self, p=0, name=None, deterministic=False, random_state=None):
+    def __init__(self, p=0, seed=None, name=None, **old_kwargs):
         super(Flipud, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.p = iap.handle_probability_param(p, "p")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         samples = self.p.draw_samples((batch.nb_rows,),
                                       random_state=random_state)
         for i, sample in enumerate(samples):
@@ -1012,5 +1019,5 @@ class Flipud(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p]

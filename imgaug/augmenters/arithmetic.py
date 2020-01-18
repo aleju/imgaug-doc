@@ -1,39 +1,32 @@
 """
 Augmenters that perform simple arithmetic changes.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead::
-
-    from imgaug import augmenters as iaa
-
-and then e.g.::
-
-    seq = iaa.Sequential([iaa.Add((-5, 5)), iaa.Multiply((0.9, 1.1))])
-
 List of augmenters:
 
-    * Add
-    * AddElementwise
-    * AdditiveGaussianNoise
-    * AdditiveLaplaceNoise
-    * AdditivePoissonNoise
-    * Multiply
-    * MultiplyElementwise
-    * Dropout
-    * CoarseDropout
-    * Dropout2d
-    * TotalDropout
-    * ReplaceElementwise
-    * ImpulseNoise
-    * SaltAndPepper
-    * CoarseSaltAndPepper
-    * Salt
-    * CoarseSalt
-    * Pepper
-    * CoarsePepper
-    * Invert
-    * ContrastNormalization
-    * JpegCompression
+    * :class:`Add`
+    * :class:`AddElementwise`
+    * :class:`AdditiveGaussianNoise`
+    * :class:`AdditiveLaplaceNoise`
+    * :class:`AdditivePoissonNoise`
+    * :class:`Multiply`
+    * :class:`MultiplyElementwise`
+    * :class:`Cutout`
+    * :class:`Dropout`
+    * :class:`CoarseDropout`
+    * :class:`Dropout2d`
+    * :class:`TotalDropout`
+    * :class:`ReplaceElementwise`
+    * :class:`ImpulseNoise`
+    * :class:`SaltAndPepper`
+    * :class:`CoarseSaltAndPepper`
+    * :class:`Salt`
+    * :class:`CoarseSalt`
+    * :class:`Pepper`
+    * :class:`CoarsePepper`
+    * :class:`Invert`
+    * :class:`Solarize`
+    * :class:`ContrastNormalization`
+    * :class:`JpegCompression`
 
 """
 from __future__ import print_function, division, absolute_import
@@ -42,12 +35,26 @@ import tempfile
 
 import imageio
 import numpy as np
-import cv2
 
 import imgaug as ia
 from . import meta
 from .. import parameters as iap
 from .. import dtypes as iadt
+from .. import random as iarandom
+
+
+# fill modes for apply_cutout_() and Cutout augmenter
+# contains roughly:
+#     'str fill_mode_name => (str module_name, str function_name)'
+# We could also assign the function to each fill mode name instead of its
+# name, but that has the disadvantage that these aren't defined yet (they
+# are defined further below) and that during unittesting they would be harder
+# to mock. (mock.patch() seems to not automatically replace functions
+# assigned in that way.)
+_CUTOUT_FILL_MODES = {
+    "constant": ("imgaug.augmenters.arithmetic", "_fill_rectangle_constant_"),
+    "gaussian": ("imgaug.augmenters.arithmetic", "_fill_rectangle_gaussian_")
+}
 
 
 def add_scalar(image, value):
@@ -55,7 +62,8 @@ def add_scalar(image, value):
 
     This method ensures that ``uint8`` does not overflow during the addition.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: limited; tested (1)
@@ -143,26 +151,15 @@ def _add_scalar_to_uint8(image, value):
             "in `value` to be identical. Got %d vs. %d." % (
                 image.shape[-1], value.size))
 
-        result = []
         # TODO check if tile() is here actually needed
         tables = np.tile(
-            value_range[np.newaxis, :],
-            (nb_channels, 1)
-        ) + value[:, np.newaxis]
-        tables = np.clip(tables, 0, 255).astype(image.dtype)
-
-        for c, table in enumerate(tables):
-            result.append(cv2.LUT(image[..., c], table))
-
-        return np.stack(result, axis=-1)
+            value_range[:, np.newaxis],
+            (1, nb_channels)
+        ) + value[np.newaxis, :]
     else:
-        table = value_range + value
-        image_aug = cv2.LUT(
-            image,
-            iadt.clip_(table, 0, 255).astype(image.dtype))
-        if image_aug.ndim == 2 and image.ndim == 3:
-            image_aug = image_aug[..., np.newaxis]
-        return image_aug
+        tables = value_range + value
+    tables = np.clip(tables, 0, 255).astype(image.dtype)
+    return ia.apply_lut(image, tables)
 
 
 def _add_scalar_to_non_uint8(image, value):
@@ -213,7 +210,8 @@ def add_elementwise(image, values):
 
     This method ensures that ``uint8`` does not overflow during the addition.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: limited; tested (1)
@@ -335,7 +333,8 @@ def multiply_scalar(image, multiplier):
     This method ensures that ``uint8`` does not overflow during the
     multiplication.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: limited; tested (1)
@@ -354,7 +353,9 @@ def multiply_scalar(image, multiplier):
         - (1) Non-uint8 dtypes can overflow. For floats, this can result in
               +/-inf.
 
-        Note: tests were only conducted for rather small multipliers, around
+    note::
+
+        Tests were only conducted for rather small multipliers, around
         ``-10.0`` to ``+10.0``.
 
         In general, the multipliers sampled from `multiplier` must be in a
@@ -433,26 +434,15 @@ def _multiply_scalar_to_uint8(image, multiplier):
             "in `multiplier` to be identical. Got %d vs. %d." % (
                 image.shape[-1], multiplier.size))
 
-        result = []
         # TODO check if tile() is here actually needed
         tables = np.tile(
-            value_range[np.newaxis, :],
-            (nb_channels, 1)
-        ) * multiplier[:, np.newaxis]
-        tables = np.clip(tables, 0, 255).astype(image.dtype)
-
-        for c, table in enumerate(tables):
-            arr_aug = cv2.LUT(image[..., c], table)
-            result.append(arr_aug)
-
-        return np.stack(result, axis=-1)
+            value_range[:, np.newaxis],
+            (1, nb_channels)
+        ) * multiplier[np.newaxis, :]
     else:
-        table = value_range * multiplier
-        image_aug = cv2.LUT(
-            image, np.clip(table, 0, 255).astype(image.dtype))
-        if image_aug.ndim == 2 and image.ndim == 3:
-            image_aug = image_aug[..., np.newaxis]
-        return image_aug
+        tables = value_range * multiplier
+    tables = np.clip(tables, 0, 255).astype(image.dtype)
+    return ia.apply_lut(image, tables)
 
 
 def _multiply_scalar_to_non_uint8(image, multiplier):
@@ -510,7 +500,8 @@ def multiply_elementwise(image, multipliers):
 
     This method ensures that ``uint8`` does not overflow during the addition.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: limited; tested (1)
@@ -529,7 +520,9 @@ def multiply_elementwise(image, multipliers):
         - (1) Non-uint8 dtypes can overflow. For floats, this can result
               in +/-inf.
 
-        Note: tests were only conducted for rather small multipliers, around
+    note::
+
+        Tests were only conducted for rather small multipliers, around
         ``-10.0`` to ``+10.0``.
 
         In general, the multipliers sampled from `multipliers` must be in a
@@ -639,10 +632,273 @@ def _multiply_elementwise_to_non_uint8(image, multipliers):
     return iadt.restore_dtypes_(image, input_dtype)
 
 
+def cutout(image, x1, y1, x2, y2,
+           fill_mode="constant", cval=0, fill_per_channel=False,
+           seed=None):
+    """Fill a single area within an image using a fill mode.
+
+    This cutout method uses the top-left and bottom-right corner coordinates
+    of the cutout region given as absolute pixel values.
+
+    .. note::
+
+        Gaussian fill mode will assume that float input images contain values
+        in the interval ``[0.0, 1.0]`` and hence sample values from a
+        gaussian within that interval, i.e. from ``N(0.5, std=0.5/3)``.
+
+    Supported dtypes
+    ----------------
+
+    See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    Parameters
+    ----------
+    image : ndarray
+        Image to modify.
+
+    x1 : number
+        See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    y1 : number
+        See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    x2 : number
+        See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    y2 : number
+        See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    fill_mode : {'constant', 'gaussian'}, optional
+        See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    cval : number or tuple of number, optional
+        See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    fill_per_channel : number or bool, optional
+        See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    Returns
+    -------
+    ndarray
+        Image with area filled in.
+
+    """
+    return cutout_(np.copy(image),
+                   x1, y1, x2, y2,
+                   fill_mode, cval, fill_per_channel, seed)
+
+
+def cutout_(image, x1, y1, x2, y2,
+            fill_mode="constant", cval=0, fill_per_channel=False,
+            seed=None):
+    """Fill a single area within an image using a fill mode (in-place).
+
+    This cutout method uses the top-left and bottom-right corner coordinates
+    of the cutout region given as absolute pixel values.
+
+    .. note::
+
+        Gaussian fill mode will assume that float input images contain values
+        in the interval ``[0.0, 1.0]`` and hence sample values from a
+        gaussian within that interval, i.e. from ``N(0.5, std=0.5/3)``.
+
+
+    Supported dtypes
+    ----------------
+
+    minimum of (
+        :func:`~imgaug.augmenters.arithmetic._fill_rectangle_gaussian_`,
+        :func:`~imgaug.augmenters.arithmetic._fill_rectangle_constant_`
+    )
+
+    Parameters
+    ----------
+    image : ndarray
+        Image to modify. Might be modified in-place.
+
+    x1 : number
+        X-coordinate of the top-left corner of the cutout region.
+
+    y1 : number
+        Y-coordinate of the top-left corner of the cutout region.
+
+    x2 : number
+        X-coordinate of the bottom-right corner of the cutout region.
+
+    y2 : number
+        Y-coordinate of the bottom-right corner of the cutout region.
+
+    fill_mode : {'constant', 'gaussian'}, optional
+        Fill mode to use.
+
+    cval : number or tuple of number, optional
+        The constant value to use when filling with mode ``constant``.
+        May be an intensity value or color tuple.
+
+    fill_per_channel : number or bool, optional
+        Whether to fill in a channelwise fashion.
+        If number then a value ``>=0.5`` will be interpreted as ``True``.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        A random number generator to sample random values from.
+        Usually an integer seed value or an ``RNG`` instance.
+        See :class:`imgaug.random.RNG` for details.
+
+    Returns
+    -------
+    ndarray
+        Image with area filled in.
+        The input image might have been modified in-place.
+
+    """
+    import importlib
+
+    height, width = image.shape[0:2]
+    x1 = min(max(int(x1), 0), width)
+    y1 = min(max(int(y1), 0), height)
+    x2 = min(max(int(x2), 0), width)
+    y2 = min(max(int(y2), 0), height)
+
+    if x2 > x1 and y2 > y1:
+        assert fill_mode in _CUTOUT_FILL_MODES, (
+            "Expected one of the following fill modes: %s. "
+            "Got: %s." % (
+                str(list(_CUTOUT_FILL_MODES.keys())), fill_mode))
+
+        module_name, fname = _CUTOUT_FILL_MODES[fill_mode]
+        module = importlib.import_module(module_name)
+        func = getattr(module, fname)
+        image = func(
+            image,
+            x1=x1, y1=y1, x2=x2, y2=y2,
+            cval=cval,
+            per_channel=(fill_per_channel >= 0.5),
+            random_state=(
+                iarandom.RNG(seed)
+                if not isinstance(seed, iarandom.RNG)
+                else seed)  # only RNG(.) without "if" is ~8x slower
+        )
+    return image
+
+
+def _fill_rectangle_gaussian_(image, x1, y1, x2, y2, cval, per_channel,
+                              random_state):
+    """Fill a rectangular image area with samples from a gaussian.
+
+    Supported dtypes
+    ----------------
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: limited; tested (1)
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: limited; tested (1)
+        * ``float16``: yes; tested (2)
+        * ``float32``: yes; tested (2)
+        * ``float64``: yes; tested (2)
+        * ``float128``: limited; tested (1) (2)
+        * ``bool``: yes; tested
+
+        - (1) Possible loss of resolution due to gaussian values being sampled
+              as ``float64`` s.
+        - (2) Float input arrays are assumed to be in interval ``[0.0, 1.0]``
+              and all gaussian samples are within that interval too.
+
+    """
+    # for float we assume value range [0.0, 1.0]
+    # that matches the common use case and also makes the tests way easier
+    # we also set bool here manually as the center value returned by
+    # get_value_range_for_dtype() is None
+    kind = image.dtype.kind
+    if kind in ["f", "b"]:
+        min_value = 0.0
+        center_value = 0.5
+        max_value = 1.0
+    else:
+        min_value, center_value, max_value = iadt.get_value_range_of_dtype(
+            image.dtype)
+
+    # set standard deviation to 1/3 of value range to get 99.7% of values
+    # within [min v.r., max v.r.]
+    # we also divide by 2 because we want to spread towards the
+    # "left"/"right" of the center value by half of the value range
+    stddev = (float(max_value) - float(min_value)) / 2.0 / 3.0
+
+    height = y2 - y1
+    width = x2 - x1
+    shape = (height, width)
+    if per_channel and image.ndim == 3:
+        shape = shape + (image.shape[2],)
+    rect = random_state.normal(center_value, stddev, size=shape)
+    if image.dtype.kind == "b":
+        rect_vr = (rect > 0.5)
+    else:
+        rect_vr = np.clip(rect, min_value, max_value).astype(image.dtype)
+
+    if image.ndim == 3:
+        image[y1:y2, x1:x2, :] = np.atleast_3d(rect_vr)
+    else:
+        image[y1:y2, x1:x2] = rect_vr
+
+    return image
+
+
+def _fill_rectangle_constant_(image, x1, y1, x2, y2, cval, per_channel,
+                              random_state):
+    """Fill a rectangular area within an image with constant value(s).
+
+    `cval` may be a single value or one per channel. If the number of items
+    in `cval` does not match the number of channels in `image`, it may
+    be tiled up to the number of channels.
+
+    Supported dtypes
+    ----------------
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
+
+    """
+    if ia.is_iterable(cval):
+        if per_channel:
+            nb_channels = None if image.ndim == 2 else image.shape[-1]
+            if nb_channels is None:
+                cval = cval[0]
+            elif len(cval) < nb_channels:
+                mul = int(np.ceil(nb_channels / len(cval)))
+                cval = np.tile(cval, (mul,))[0:nb_channels]
+            elif len(cval) > nb_channels:
+                cval = cval[0:nb_channels]
+        else:
+            cval = cval[0]
+
+    # without the array(), uint64 max value is assigned as 0
+    image[y1:y2, x1:x2, ...] = np.array(cval, dtype=image.dtype)
+
+    return image
+
+
 def replace_elementwise_(image, mask, replacements):
     """Replace components in an image array with new values.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -659,7 +915,7 @@ def replace_elementwise_(image, mask, replacements):
         * ``bool``: yes; tested
 
         - (1) ``uint64`` is currently not supported, because
-              :func:`imgaug.dtypes.clip_to_dtype_value_range_()` does not
+              :func:`~imgaug.dtypes.clip_to_dtype_value_range_()` does not
               support it, which again is because numpy.clip() seems to not
               support it.
         - (2) `int64` is disallowed due to being converted to `float64`
@@ -754,9 +1010,10 @@ def invert(image, min_value=None, max_value=None, threshold=None,
            invert_above_threshold=True):
     """Invert an array.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.arithmetic.invert_`.
+    See :func:`~imgaug.augmenters.arithmetic.invert_`.
 
     Parameters
     ----------
@@ -790,46 +1047,47 @@ def invert_(image, min_value=None, max_value=None, threshold=None,
             invert_above_threshold=True):
     """Invert an array in-place.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        if (min_value=None and max_value=None)::
+    if (min_value=None and max_value=None):
 
-            * ``uint8``: yes; fully tested
-            * ``uint16``: yes; tested
-            * ``uint32``: yes; tested
-            * ``uint64``: yes; tested
-            * ``int8``: yes; tested
-            * ``int16``: yes; tested
-            * ``int32``: yes; tested
-            * ``int64``: yes; tested
-            * ``float16``: yes; tested
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: yes; tested
-            * ``bool``: yes; tested
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
 
-        if (min_value!=None or max_value!=None)::
+    if (min_value!=None or max_value!=None):
 
-            * ``uint8``: yes; fully tested
-            * ``uint16``: yes; tested
-            * ``uint32``: yes; tested
-            * ``uint64``: no (1)
-            * ``int8``: yes; tested
-            * ``int16``: yes; tested
-            * ``int32``: yes; tested
-            * ``int64``: no (2)
-            * ``float16``: yes; tested
-            * ``float32``: yes; tested
-            * ``float64``: no (2)
-            * ``float128``: no (3)
-            * ``bool``: no (4)
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: no (1)
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: no (2)
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: no (2)
+        * ``float128``: no (3)
+        * ``bool``: no (4)
 
-            - (1) Not allowed due to numpy's clip converting from ``uint64`` to
-                  ``float64``.
-            - (2) Not allowed as int/float have to be increased in resolution
-                  when using min/max values.
-            - (3) Not tested.
-            - (4) Makes no sense when using min/max values.
+        - (1) Not allowed due to numpy's clip converting from ``uint64`` to
+              ``float64``.
+        - (2) Not allowed as int/float have to be increased in resolution
+              when using min/max values.
+        - (3) Not tested.
+        - (4) Makes no sense when using min/max values.
 
     Parameters
     ----------
@@ -939,17 +1197,9 @@ def _invert_bool(arr, min_value, max_value):
 
 def _invert_uint8_(arr, min_value, max_value, threshold,
                    invert_above_threshold):
-    if 0 in arr.shape:
-        return np.copy(arr)
-
-    if arr.flags["OWNDATA"] is False:
-        arr = np.copy(arr)
-    if arr.flags["C_CONTIGUOUS"] is False:
-        arr = np.ascontiguousarray(arr)
-
     table = _generate_table_for_invert_uint8(
         min_value, max_value, threshold, invert_above_threshold)
-    arr = cv2.LUT(arr, table, dst=arr)
+    arr = ia.apply_lut_(arr, table)
     return arr
 
 
@@ -1060,9 +1310,10 @@ def _generate_table_for_invert_uint8(min_value, max_value, threshold,
 def solarize(image, threshold=128):
     """Invert pixel values above a threshold.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`solarize_`.
+    See :func:`solarize_`.
 
     Parameters
     ----------
@@ -1089,9 +1340,10 @@ def solarize_(image, threshold=128):
     This function performs the same transformation as
     :func:`PIL.ImageOps.solarize`.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`invert_(min_value=None and max_value=None)`.
+    See ``invert_(min_value=None and max_value=None)``.
 
     Parameters
     ----------
@@ -1101,6 +1353,7 @@ def solarize_(image, threshold=128):
     threshold : None or number, optional
         See :func:`invert_`.
         Note: The default threshold is optimized for ``uint8`` images.
+
 
     Returns
     -------
@@ -1115,7 +1368,8 @@ def solarize_(image, threshold=128):
 def compress_jpeg(image, compression):
     """Compress an image using jpeg compression.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: ?
@@ -1217,9 +1471,10 @@ class Add(meta.Augmenter):
     """
     Add a value to all pixels in an image.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.arithmetic.add_scalar`.
+    See :func:`~imgaug.augmenters.arithmetic.add_scalar`.
 
     Parameters
     ----------
@@ -1245,14 +1500,14 @@ class Add(meta.Augmenter):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1282,9 +1537,8 @@ class Add(meta.Augmenter):
     """
 
     def __init__(self, value=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
-        super(Add, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+                 seed=None, name=None, **old_kwargs):
+        super(Add, self).__init__(seed=seed, name=name, **old_kwargs)
 
         self.value = iap.handle_continuous_param(
             value, "value", value_range=None, tuple_to_uniform=True,
@@ -1292,7 +1546,7 @@ class Add(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -1339,7 +1593,7 @@ class Add(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.value, self.per_channel]
 
 
@@ -1353,9 +1607,10 @@ class AddElementwise(meta.Augmenter):
     and *per pixel* (and optionally per channel), i.e. intensities of
     neighbouring pixels may be increased/decreased by different amounts.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.arithmetic.add_elementwise`.
+    See :func:`~imgaug.augmenters.arithmetic.add_elementwise`.
 
     Parameters
     ----------
@@ -1381,14 +1636,14 @@ class AddElementwise(meta.Augmenter):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1417,9 +1672,9 @@ class AddElementwise(meta.Augmenter):
     """
 
     def __init__(self, value=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(AddElementwise, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.value = iap.handle_continuous_param(
             value, "value", value_range=None, tuple_to_uniform=True,
@@ -1427,7 +1682,7 @@ class AddElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -1450,7 +1705,7 @@ class AddElementwise(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.value, self.per_channel]
 
 
@@ -1467,9 +1722,10 @@ class AdditiveGaussianNoise(AddElementwise):
     different noise values to neighbouring pixels and is comparable
     to ``AddElementwise``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.AddElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.AddElementwise`.
 
     Parameters
     ----------
@@ -1508,14 +1764,14 @@ class AdditiveGaussianNoise(AddElementwise):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1544,7 +1800,7 @@ class AdditiveGaussianNoise(AddElementwise):
 
     """
     def __init__(self, loc=0, scale=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         loc2 = iap.handle_continuous_param(
             loc, "loc", value_range=None, tuple_to_uniform=True,
             list_to_choice=True)
@@ -1555,8 +1811,8 @@ class AdditiveGaussianNoise(AddElementwise):
         value = iap.Normal(loc=loc2, scale=scale2)
 
         super(AdditiveGaussianNoise, self).__init__(
-            value, per_channel=per_channel, name=name,
-            deterministic=deterministic, random_state=random_state)
+            value, per_channel=per_channel,
+            seed=seed, name=name, **old_kwargs)
 
 
 # TODO rename to AddLaplaceNoise?
@@ -1579,9 +1835,10 @@ class AdditiveLaplaceNoise(AddElementwise):
     different noise values to neighbouring pixels and is comparable
     to ``AddElementwise``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.AddElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.AddElementwise`.
 
     Parameters
     ----------
@@ -1620,14 +1877,14 @@ class AdditiveLaplaceNoise(AddElementwise):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1656,7 +1913,7 @@ class AdditiveLaplaceNoise(AddElementwise):
 
     """
     def __init__(self, loc=0, scale=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         loc2 = iap.handle_continuous_param(
             loc, "loc", value_range=None, tuple_to_uniform=True,
             list_to_choice=True)
@@ -1669,9 +1926,7 @@ class AdditiveLaplaceNoise(AddElementwise):
         super(AdditiveLaplaceNoise, self).__init__(
             value,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 # TODO rename to AddPoissonNoise?
@@ -1692,9 +1947,10 @@ class AdditivePoissonNoise(AddElementwise):
     different noise values to neighbouring pixels and is comparable
     to ``AddElementwise``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.AddElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.AddElementwise`.
 
     Parameters
     ----------
@@ -1721,14 +1977,14 @@ class AdditivePoissonNoise(AddElementwise):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1763,7 +2019,7 @@ class AdditivePoissonNoise(AddElementwise):
 
     """
     def __init__(self, lam=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         lam2 = iap.handle_continuous_param(
             lam, "lam",
             value_range=(0, None), tuple_to_uniform=True, list_to_choice=True)
@@ -1773,9 +2029,7 @@ class AdditivePoissonNoise(AddElementwise):
         super(AdditivePoissonNoise, self).__init__(
             value,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 class Multiply(meta.Augmenter):
@@ -1784,9 +2038,10 @@ class Multiply(meta.Augmenter):
 
     This augmenter can be used to make images lighter or darker.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.arithmetic.multiply_scalar`.
+    See :func:`~imgaug.augmenters.arithmetic.multiply_scalar`.
 
     Parameters
     ----------
@@ -1812,14 +2067,14 @@ class Multiply(meta.Augmenter):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1847,9 +2102,9 @@ class Multiply(meta.Augmenter):
     """
 
     def __init__(self, mul=1.0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(Multiply, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.mul = iap.handle_continuous_param(
             mul, "mul", value_range=None, tuple_to_uniform=True,
@@ -1857,7 +2112,7 @@ class Multiply(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -1903,7 +2158,7 @@ class Multiply(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.mul, self.per_channel]
 
 
@@ -1916,9 +2171,10 @@ class MultiplyElementwise(meta.Augmenter):
     image* (and optionally channel), this augmenter samples the multipliers
     to use per image and *per pixel* (and optionally per channel).
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.arithmetic.multiply_elementwise`.
+    See :func:`~imgaug.augmenters.arithmetic.multiply_elementwise`.
 
     Parameters
     ----------
@@ -1944,14 +2200,14 @@ class MultiplyElementwise(meta.Augmenter):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1980,9 +2236,9 @@ class MultiplyElementwise(meta.Augmenter):
     """
 
     def __init__(self, mul=1.0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(MultiplyElementwise, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.mul = iap.handle_continuous_param(
             mul, "mul",
@@ -1990,7 +2246,7 @@ class MultiplyElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(per_channel,
                                                         "per_channel")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -2024,8 +2280,344 @@ class MultiplyElementwise(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.mul, self.per_channel]
+
+
+class _CutoutSamples(object):
+    def __init__(self, nb_iterations, pos_x, pos_y, size_h, size_w, squared,
+                 fill_mode, cval, fill_per_channel):
+        self.nb_iterations = nb_iterations
+        self.pos_x = pos_x
+        self.pos_y = pos_y
+        self.size_h = size_h
+        self.size_w = size_w
+        self.squared = squared
+        self.fill_mode = fill_mode
+        self.cval = cval
+        self.fill_per_channel = fill_per_channel
+
+
+class Cutout(meta.Augmenter):
+    """Fill one or more rectangular areas in an image using a fill mode.
+
+    See paper "Improved Regularization of Convolutional Neural Networks with
+    Cutout" by DeVries and Taylor.
+
+    In contrast to the paper, this implementation also supports replacing
+    image sub-areas with gaussian noise, random intensities or random RGB
+    colors. It also supports non-squared areas. While the paper uses
+    absolute pixel values for the size and position, this implementation
+    uses relative values, which seems more appropriate for mixed-size
+    datasets. The position parameter furthermore allows more flexibility, e.g.
+    gaussian distributions around the center.
+
+    .. note::
+
+        This augmenter affects only image data. Other datatypes (e.g.
+        segmentation map pixels or keypoints within the filled areas)
+        are not affected.
+
+    .. note::
+
+        Gaussian fill mode will assume that float input images contain values
+        in the interval ``[0.0, 1.0]`` and hence sample values from a
+        gaussian within that interval, i.e. from ``N(0.5, std=0.5/3)``.
+
+    Supported dtypes
+    ----------------
+
+    See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    Parameters
+    ----------
+    nb_iterations : int or tuple of int or list of int or imgaug.parameters.StochasticParameter, optional
+        How many rectangular areas to fill.
+
+            * If ``int``: Exactly that many areas will be filled on all images.
+            * If ``tuple`` ``(a, b)``: A value from the interval ``[a, b]``
+              will be sampled per image.
+            * If ``list``: A random value will be sampled from that ``list``
+              per image.
+            * If ``StochasticParameter``: That parameter will be used to
+              sample ``(B,)`` values per batch of ``B`` images.
+
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        Defines the position of each area to fill.
+        Analogous to the definition in e.g.
+        :class:`~imgaug.augmenters.size.CropToFixedSize`.
+        Usually, ``uniform`` (anywhere in the image) or ``normal`` (anywhere
+        in the image with preference around the center) are sane values.
+
+    size : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        The size of the rectangle to fill as a fraction of the corresponding
+        image size, i.e. with value range ``[0.0, 1.0]``. The size is sampled
+        independently per image axis.
+
+            * If ``number``: Exactly that size is always used.
+            * If ``tuple`` ``(a, b)``: A value from the interval ``[a, b]``
+              will be sampled per area and axis.
+            * If ``list``: A random value will be sampled from that ``list``
+              per area and axis.
+            * If ``StochasticParameter``: That parameter will be used to
+              sample ``(N, 2)`` values per batch, where ``N`` is the total
+              number of areas to fill within the whole batch.
+
+    squared : bool or float or imgaug.parameters.StochasticParameter, optional
+        Whether to generate only squared areas cutout areas or allow
+        rectangular ones. If this evaluates to a true-like value, the
+        first value from `size` will be converted to absolute pixels and used
+        for both axes.
+
+        If this value is a float ``p``, then for ``p`` percent of all areas
+        to be filled `per_channel` will be treated as ``True``.
+        If it is a ``StochasticParameter`` it is expected to produce samples
+        with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
+        lead to per-channel behaviour (i.e. same as ``True``).
+
+    fill_mode : str or list of str or imgaug.parameters.StochasticParameter, optional
+        Mode to use in order to fill areas. Corresponds to ``mode`` parameter
+        in some other augmenters. Valid strings for the mode are:
+
+            * ``contant``: Fill each area with a single value.
+            * ``gaussian``: Fill each area with gaussian noise.
+
+        Valid datatypes are:
+
+            * If ``str``: Exactly that mode will alaways be used.
+            * If ``list``: A random value will be sampled from that ``list``
+              per area.
+            * If ``StochasticParameter``: That parameter will be used to
+              sample ``(N,)`` values per batch, where ``N`` is the total number
+              of areas to fill within the whole batch.
+
+    cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        The value to use (i.e. the color) to fill areas if `fill_mode` is
+        ```constant``.
+
+            * If ``number``: Exactly that value is used for all areas
+              and channels.
+            * If ``tuple`` ``(a, b)``: A value from the interval ``[a, b]``
+              will be sampled per area (and channel if ``per_channel=True``).
+            * If ``list``: A random value will be sampled from that ``list``
+              per area (and channel if ``per_channel=True``).
+            * If ``StochasticParameter``: That parameter will be used to
+              sample ``(N, Cmax)`` values per batch, where ``N`` is the total
+              number of areas to fill within the whole batch and ``Cmax``
+              is the maximum number of channels in any image (usually ``3``).
+              If ``per_channel=False``, only the first value of the second
+              axis is used.
+
+    fill_per_channel : bool or float or imgaug.parameters.StochasticParameter, optional
+        Whether to fill each area in a channelwise fashion (``True``) or
+        not (``False``).
+        The behaviour per fill mode is:
+
+            * ``constant``: Whether to fill all channels with the same value
+              (i.e, grayscale) or different values (i.e. usually RGB color).
+            * ``gaussian``: Whether to sample once from a gaussian and use the
+              values for all channels (i.e. grayscale) or to sample
+              channelwise (i.e. RGB colors)
+
+        If this value is a float ``p``, then for ``p`` percent of all areas
+        to be filled `per_channel` will be treated as ``True``.
+        If it is a ``StochasticParameter`` it is expected to produce samples
+        with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
+        lead to per-channel behaviour (i.e. same as ``True``).
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    deterministic : bool, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.Cutout(nb_iterations=2)
+
+    Fill per image two random areas, by default with grayish pixels.
+
+    >>> aug = iaa.Cutout(nb_iterations=(1, 5), size=0.2, squared=False)
+
+    Fill per image between one and five areas, each having ``20%``
+    of the corresponding size of the height and width (for non-square
+    images this results in non-square areas to be filled).
+
+    >>> aug = iaa.Cutout(fill_mode="constant", cval=255)
+
+    Fill all areas with white pixels.
+
+    >>> aug = iaa.Cutout(fill_mode="constant", cval=(0, 255),
+    >>>                  fill_per_channel=0.5)
+
+    Fill ``50%`` of all areas with a random intensity value between
+    ``0`` and ``256``. Fill the other ``50%`` of all areas with
+    random colors.
+
+    >>> aug = iaa.Cutout(fill_mode="gaussian", fill_per_channel=True)
+
+    Fill areas with gaussian channelwise noise (i.e. usually RGB).
+
+    """
+
+    def __init__(self,
+                 nb_iterations=1,
+                 position="uniform",
+                 size=0.2,
+                 squared=True,
+                 fill_mode="constant",
+                 cval=128,
+                 fill_per_channel=False,
+                 seed=None, name=None, **old_kwargs):
+        from .size import _handle_position_parameter  # TODO move to iap
+        from .geometric import _handle_cval_arg  # TODO move to iap
+
+        super(Cutout, self).__init__(
+            seed=seed, name=name, **old_kwargs)
+        self.nb_iterations = iap.handle_discrete_param(
+            nb_iterations, "nb_iterations", value_range=(0, None),
+            tuple_to_uniform=True, list_to_choice=True, allow_floats=False)
+        self.position = _handle_position_parameter(position)
+        self.size = iap.handle_continuous_param(
+            size, "size", value_range=(0.0, 1.0+1e-4),
+            tuple_to_uniform=True, list_to_choice=True)
+        self.squared = iap.handle_probability_param(squared, "squared")
+        self.fill_mode = self._handle_fill_mode_param(fill_mode)
+        self.cval = _handle_cval_arg(cval)
+        self.fill_per_channel = iap.handle_probability_param(
+            fill_per_channel, "fill_per_channel")
+
+    @classmethod
+    def _handle_fill_mode_param(cls, fill_mode):
+        if ia.is_string(fill_mode):
+            assert fill_mode in _CUTOUT_FILL_MODES, (
+                "Expected 'fill_mode' to be one of: %s. Got %s." % (
+                    str(list(_CUTOUT_FILL_MODES.keys())), fill_mode))
+            return iap.Deterministic(fill_mode)
+        if isinstance(fill_mode, iap.StochasticParameter):
+            return fill_mode
+        assert ia.is_iterable(fill_mode), (
+            "Expected 'fill_mode' to be a string, "
+            "StochasticParameter or list of strings. Got type %s." % (
+                type(fill_mode).__name__))
+        return iap.Choice(fill_mode)
+
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        samples = self._draw_samples(batch.images, random_state)
+
+        # map from xyhw to xyxy (both relative coords)
+        cutout_height_half = samples.size_h / 2
+        cutout_width_half = samples.size_w / 2
+        x1_rel = samples.pos_x - cutout_width_half
+        y1_rel = samples.pos_y - cutout_height_half
+        x2_rel = samples.pos_x + cutout_width_half
+        y2_rel = samples.pos_y + cutout_height_half
+
+        nb_iterations_sum = 0
+        gen = enumerate(zip(batch.images, samples.nb_iterations))
+        for i, (image, nb_iterations) in gen:
+            start = nb_iterations_sum
+            end = start + nb_iterations
+
+            height, width = image.shape[0:2]
+
+            # map from relative xyxy to absolute xyxy coords
+            batch.images[i] = self._augment_image_by_samples(
+                image,
+                x1_rel[start:end] * width,
+                y1_rel[start:end] * height,
+                x2_rel[start:end] * width,
+                y2_rel[start:end] * height,
+                samples.squared[start:end],
+                samples.fill_mode[start:end],
+                samples.cval[start:end],
+                samples.fill_per_channel[start:end],
+                random_state)
+
+            nb_iterations_sum += nb_iterations
+
+        return batch
+
+    def _draw_samples(self, images, random_state):
+        rngs = random_state.duplicate(8)
+        nb_rows = len(images)
+        nb_channels_max = meta.estimate_max_number_of_channels(images)
+
+        nb_iterations = self.nb_iterations.draw_samples(
+            (nb_rows,), random_state=rngs[0])
+        nb_dropped_areas = int(np.sum(nb_iterations))
+
+        if isinstance(self.position, tuple):
+            pos_x = self.position[0].draw_samples((nb_dropped_areas,),
+                                                  random_state=rngs[1])
+            pos_y = self.position[1].draw_samples((nb_dropped_areas,),
+                                                  random_state=rngs[2])
+        else:
+            pos = self.position.draw_samples((nb_dropped_areas, 2),
+                                             random_state=rngs[1])
+            pos_x = pos[:, 0]
+            pos_y = pos[:, 1]
+
+        size = self.size.draw_samples((nb_dropped_areas, 2),
+                                      random_state=rngs[3])
+        squared = self.squared.draw_samples((nb_dropped_areas,),
+                                            random_state=rngs[4])
+        fill_mode = self.fill_mode.draw_samples(
+            (nb_dropped_areas,), random_state=rngs[5])
+
+        cval = self.cval.draw_samples((nb_dropped_areas, nb_channels_max),
+                                      random_state=rngs[6])
+
+        fill_per_channel = self.fill_per_channel.draw_samples(
+            (nb_dropped_areas,), random_state=rngs[7])
+
+        return _CutoutSamples(
+            nb_iterations=nb_iterations,
+            pos_x=pos_x,
+            pos_y=pos_y,
+            size_h=size[:, 0],
+            size_w=size[:, 1],
+            squared=squared,
+            fill_mode=fill_mode,
+            cval=cval,
+            fill_per_channel=fill_per_channel
+        )
+
+    @classmethod
+    def _augment_image_by_samples(cls, image, x1, y1, x2, y2, squared,
+                                  fill_mode, cval, fill_per_channel,
+                                  random_state):
+        for i, x1_i in enumerate(x1):
+            x2_i = x2[i]
+            if squared[i] >= 0.5:
+                height_h = (y2[i] - y1[i]) / 2
+                x_center = x1_i + (x2_i - x1_i) / 2
+                x1_i = x_center - height_h
+                x2_i = x_center + height_h
+
+            image = cutout_(
+                image,
+                x1=x1_i,
+                y1=y1[i],
+                x2=x2_i,
+                y2=y2[i],
+                fill_mode=fill_mode[i],
+                cval=cval[i],
+                fill_per_channel=fill_per_channel[i],
+                seed=random_state)
+        return image
+
+    def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.nb_iterations, self.position, self.size, self.squared,
+                self.fill_mode, self.cval, self.fill_per_channel]
 
 
 # TODO verify that (a, b) still leads to a p being sampled per image and not
@@ -2034,9 +2626,10 @@ class Dropout(MultiplyElementwise):
     """
     Set a fraction of pixels in images to zero.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.MultiplyElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.MultiplyElementwise`.
 
     Parameters
     ----------
@@ -2070,14 +2663,14 @@ class Dropout(MultiplyElementwise):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2103,15 +2696,13 @@ class Dropout(MultiplyElementwise):
 
     """
     def __init__(self, p=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         p_param = _handle_dropout_probability_param(p, "p")
 
         super(Dropout, self).__init__(
             p_param,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 def _handle_dropout_probability_param(p, name):
@@ -2171,9 +2762,10 @@ class CoarseDropout(MultiplyElementwise):
     ``CoarseDropout`` can drop multiple rectangles (with some correlation
     between the sizes of these rectangles).
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.MultiplyElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.MultiplyElementwise`.
 
     Parameters
     ----------
@@ -2250,14 +2842,14 @@ class CoarseDropout(MultiplyElementwise):
         less than ``2``, otherwise one may end up with a ``1x1`` low resolution
         mask, leading easily to the whole image being dropped.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2296,7 +2888,7 @@ class CoarseDropout(MultiplyElementwise):
     """
     def __init__(self, p=0, size_px=None, size_percent=None, per_channel=False,
                  min_size=4,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         p_param = _handle_dropout_probability_param(p, "p")
 
         if size_px is not None:
@@ -2313,9 +2905,7 @@ class CoarseDropout(MultiplyElementwise):
         super(CoarseDropout, self).__init__(
             p_param,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 class Dropout2d(meta.Augmenter):
@@ -2331,7 +2921,8 @@ class Dropout2d(meta.Augmenter):
         It does so if and only if *all* channels of an image are dropped.
         If ``nb_keep_channels >= 1`` then that never happens.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -2373,14 +2964,14 @@ class Dropout2d(meta.Augmenter):
         will not be dropped, even if ``p=1.0``. Set to ``0`` to allow dropping
         all channels.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2400,10 +2991,10 @@ class Dropout2d(meta.Augmenter):
 
     """
 
-    def __init__(self, p, nb_keep_channels=1, name=None, deterministic=False,
-                 random_state=None):
+    def __init__(self, p, nb_keep_channels=1,
+                 seed=None, name=None, **old_kwargs):
         super(Dropout2d, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.p = _handle_dropout_probability_param(p, "p")
         self.nb_keep_channels = max(nb_keep_channels, 0)
 
@@ -2418,7 +3009,7 @@ class Dropout2d(meta.Augmenter):
         self._heatmaps_cval = 0.0
         self._segmentation_maps_cval = 0
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         imagewise_drop_channel_ids, all_dropped_ids = self._draw_samples(
             batch, random_state)
 
@@ -2498,7 +3089,7 @@ class Dropout2d(meta.Augmenter):
         return imagewise_channels_to_drop, all_dropped_ids
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p, self.nb_keep_channels]
 
 
@@ -2513,7 +3104,8 @@ class TotalDropout(meta.Augmenter):
         maps to zero and removes all coordinate-based data (e.g. it removes
         all bounding boxes on images that were filled with zeros).
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -2549,14 +3141,14 @@ class TotalDropout(meta.Augmenter):
               parameter, you can usually do ``imgaug.parameters.Binomial(1-p)``
               to convert parameter `p` to a 0/1 representation.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2572,9 +3164,9 @@ class TotalDropout(meta.Augmenter):
 
     """
 
-    def __init__(self, p, name=None, deterministic=False, random_state=None):
+    def __init__(self, p, seed=None, name=None, **old_kwargs):
         super(TotalDropout, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.p = _handle_dropout_probability_param(p, "p")
 
         self._drop_images = True
@@ -2588,7 +3180,7 @@ class TotalDropout(meta.Augmenter):
         self._heatmaps_cval = 0.0
         self._segmentation_maps_cval = 0
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         drop_mask = self._draw_samples(batch, random_state)
         drop_ids = None
 
@@ -2637,7 +3229,7 @@ class TotalDropout(meta.Augmenter):
         return drop_ids
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p]
 
 
@@ -2645,9 +3237,10 @@ class ReplaceElementwise(meta.Augmenter):
     """
     Replace pixels in an image with new values.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.arithmetic.replace_elementwise_`.
+    See :func:`~imgaug.augmenters.arithmetic.replace_elementwise_`.
 
     Parameters
     ----------
@@ -2690,14 +3283,14 @@ class ReplaceElementwise(meta.Augmenter):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2740,9 +3333,9 @@ class ReplaceElementwise(meta.Augmenter):
     """
 
     def __init__(self, mask, replacement, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(ReplaceElementwise, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.mask = iap.handle_probability_param(
             mask, "mask", tuple_to_uniform=True, list_to_choice=True)
@@ -2751,7 +3344,7 @@ class ReplaceElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(per_channel,
                                                         "per_channel")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -2796,7 +3389,7 @@ class ReplaceElementwise(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.mask, self.replacement, self.per_channel]
 
 
@@ -2804,9 +3397,10 @@ class SaltAndPepper(ReplaceElementwise):
     """
     Replace pixels in images with salt/pepper noise (white/black-ish colors).
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.ReplaceElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
     Parameters
     ----------
@@ -2834,14 +3428,14 @@ class SaltAndPepper(ReplaceElementwise):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2858,14 +3452,12 @@ class SaltAndPepper(ReplaceElementwise):
 
     """
     def __init__(self, p=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(SaltAndPepper, self).__init__(
             mask=p,
             replacement=iap.Beta(0.5, 0.5) * 255,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
+            seed=seed, name=name, **old_kwargs
         )
 
 
@@ -2876,9 +3468,10 @@ class ImpulseNoise(SaltAndPepper):
     This is identical to ``SaltAndPepper``, except that `per_channel` is
     always set to ``True``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.SaltAndPepper``.
+    See :class:`~imgaug.augmenters.arithmetic.SaltAndPepper`.
 
     Parameters
     ----------
@@ -2895,14 +3488,14 @@ class ImpulseNoise(SaltAndPepper):
               sampled from that parameter per image. Any value ``>0.5`` in
               that mask will be replaced with impulse noise noise.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2912,13 +3505,11 @@ class ImpulseNoise(SaltAndPepper):
     Replace ``10%`` of all pixels with impulse noise.
 
     """
-    def __init__(self, p=0, name=None, deterministic=False, random_state=None):
+    def __init__(self, p=0, seed=None, name=None, **old_kwargs):
         super(ImpulseNoise, self).__init__(
             p=p,
             per_channel=True,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 class CoarseSaltAndPepper(ReplaceElementwise):
@@ -2935,9 +3526,10 @@ class CoarseSaltAndPepper(ReplaceElementwise):
     TODO replace dtype support with uint8 only, because replacement is
          geared towards that value range
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.ReplaceElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
     Parameters
     ----------
@@ -3009,14 +3601,14 @@ class CoarseSaltAndPepper(ReplaceElementwise):
         less than ``2``, otherwise one may end up with a ``1x1`` low resolution
         mask, leading easily to the whole image being replaced.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3044,7 +3636,7 @@ class CoarseSaltAndPepper(ReplaceElementwise):
     """
     def __init__(self, p=0, size_px=None, size_percent=None,
                  per_channel=False, min_size=4,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         mask = iap.handle_probability_param(
             p, "p", tuple_to_uniform=True, list_to_choice=True)
 
@@ -3063,9 +3655,7 @@ class CoarseSaltAndPepper(ReplaceElementwise):
             mask=mask_low,
             replacement=replacement,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
+            seed=seed, name=name, **old_kwargs
         )
 
 
@@ -3076,9 +3666,10 @@ class Salt(ReplaceElementwise):
     This augmenter is similar to ``SaltAndPepper``, but adds no pepper noise to
     images.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.ReplaceElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
     Parameters
     ----------
@@ -3106,14 +3697,14 @@ class Salt(ReplaceElementwise):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3125,7 +3716,7 @@ class Salt(ReplaceElementwise):
     """
 
     def __init__(self, p=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         replacement01 = iap.ForceSign(
             iap.Beta(0.5, 0.5) - 0.5,
             positive=True,
@@ -3138,9 +3729,7 @@ class Salt(ReplaceElementwise):
             mask=p,
             replacement=replacement,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 class CoarseSalt(ReplaceElementwise):
@@ -3149,9 +3738,10 @@ class CoarseSalt(ReplaceElementwise):
 
     See also the similar ``CoarseSaltAndPepper``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.ReplaceElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
     Parameters
     ----------
@@ -3223,14 +3813,14 @@ class CoarseSalt(ReplaceElementwise):
         less than ``2``, otherwise one may end up with a ``1x1`` low resolution
         mask, leading easily to the whole image being replaced.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3247,7 +3837,7 @@ class CoarseSalt(ReplaceElementwise):
 
     def __init__(self, p=0, size_px=None, size_percent=None, per_channel=False,
                  min_size=4,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         mask = iap.handle_probability_param(
             p, "p", tuple_to_uniform=True, list_to_choice=True)
 
@@ -3271,9 +3861,7 @@ class CoarseSalt(ReplaceElementwise):
             mask=mask_low,
             replacement=replacement,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 class Pepper(ReplaceElementwise):
@@ -3286,9 +3874,10 @@ class Pepper(ReplaceElementwise):
     This augmenter is similar to ``Dropout``, but slower and the black pixels
     are not uniformly black.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.ReplaceElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
     Parameters
     ----------
@@ -3316,14 +3905,14 @@ class Pepper(ReplaceElementwise):
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3335,7 +3924,7 @@ class Pepper(ReplaceElementwise):
     """
 
     def __init__(self, p=0, per_channel=False,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         replacement01 = iap.ForceSign(
             iap.Beta(0.5, 0.5) - 0.5,
             positive=False,
@@ -3347,9 +3936,7 @@ class Pepper(ReplaceElementwise):
             mask=p,
             replacement=replacement,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
+            seed=seed, name=name, **old_kwargs
         )
 
 
@@ -3357,9 +3944,10 @@ class CoarsePepper(ReplaceElementwise):
     """
     Replace rectangular areas in images with black-ish pixel noise.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.arithmetic.ReplaceElementwise``.
+    See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
     Parameters
     ----------
@@ -3431,14 +4019,14 @@ class CoarsePepper(ReplaceElementwise):
         otherwise one may end up with a ``1x1`` low resolution mask, leading
         easily to the whole image being replaced.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3455,7 +4043,7 @@ class CoarsePepper(ReplaceElementwise):
 
     def __init__(self, p=0, size_px=None, size_percent=None, per_channel=False,
                  min_size=4,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         mask = iap.handle_probability_param(
             p, "p", tuple_to_uniform=True, list_to_choice=True)
 
@@ -3479,9 +4067,7 @@ class CoarsePepper(ReplaceElementwise):
             mask=mask_low,
             replacement=replacement,
             per_channel=per_channel,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
+            seed=seed, name=name, **old_kwargs
         )
 
 
@@ -3495,9 +4081,10 @@ class Invert(meta.Augmenter):
     ``v`` a value. Then the distance of ``v`` to ``m`` is ``d=abs(v-m)`` and
     the new value is given by ``v'=M-d``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.arithmetic.invert_`.
+    See :func:`~imgaug.augmenters.arithmetic.invert_`.
 
     Parameters
     ----------
@@ -3555,14 +4142,14 @@ class Invert(meta.Augmenter):
         ``N`` and interpreted as ``True`` if ``>0.5``.
         If `threshold` is ``None`` this parameter has no effect.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3602,9 +4189,9 @@ class Invert(meta.Augmenter):
 
     def __init__(self, p=0, per_channel=False, min_value=None, max_value=None,
                  threshold=None, invert_above_threshold=0.5,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(Invert, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         # TODO allow list and tuple for p
         self.p = iap.handle_probability_param(p, "p")
@@ -3622,7 +4209,7 @@ class Invert(meta.Augmenter):
         self.invert_above_threshold = iap.handle_probability_param(
             invert_above_threshold, "invert_above_threshold")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -3681,7 +4268,7 @@ class Invert(meta.Augmenter):
         )
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p, self.per_channel, self.min_value, self.max_value,
                 self.threshold, self.invert_above_threshold]
 
@@ -3706,13 +4293,14 @@ class Solarize(Invert):
 
     See :class:`Invert` for more details.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :class:`Invert`.
+    See :class:`Invert`.
 
     Parameters
     ----------
-    p : float or imgaug.parameters.StochasticParameter, optional
+    p : float or imgaug.parameters.StochasticParameter
         See :class:`Invert`.
 
     per_channel : bool or float or imgaug.parameters.StochasticParameter, optional
@@ -3730,14 +4318,14 @@ class Solarize(Invert):
     invert_above_threshold : bool or float or imgaug.parameters.StochasticParameter, optional
         See :class:`Invert`.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3751,18 +4339,18 @@ class Solarize(Invert):
     """
     def __init__(self, p, per_channel=False, min_value=None, max_value=None,
                  threshold=(128-64, 128+64), invert_above_threshold=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(Solarize, self).__init__(
             p=p, per_channel=per_channel,
             min_value=min_value, max_value=max_value,
             threshold=threshold, invert_above_threshold=invert_above_threshold,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 # TODO remove from examples
 @ia.deprecated("imgaug.contrast.LinearContrast")
 def ContrastNormalization(alpha=1.0, per_channel=False,
-                          name=None, deterministic=False, random_state=None):
+                          seed=None, name=None, **old_kwargs):
     """
     Change the contrast of images.
 
@@ -3796,14 +4384,14 @@ def ContrastNormalization(alpha=1.0, per_channel=False,
         with values between ``0.0`` and ``1.0``, where values ``>0.5`` will
         lead to per-channel behaviour (i.e. same as ``True``).
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3827,7 +4415,7 @@ def ContrastNormalization(alpha=1.0, per_channel=False,
     from . import contrast as contrast_lib
     return contrast_lib.LinearContrast(
         alpha=alpha, per_channel=per_channel,
-        name=name, deterministic=deterministic, random_state=random_state)
+        seed=seed, name=name, **old_kwargs)
 
 
 # TODO try adding per channel somehow
@@ -3845,9 +4433,10 @@ class JpegCompression(meta.Augmenter):
     the images with JPEG compression and then reloads them into arrays). It
     does not return the raw JPEG file content.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.arithmetic.compress_jpeg`.
+    See :func:`~imgaug.augmenters.arithmetic.compress_jpeg`.
 
     Parameters
     ----------
@@ -3870,14 +4459,14 @@ class JpegCompression(meta.Augmenter):
               from that parameter per ``N`` input images, each representing the
               compression for the ``n``-th image.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3891,9 +4480,9 @@ class JpegCompression(meta.Augmenter):
 
     """
     def __init__(self, compression=50,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(JpegCompression, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         # will be converted to int during augmentation, which is why we allow
         # floats here
@@ -3901,7 +4490,7 @@ class JpegCompression(meta.Augmenter):
             compression, "compression",
             value_range=(0, 100), tuple_to_uniform=True, list_to_choice=True)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -3916,5 +4505,5 @@ class JpegCompression(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.compression]

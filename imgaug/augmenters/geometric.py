@@ -1,33 +1,22 @@
 """Augmenters that apply affine or similar transformations.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.Affine(...),
-        iaa.PerspectiveTransform(...)
-    ])
-
 List of augmenters:
-    * Affine
-    * ScaleX
-    * ScaleY
-    * TranslateX
-    * TranslateY
-    * Rotate
-    * ShearX
-    * ShearY
-    * AffineCv2
-    * PiecewiseAffine
-    * PerspectiveTransform
-    * ElasticTransformation
-    * Rot90
-    * WithPolarWarping
-    * Jigsaw
+
+    * :class:`Affine`
+    * :class:`ScaleX`
+    * :class:`ScaleY`
+    * :class:`TranslateX`
+    * :class:`TranslateY`
+    * :class:`Rotate`
+    * :class:`ShearX`
+    * :class:`ShearY`
+    * :class:`AffineCv2`
+    * :class:`PiecewiseAffine`
+    * :class:`PerspectiveTransform`
+    * :class:`ElasticTransformation`
+    * :class:`Rot90`
+    * :class:`WithPolarWarping`
+    * :class:`Jigsaw`
 
 """
 from __future__ import print_function, division, absolute_import
@@ -42,6 +31,7 @@ import cv2
 import six.moves as sm
 
 import imgaug as ia
+from imgaug.imgaug import _normalize_cv2_input_arr_
 from imgaug.augmentables.polys import _ConcavePolygonRecoverer
 from . import meta
 from . import blur as blur_lib
@@ -295,7 +285,7 @@ def _warp_affine_arr_cv2(arr, matrix, cval, mode, order, output_shape):
         #      but was deactivated for now, because cval would always
         #      contain 3 values and not nb_channels values
         image_warped = cv2.warpAffine(
-            arr,
+            _normalize_cv2_input_arr_(arr),
             matrix.params[:2],
             dsize=dsize,
             flags=order,
@@ -311,7 +301,7 @@ def _warp_affine_arr_cv2(arr, matrix, cval, mode, order, output_shape):
         # the result from a list of [H, W, 1] to (H, W, C).
         image_warped = [
             cv2.warpAffine(
-                arr[:, :, c],
+                _normalize_cv2_input_arr_(arr[:, :, c]),
                 matrix.params[:2],
                 dsize=dsize,
                 flags=order,
@@ -368,7 +358,8 @@ def apply_jigsaw(arr, destinations):
     This function will split the image into ``rows x cols`` cells and
     move each cell to the target index given in `destinations`.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -514,7 +505,7 @@ def apply_jigsaw_to_coords(coords, destinations, image_shape):
     return result
 
 
-def generate_jigsaw_destinations(nb_rows, nb_cols, max_steps, random_state,
+def generate_jigsaw_destinations(nb_rows, nb_cols, max_steps, seed,
                                  connectivity=4):
     """Generate a destination pattern for :func:`apply_jigsaw`.
 
@@ -529,8 +520,9 @@ def generate_jigsaw_destinations(nb_rows, nb_cols, max_steps, random_state,
     max_steps : int
         Maximum number of cells that each cell may be moved.
 
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
-        RNG or seed to use. If ``None`` the global RNG will be used.
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
+        Seed value or alternatively RNG to use.
+        If ``None`` the global RNG will be used.
 
     connectivity : int, optional
         Whether a diagonal move of a cell counts as one step
@@ -545,7 +537,7 @@ def generate_jigsaw_destinations(nb_rows, nb_cols, max_steps, random_state,
     """
     assert connectivity in (4, 8), (
         "Expected connectivity of 4 or 8, got %d." % (connectivity,))
-    random_state = iarandom.RNG(random_state)
+    random_state = iarandom.RNG(seed)
     steps = random_state.integers(0, max_steps, size=(nb_rows, nb_cols),
                                   endpoint=True)
     directions = random_state.integers(0, connectivity,
@@ -597,18 +589,7 @@ class _AffineSamplingResult(object):
         self.mode = mode
         self.order = order
 
-    def to_matrix(self, idx, arr_shape, image_shape, fit_output,
-                  shift_add=(0.5, 0.5)):
-        if 0 in image_shape:
-            return tf.AffineTransform(), arr_shape
-
-        height, width = arr_shape[0:2]
-
-        # for images we use additional shifts of (0.5, 0.5) as otherwise
-        # we get an ugly black border for 90deg rotations
-        shift_y = height / 2.0 - shift_add[0]
-        shift_x = width / 2.0 - shift_add[1]
-
+    def get_affine_parameters(self, idx, arr_shape, image_shape):
         scale_y = self.scale[1][idx]  # TODO 1 and 0 should be inverted here
         scale_x = self.scale[0][idx]
 
@@ -625,20 +606,53 @@ class _AffineSamplingResult(object):
         else:
             translate_x_px = (translate_x / image_shape[1]) * arr_shape[1]
 
-        rotation_rad, shear_x_rad, shear_y_rad = np.deg2rad([
-            self.rotate[idx],
-            self.shear[0][idx], self.shear[1][idx]])
+        rotate_deg = self.rotate[idx]
+        shear_x_deg = self.shear[0][idx]
+        shear_y_deg = self.shear[1][idx]
+        rotate_rad, shear_x_rad, shear_y_rad = np.deg2rad([
+            rotate_deg, shear_x_deg, shear_y_deg])
+
+        # we add the _deg versions of rotate and shear here for PILAffine,
+        # Affine itself only uses *_rad
+        return {
+            "scale_y": scale_y,
+            "scale_x": scale_x,
+            "translate_y_px": translate_y_px,
+            "translate_x_px": translate_x_px,
+            "rotate_rad": rotate_rad,
+            "shear_y_rad": shear_y_rad,
+            "shear_x_rad": shear_x_rad,
+            "rotate_deg": rotate_deg,
+            "shear_y_deg": shear_y_deg,
+            "shear_x_deg": shear_x_deg
+        }
+
+    def to_matrix(self, idx, arr_shape, image_shape, fit_output,
+                  shift_add=(0.5, 0.5)):
+        if 0 in image_shape:
+            return tf.AffineTransform(), arr_shape
+
+        height, width = arr_shape[0:2]
+
+        params = self.get_affine_parameters(idx,
+                                            arr_shape=arr_shape,
+                                            image_shape=image_shape)
+
+        # for images we use additional shifts of (0.5, 0.5) as otherwise
+        # we get an ugly black border for 90deg rotations
+        shift_y = height / 2.0 - shift_add[0]
+        shift_x = width / 2.0 - shift_add[1]
 
         matrix_to_topleft = tf.SimilarityTransform(
             translation=[-shift_x, -shift_y])
         matrix_shear_y_rot = tf.AffineTransform(rotation=-3.141592/2)
-        matrix_shear_y = tf.AffineTransform(shear=shear_y_rad)
+        matrix_shear_y = tf.AffineTransform(shear=params["shear_y_rad"])
         matrix_shear_y_rot_inv = tf.AffineTransform(rotation=3.141592/2)
         matrix_transforms = tf.AffineTransform(
-            scale=(scale_x, scale_y),
-            translation=(translate_x_px, translate_y_px),
-            rotation=rotation_rad,
-            shear=shear_x_rad
+            scale=(params["scale_x"], params["scale_y"]),
+            translation=(params["translate_x_px"], params["translate_y_px"]),
+            rotation=params["rotate_rad"],
+            shear=params["shear_x_rad"]
         )
         matrix_to_center = tf.SimilarityTransform(
             translation=[shift_x, shift_y])
@@ -701,7 +715,7 @@ class Affine(meta.Augmenter):
     of the input image to generate output pixel values. The parameter `order`
     deals with the method of interpolation used for this.
 
-    .. note ::
+    .. note::
 
         While this augmenter supports segmentation maps and heatmaps that
         have a different size than the corresponding image, it is strongly
@@ -713,9 +727,53 @@ class Affine(meta.Augmenter):
         For performance reasons, there is no explicit validation of whether
         the aspect ratios are similar.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        if (backend="skimage", order in [0, 1])::
+    if (backend="skimage", order in [0, 1]):
+
+        * ``uint8``: yes; tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested (1)
+        * ``uint64``: no (2)
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested  (1)
+        * ``int64``: no (2)
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: no (2)
+        * ``bool``: yes; tested
+
+        - (1) scikit-image converts internally to float64, which might
+              affect the accuracy of large integers. In tests this seemed
+              to not be an issue.
+        - (2) results too inaccurate
+
+    if (backend="skimage", order in [3, 4]):
+
+        * ``uint8``: yes; tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested (1)
+        * ``uint64``: no (2)
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested  (1)
+        * ``int64``: no (2)
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: limited; tested (3)
+        * ``float128``: no (2)
+        * ``bool``: yes; tested
+
+        - (1) scikit-image converts internally to float64, which might
+              affect the accuracy of large integers. In tests this seemed
+              to not be an issue.
+        - (2) results too inaccurate
+        - (3) ``NaN`` around minimum and maximum of float64 value range
+
+    if (backend="skimage", order=5]):
 
             * ``uint8``: yes; tested
             * ``uint16``: yes; tested
@@ -727,124 +785,81 @@ class Affine(meta.Augmenter):
             * ``int64``: no (2)
             * ``float16``: yes; tested
             * ``float32``: yes; tested
-            * ``float64``: yes; tested
+            * ``float64``: limited; not tested (3)
             * ``float128``: no (2)
             * ``bool``: yes; tested
 
-            - (1) scikit-image converts internally to float64, which might
-                  affect the accuracy of large integers. In tests this seemed
-                  to not be an issue.
-            - (2) results too inaccurate
-
-        if (backend="skimage", order in [3, 4])::
-
-            * ``uint8``: yes; tested
-            * ``uint16``: yes; tested
-            * ``uint32``: yes; tested (1)
-            * ``uint64``: no (2)
-            * ``int8``: yes; tested
-            * ``int16``: yes; tested
-            * ``int32``: yes; tested  (1)
-            * ``int64``: no (2)
-            * ``float16``: yes; tested
-            * ``float32``: yes; tested
-            * ``float64``: limited; tested (3)
-            * ``float128``: no (2)
-            * ``bool``: yes; tested
-
-            - (1) scikit-image converts internally to float64, which might
-                  affect the accuracy of large integers. In tests this seemed
-                  to not be an issue.
+            - (1) scikit-image converts internally to ``float64``, which
+                  might affect the accuracy of large integers. In tests
+                  this seemed to not be an issue.
             - (2) results too inaccurate
             - (3) ``NaN`` around minimum and maximum of float64 value range
 
-        if (backend="skimage", order=5])::
+    if (backend="cv2", order=0):
 
-                * ``uint8``: yes; tested
-                * ``uint16``: yes; tested
-                * ``uint32``: yes; tested (1)
-                * ``uint64``: no (2)
-                * ``int8``: yes; tested
-                * ``int16``: yes; tested
-                * ``int32``: yes; tested  (1)
-                * ``int64``: no (2)
-                * ``float16``: yes; tested
-                * ``float32``: yes; tested
-                * ``float64``: limited; not tested (3)
-                * ``float128``: no (2)
-                * ``bool``: yes; tested
+        * ``uint8``: yes; tested
+        * ``uint16``: yes; tested
+        * ``uint32``: no (1)
+        * ``uint64``: no (2)
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: no (2)
+        * ``float16``: yes; tested (3)
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: no (1)
+        * ``bool``: yes; tested (3)
 
-                - (1) scikit-image converts internally to ``float64``, which
-                      might affect the accuracy of large integers. In tests
-                      this seemed to not be an issue.
-                - (2) results too inaccurate
-                - (3) ``NaN`` around minimum and maximum of float64 value range
+        - (1) rejected by cv2
+        - (2) changed to ``int32`` by cv2
+        - (3) mapped internally to ``float32``
 
-        if (backend="cv2", order=0)::
+    if (backend="cv2", order=1):
 
-            * ``uint8``: yes; tested
-            * ``uint16``: yes; tested
-            * ``uint32``: no (1)
-            * ``uint64``: no (2)
-            * ``int8``: yes; tested
-            * ``int16``: yes; tested
-            * ``int32``: yes; tested
-            * ``int64``: no (2)
-            * ``float16``: yes; tested (3)
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: no (1)
-            * ``bool``: yes; tested (3)
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: no (1)
+        * ``uint64``: no (2)
+        * ``int8``: yes; tested (3)
+        * ``int16``: yes; tested
+        * ``int32``: no (2)
+        * ``int64``: no (2)
+        * ``float16``: yes; tested (4)
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: no (1)
+        * ``bool``: yes; tested (4)
 
-            - (1) rejected by cv2
-            - (2) changed to ``int32`` by cv2
-            - (3) mapped internally to ``float32``
+        - (1) rejected by cv2
+        - (2) causes cv2 error: ``cv2.error: OpenCV(3.4.4)
+              (...)imgwarp.cpp:1805: error:
+              (-215:Assertion failed) ifunc != 0 in function 'remap'``
+        - (3) mapped internally to ``int16``
+        - (4) mapped internally to ``float32``
 
-        if (backend="cv2", order=1):
+    if (backend="cv2", order=3):
 
-            * ``uint8``: yes; fully tested
-            * ``uint16``: yes; tested
-            * ``uint32``: no (1)
-            * ``uint64``: no (2)
-            * ``int8``: yes; tested (3)
-            * ``int16``: yes; tested
-            * ``int32``: no (2)
-            * ``int64``: no (2)
-            * ``float16``: yes; tested (4)
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: no (1)
-            * ``bool``: yes; tested (4)
+        * ``uint8``: yes; tested
+        * ``uint16``: yes; tested
+        * ``uint32``: no (1)
+        * ``uint64``: no (2)
+        * ``int8``: yes; tested (3)
+        * ``int16``: yes; tested
+        * ``int32``: no (2)
+        * ``int64``: no (2)
+        * ``float16``: yes; tested (4)
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: no (1)
+        * ``bool``: yes; tested (4)
 
-            - (1) rejected by cv2
-            - (2) causes cv2 error: ``cv2.error: OpenCV(3.4.4)
-                  (...)imgwarp.cpp:1805: error:
-                  (-215:Assertion failed) ifunc != 0 in function 'remap'``
-            - (3) mapped internally to ``int16``
-            - (4) mapped internally to ``float32``
-
-        if (backend="cv2", order=3):
-
-            * ``uint8``: yes; tested
-            * ``uint16``: yes; tested
-            * ``uint32``: no (1)
-            * ``uint64``: no (2)
-            * ``int8``: yes; tested (3)
-            * ``int16``: yes; tested
-            * ``int32``: no (2)
-            * ``int64``: no (2)
-            * ``float16``: yes; tested (4)
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: no (1)
-            * ``bool``: yes; tested (4)
-
-            - (1) rejected by cv2
-            - (2) causes cv2 error: ``cv2.error: OpenCV(3.4.4)
-                  (...)imgwarp.cpp:1805: error:
-                  (-215:Assertion failed) ifunc != 0 in function 'remap'``
-            - (3) mapped internally to ``int16``
-            - (4) mapped internally to ``float32``
+        - (1) rejected by cv2
+        - (2) causes cv2 error: ``cv2.error: OpenCV(3.4.4)
+              (...)imgwarp.cpp:1805: error:
+              (-215:Assertion failed) ifunc != 0 in function 'remap'``
+        - (3) mapped internally to ``int16``
+        - (4) mapped internally to ``float32``
 
 
     Parameters
@@ -1037,7 +1052,7 @@ class Affine(meta.Augmenter):
         and scaling.
         Note also that activating this may lead to image sizes differing from
         the input image sizes. To avoid this, wrap ``Affine`` in
-        :class:`imgaug.augmenters.size.KeepSizeByResize`,
+        :class:`~imgaug.augmenters.size.KeepSizeByResize`,
         e.g. ``KeepSizeByResize(Affine(...))``.
 
     backend : str, optional
@@ -1051,14 +1066,14 @@ class Affine(meta.Augmenter):
         as RGB). If ``cv2`` is chosen and order is ``2`` or ``4``, it will
         automatically fall back to order ``3``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1137,9 +1152,9 @@ class Affine(meta.Augmenter):
     def __init__(self, scale=1.0, translate_percent=None, translate_px=None,
                  rotate=0.0, shear=0.0, order=1, cval=0, mode="constant",
                  fit_output=False, backend="auto",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(Affine, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         assert backend in ["auto", "skimage", "cv2"], (
             "Expected 'backend' to be \"auto\", \"skimage\" or \"cv2\", "
@@ -1284,7 +1299,7 @@ class Affine(meta.Augmenter):
                 list_to_choice=True
             ), param_type
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         samples = self._draw_samples(batch.nb_rows, random_state)
 
         if batch.images is not None:
@@ -1486,7 +1501,7 @@ class Affine(meta.Augmenter):
             order=order_samples)
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [
             self.scale, self.translate, self.rotate, self.shear, self.order,
             self.cval, self.mode, self.backend, self.fit_output]
@@ -1497,9 +1512,10 @@ class ScaleX(Affine):
 
     This is a wrapper around :class:`Affine`.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :class:`imgaug.augmenters.geometric.Affine`.
+    See :class:`~imgaug.augmenters.geometric.Affine`.
 
     Parameters
     ----------
@@ -1522,14 +1538,14 @@ class ScaleX(Affine):
     backend : str, optional
         See :class:`Affine`.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1545,7 +1561,7 @@ class ScaleX(Affine):
 
     def __init__(self, scale, order=1, cval=0, mode="constant",
                  fit_output=False, backend="auto",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(ScaleX, self).__init__(
             scale={"x": scale},
             order=order,
@@ -1553,176 +1569,7 @@ class ScaleX(Affine):
             mode=mode,
             fit_output=fit_output,
             backend=backend,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
-
-
-# TODO make Affine more efficient for translation-only transformations
-class TranslateX(Affine):
-    """Apply affine translation on the x-axis to input data.
-
-    This is a wrapper around :class:`Affine`.
-
-    dtype support::
-
-        See :class:`imgaug.augmenters.geometric.Affine`.
-
-    Parameters
-    ----------
-    percent : None or number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
-        Analogous to ``translate_percent`` in :class:`Affine`, except that
-        this translation value only affects the x-axis. No dictionary input
-        is allowed.
-
-    px : None or int or tuple of int or list of int or imgaug.parameters.StochasticParameter or dict {"x": int/tuple/list/StochasticParameter, "y": int/tuple/list/StochasticParameter}, optional
-        Analogous to ``translate_px`` in :class:`Affine`, except that
-        this translation value only affects the x-axis. No dictionary input
-        is allowed.
-
-    order : int or iterable of int or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :class:`Affine`.
-
-    cval : number or tuple of number or list of number or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :class:`Affine`.
-
-    mode : str or list of str or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :class:`Affine`.
-
-    fit_output : bool, optional
-        See :class:`Affine`.
-
-    backend : str, optional
-        See :class:`Affine`.
-
-    name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    Examples
-    --------
-    >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.TranslateX(px=(-20, 20))
-
-    Create an augmenter that translates images along the x-axis by
-    ``-20`` to ``20`` pixels.
-
-    >>> aug = iaa.TranslateX(percent=(-0.1, 0.1))
-
-    Create an augmenter that translates images along the x-axis by
-    ``-10%`` to ``10%`` (relative to the x-axis size).
-
-    """
-
-    def __init__(self, percent=None, px=None, order=1,
-                 cval=0, mode="constant", fit_output=False, backend="auto",
-                 name=None, deterministic=False, random_state=None):
-        # we don't test here if both are not-None at the same time, because
-        # that is already checked in Affine
-        assert percent is not None or px is not None, (
-            "Expected either `percent` to be not-None or "
-            "`px` to be not-None, but both were None.")
-        super(TranslateX, self).__init__(
-            translate_percent=({"x": percent} if percent is not None else None),
-            translate_px=({"x": px} if px is not None else None),
-            order=order,
-            cval=cval,
-            mode=mode,
-            fit_output=fit_output,
-            backend=backend,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
-
-
-# TODO make Affine more efficient for translation-only transformations
-class TranslateY(Affine):
-    """Apply affine translation on the y-axis to input data.
-
-    This is a wrapper around :class:`Affine`.
-
-    dtype support::
-
-        See :class:`imgaug.augmenters.geometric.Affine`.
-
-    Parameters
-    ----------
-    percent : None or number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
-        Analogous to ``translate_percent`` in :class:`Affine`, except that
-        this translation value only affects the y-axis. No dictionary input
-        is allowed.
-
-    px : None or int or tuple of int or list of int or imgaug.parameters.StochasticParameter or dict {"x": int/tuple/list/StochasticParameter, "y": int/tuple/list/StochasticParameter}, optional
-        Analogous to ``translate_px`` in :class:`Affine`, except that
-        this translation value only affects the y-axis. No dictionary input
-        is allowed.
-
-    order : int or iterable of int or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :class:`Affine`.
-
-    cval : number or tuple of number or list of number or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :class:`Affine`.
-
-    mode : str or list of str or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :class:`Affine`.
-
-    fit_output : bool, optional
-        See :class:`Affine`.
-
-    backend : str, optional
-        See :class:`Affine`.
-
-    name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    Examples
-    --------
-    >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.TranslateY(px=(-20, 20))
-
-    Create an augmenter that translates images along the y-axis by
-    ``-20`` to ``20`` pixels.
-
-    >>> aug = iaa.TranslateY(percent=(-0.1, 0.1))
-
-    Create an augmenter that translates images along the y-axis by
-    ``-10%`` to ``10%`` (relative to the y-axis size).
-
-    """
-
-    def __init__(self, percent=None, px=None, order=1,
-                 cval=0, mode="constant", fit_output=False, backend="auto",
-                 name=None, deterministic=False, random_state=None):
-        # we don't test here if both are not-None at the same time, because
-        # that is already checked in Affine
-        assert percent is not None or px is not None, (
-            "Expected either `percent` to be not-None or "
-            "`px` to be not-None, but both were None.")
-        super(TranslateY, self).__init__(
-            translate_percent=({"y": percent} if percent is not None else None),
-            translate_px=({"y": px} if px is not None else None),
-            order=order,
-            cval=cval,
-            mode=mode,
-            fit_output=fit_output,
-            backend=backend,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
 
 
 class ScaleY(Affine):
@@ -1730,9 +1577,10 @@ class ScaleY(Affine):
 
     This is a wrapper around :class:`Affine`.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :class:`imgaug.augmenters.geometric.Affine`.
+    See :class:`~imgaug.augmenters.geometric.Affine`.
 
     Parameters
     ----------
@@ -1755,14 +1603,14 @@ class ScaleY(Affine):
     backend : str, optional
         See :class:`Affine`.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1778,7 +1626,7 @@ class ScaleY(Affine):
 
     def __init__(self, scale, order=1, cval=0, mode="constant",
                  fit_output=False, backend="auto",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(ScaleY, self).__init__(
             scale={"y": scale},
             order=order,
@@ -1786,10 +1634,169 @@ class ScaleY(Affine):
             mode=mode,
             fit_output=fit_output,
             backend=backend,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
+
+
+# TODO make Affine more efficient for translation-only transformations
+class TranslateX(Affine):
+    """Apply affine translation on the x-axis to input data.
+
+    This is a wrapper around :class:`Affine`.
+
+    Supported dtypes
+    ----------------
+
+    See :class:`~imgaug.augmenters.geometric.Affine`.
+
+    Parameters
+    ----------
+    percent : None or number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        Analogous to ``translate_percent`` in :class:`Affine`, except that
+        this translation value only affects the x-axis. No dictionary input
+        is allowed.
+
+    px : None or int or tuple of int or list of int or imgaug.parameters.StochasticParameter or dict {"x": int/tuple/list/StochasticParameter, "y": int/tuple/list/StochasticParameter}, optional
+        Analogous to ``translate_px`` in :class:`Affine`, except that
+        this translation value only affects the x-axis. No dictionary input
+        is allowed.
+
+    order : int or iterable of int or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
+        See :class:`Affine`.
+
+    cval : number or tuple of number or list of number or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
+        See :class:`Affine`.
+
+    mode : str or list of str or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
+        See :class:`Affine`.
+
+    fit_output : bool, optional
+        See :class:`Affine`.
+
+    backend : str, optional
+        See :class:`Affine`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    **old_kwargs
+        Outdated parameters. Avoid using these.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.TranslateX(px=(-20, 20))
+
+    Create an augmenter that translates images along the x-axis by
+    ``-20`` to ``20`` pixels.
+
+    >>> aug = iaa.TranslateX(percent=(-0.1, 0.1))
+
+    Create an augmenter that translates images along the x-axis by
+    ``-10%`` to ``10%`` (relative to the x-axis size).
+
+    """
+
+    def __init__(self, percent=None, px=None, order=1,
+                 cval=0, mode="constant", fit_output=False, backend="auto",
+                 seed=None, name=None, **old_kwargs):
+        # we don't test here if both are not-None at the same time, because
+        # that is already checked in Affine
+        assert percent is not None or px is not None, (
+            "Expected either `percent` to be not-None or "
+            "`px` to be not-None, but both were None.")
+        super(TranslateX, self).__init__(
+            translate_percent=({"x": percent} if percent is not None else None),
+            translate_px=({"x": px} if px is not None else None),
+            order=order,
+            cval=cval,
+            mode=mode,
+            fit_output=fit_output,
+            backend=backend,
+            seed=seed, name=name, **old_kwargs)
+
+
+# TODO make Affine more efficient for translation-only transformations
+class TranslateY(Affine):
+    """Apply affine translation on the y-axis to input data.
+
+    This is a wrapper around :class:`Affine`.
+
+    Supported dtypes
+    ----------------
+
+    See :class:`~imgaug.augmenters.geometric.Affine`.
+
+    Parameters
+    ----------
+    percent : None or number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        Analogous to ``translate_percent`` in :class:`Affine`, except that
+        this translation value only affects the y-axis. No dictionary input
+        is allowed.
+
+    px : None or int or tuple of int or list of int or imgaug.parameters.StochasticParameter or dict {"x": int/tuple/list/StochasticParameter, "y": int/tuple/list/StochasticParameter}, optional
+        Analogous to ``translate_px`` in :class:`Affine`, except that
+        this translation value only affects the y-axis. No dictionary input
+        is allowed.
+
+    order : int or iterable of int or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
+        See :class:`Affine`.
+
+    cval : number or tuple of number or list of number or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
+        See :class:`Affine`.
+
+    mode : str or list of str or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
+        See :class:`Affine`.
+
+    fit_output : bool, optional
+        See :class:`Affine`.
+
+    backend : str, optional
+        See :class:`Affine`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    **old_kwargs
+        Outdated parameters. Avoid using these.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.TranslateY(px=(-20, 20))
+
+    Create an augmenter that translates images along the y-axis by
+    ``-20`` to ``20`` pixels.
+
+    >>> aug = iaa.TranslateY(percent=(-0.1, 0.1))
+
+    Create an augmenter that translates images along the y-axis by
+    ``-10%`` to ``10%`` (relative to the y-axis size).
+
+    """
+
+    def __init__(self, percent=None, px=None, order=1,
+                 cval=0, mode="constant", fit_output=False, backend="auto",
+                 seed=None, name=None, **old_kwargs):
+        # we don't test here if both are not-None at the same time, because
+        # that is already checked in Affine
+        assert percent is not None or px is not None, (
+            "Expected either `percent` to be not-None or "
+            "`px` to be not-None, but both were None.")
+        super(TranslateY, self).__init__(
+            translate_percent=({"y": percent} if percent is not None else None),
+            translate_px=({"y": px} if px is not None else None),
+            order=order,
+            cval=cval,
+            mode=mode,
+            fit_output=fit_output,
+            backend=backend,
+            seed=seed, name=name, **old_kwargs)
 
 
 class Rotate(Affine):
@@ -1798,9 +1805,10 @@ class Rotate(Affine):
     This is a wrapper around :class:`Affine`.
     It is the same as ``Affine(rotate=<value>)``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :class:`imgaug.augmenters.geometric.Affine`.
+    See :class:`~imgaug.augmenters.geometric.Affine`.
 
     Parameters
     ----------
@@ -1822,14 +1830,14 @@ class Rotate(Affine):
     backend : str, optional
         See :class:`Affine`.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1843,7 +1851,7 @@ class Rotate(Affine):
 
     def __init__(self, rotate, order=1, cval=0, mode="constant",
                  fit_output=False, backend="auto",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(Rotate, self).__init__(
             rotate=rotate,
             order=order,
@@ -1851,10 +1859,7 @@ class Rotate(Affine):
             mode=mode,
             fit_output=fit_output,
             backend=backend,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
 
 
 class ShearX(Affine):
@@ -1862,9 +1867,10 @@ class ShearX(Affine):
 
     This is a wrapper around :class:`Affine`.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :class:`imgaug.augmenters.geometric.Affine`.
+    See :class:`~imgaug.augmenters.geometric.Affine`.
 
     Parameters
     ----------
@@ -1887,20 +1893,20 @@ class ShearX(Affine):
     backend : str, optional
         See :class:`Affine`.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     """
 
     def __init__(self, shear, order=1, cval=0, mode="constant",
                  fit_output=False, backend="auto",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(ShearX, self).__init__(
             shear={"x": shear},
             order=order,
@@ -1908,10 +1914,7 @@ class ShearX(Affine):
             mode=mode,
             fit_output=fit_output,
             backend=backend,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
 
 
 class ShearY(Affine):
@@ -1919,9 +1922,10 @@ class ShearY(Affine):
 
     This is a wrapper around :class:`Affine`.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :class:`imgaug.augmenters.geometric.Affine`.
+    See :class:`~imgaug.augmenters.geometric.Affine`.
 
     Parameters
     ----------
@@ -1944,20 +1948,20 @@ class ShearY(Affine):
     backend : str, optional
         See :class:`Affine`.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     """
 
     def __init__(self, shear, order=1, cval=0, mode="constant",
                  fit_output=False, backend="auto",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(ShearY, self).__init__(
             shear={"y": shear},
             order=order,
@@ -1965,21 +1969,18 @@ class ShearY(Affine):
             mode=mode,
             fit_output=fit_output,
             backend=backend,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name, **old_kwargs)
 
 
 class AffineCv2(meta.Augmenter):
     """
-    Augmenter to apply affine transformations to images using cv2 (i.e. opencv)
-    backend.
+    **Deprecated.** Augmenter to apply affine transformations to images using
+    cv2 (i.e. opencv) backend.
 
     .. warning::
 
-        This augmenter might be removed in the future as ``Affine``
-        already offers a cv2 backend (use ``backend="cv2"``).
+        This augmenter is deprecated since 0.4.0.
+        Use ``Affine(..., backend='cv2')`` instead.
 
     Affine transformations
     involve:
@@ -1999,7 +2000,8 @@ class AffineCv2(meta.Augmenter):
     of the input image to generate output pixel values. The parameter `order`
     deals with the method of interpolation used for this.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: ?
@@ -2127,9 +2129,8 @@ class AffineCv2(meta.Augmenter):
             * If an iterable of ``int``/``str``, then for each image a random
               value will be sampled from that iterable (i.e. list of allowed
               order values).
-            * If ``imgaug.ALL``, then equivalant to list
-              ``[cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC,``
-              ``cv2.INTER_LANCZOS4]``.
+            * If ``imgaug.ALL``, then equivalant to list ``[cv2.INTER_NEAREST,
+              cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4]``.
             * If ``StochasticParameter``, then that parameter is queried per
               image to sample the order value to use.
 
@@ -2184,14 +2185,14 @@ class AffineCv2(meta.Augmenter):
               that parameter per image, i.e. it must return only the above
               mentioned strings.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2263,9 +2264,16 @@ class AffineCv2(meta.Augmenter):
     def __init__(self, scale=1.0, translate_percent=None, translate_px=None,
                  rotate=0.0, shear=0.0, order=cv2.INTER_LINEAR, cval=0,
                  mode=cv2.BORDER_CONSTANT,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(AffineCv2, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
+
+        # using a context on __init__ seems to produce no warning,
+        # so warn manually here
+        ia.warn_deprecated(
+            "AffineCv2 is deprecated. "
+            "Use imgaug.augmenters.geometric.Affine(..., backend='cv2') "
+            "instead.", stacklevel=4)
 
         available_orders = [cv2.INTER_NEAREST, cv2.INTER_LINEAR,
                             cv2.INTER_CUBIC, cv2.INTER_LANCZOS4]
@@ -2510,7 +2518,7 @@ class AffineCv2(meta.Augmenter):
                           + matrix_to_center)
 
                 image_warped = cv2.warpAffine(
-                    images[i],
+                    _normalize_cv2_input_arr_(images[i]),
                     matrix.params[:2],
                     dsize=(width, height),
                     flags=order,
@@ -2643,7 +2651,7 @@ class AffineCv2(meta.Augmenter):
             bounding_boxes_on_images, random_state, parents, hooks)
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.scale, self.translate, self.rotate, self.shear,
                 self.order, self.cval, self.mode]
 
@@ -2738,7 +2746,8 @@ class PiecewiseAffine(meta.Augmenter):
         which will make it significantly slower for such inputs than other
         augmenters. See :ref:`performance`.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested (1)
@@ -2801,13 +2810,13 @@ class PiecewiseAffine(meta.Augmenter):
         Number of columns. Analogous to `nb_rows`.
 
     order : int or list of int or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :func:`imgaug.augmenters.geometric.Affine.__init__`.
+        See :func:`~imgaug.augmenters.geometric.Affine.__init__`.
 
     cval : int or float or tuple of float or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :func:`imgaug.augmenters.geometric.Affine.__init__`.
+        See :func:`~imgaug.augmenters.geometric.Affine.__init__`.
 
     mode : str or list of str or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
-        See :func:`imgaug.augmenters.geometric.Affine.__init__`.
+        See :func:`~imgaug.augmenters.geometric.Affine.__init__`.
 
     absolute_scale : bool, optional
         Take `scale` as an absolute value rather than a relative value.
@@ -2820,16 +2829,16 @@ class PiecewiseAffine(meta.Augmenter):
         If ``None``, no polygon recoverer will be used.
         If an object, then that object will be used and must provide a
         ``recover_from()`` method, similar to
-        :class:`imgaug.augmentables.polygons._ConcavePolygonRecoverer`.
+        :class:`~imgaug.augmentables.polygons._ConcavePolygonRecoverer`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2849,9 +2858,9 @@ class PiecewiseAffine(meta.Augmenter):
 
     def __init__(self, scale=0, nb_rows=4, nb_cols=4, order=1, cval=0,
                  mode="constant", absolute_scale=False, polygon_recoverer=None,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(PiecewiseAffine, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.scale = iap.handle_continuous_param(
             scale, "scale", value_range=(0, None), tuple_to_uniform=True,
@@ -2885,7 +2894,7 @@ class PiecewiseAffine(meta.Augmenter):
         self._cval_heatmaps = 0
         self._cval_segmentation_maps = 0
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         samples = self._draw_samples(batch.nb_rows, random_state)
 
         if batch.images is not None:
@@ -3193,7 +3202,7 @@ class PiecewiseAffine(meta.Augmenter):
                 return matrix
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [
             self.scale, self.nb_rows, self.nb_cols, self.order, self.cval,
             self.mode, self.absolute_scale]
@@ -3223,37 +3232,38 @@ class PerspectiveTransform(meta.Augmenter):
     Code partially from
     http://www.pyimagesearch.com/2014/08/25/4-point-opencv-getperspective-transform-example/
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        if (keep_size=False)::
+    if (keep_size=False):
 
-            * ``uint8``: yes; fully tested
-            * ``uint16``: yes; tested
-            * ``uint32``: no (1)
-            * ``uint64``: no (2)
-            * ``int8``: yes; tested (3)
-            * ``int16``: yes; tested
-            * ``int32``: no (2)
-            * ``int64``: no (2)
-            * ``float16``: yes; tested (4)
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: no (1)
-            * ``bool``: yes; tested (4)
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: no (1)
+        * ``uint64``: no (2)
+        * ``int8``: yes; tested (3)
+        * ``int16``: yes; tested
+        * ``int32``: no (2)
+        * ``int64``: no (2)
+        * ``float16``: yes; tested (4)
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: no (1)
+        * ``bool``: yes; tested (4)
 
-            - (1) rejected by opencv
-            - (2) leads to opencv error: cv2.error: ``OpenCV(3.4.4)
-                  (...)imgwarp.cpp:1805: error: (-215:Assertion failed)
-                  ifunc != 0 in function 'remap'``.
-            - (3) mapped internally to ``int16``.
-            - (4) mapped intenally to ``float32``.
+        - (1) rejected by opencv
+        - (2) leads to opencv error: cv2.error: ``OpenCV(3.4.4)
+              (...)imgwarp.cpp:1805: error: (-215:Assertion failed)
+              ifunc != 0 in function 'remap'``.
+        - (3) mapped internally to ``int16``.
+        - (4) mapped intenally to ``float32``.
 
-        if (keep_size=True)::
+    if (keep_size=True):
 
-            minimum of (
-                ``imgaug.augmenters.geometric.PerspectiveTransform(keep_size=False)``,
-                :func:`imgaug.imgaug.imresize_many_images`
-            )
+        minimum of (
+            ``imgaug.augmenters.geometric.PerspectiveTransform(keep_size=False)``,
+            :func:`~imgaug.imgaug.imresize_many_images`
+        )
 
     Parameters
     ----------
@@ -3338,16 +3348,16 @@ class PerspectiveTransform(meta.Augmenter):
         If ``None``, no polygon recoverer will be used.
         If an object, then that object will be used and must provide a
         ``recover_from()`` method, similar to
-        :class:`imgaug.augmentables.polygons._ConcavePolygonRecoverer`.
+        :class:`~imgaug.augmentables.polygons._ConcavePolygonRecoverer`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3375,9 +3385,9 @@ class PerspectiveTransform(meta.Augmenter):
 
     def __init__(self, scale=0, cval=0, mode="constant", keep_size=True,
                  fit_output=False, polygon_recoverer="auto",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(PerspectiveTransform, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.scale = iap.handle_continuous_param(
             scale, "scale", value_range=(0, None), tuple_to_uniform=True,
@@ -3450,7 +3460,13 @@ class PerspectiveTransform(meta.Augmenter):
             "of int/strings or StochasticParameter, got %s." % (
                 type(mode),))
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        # Advance once, because below we always use random_state.copy() and
+        # hence the sampling calls actually don't change random_state's state.
+        # Without this, every call of the augmenter would produce the same
+        # results.
+        random_state.advance_()
+
         samples_images = self._draw_samples(batch.get_rowwise_shapes(),
                                             random_state.copy())
 
@@ -3534,7 +3550,7 @@ class PerspectiveTransform(meta.Augmenter):
                 warped = image
             elif nb_channels <= 4:
                 warped = cv2.warpPerspective(
-                    image,
+                    _normalize_cv2_input_arr_(image),
                     matrix,
                     (max_width, max_height),
                     borderValue=cval,
@@ -3547,7 +3563,7 @@ class PerspectiveTransform(meta.Augmenter):
                 # inputs
                 warped = [
                     cv2.warpPerspective(
-                        image[..., c],
+                        _normalize_cv2_input_arr_(image[..., c]),
                         matrix,
                         (max_width, max_height),
                         borderValue=cval[min(c, len(cval)-1)],
@@ -3578,7 +3594,7 @@ class PerspectiveTransform(meta.Augmenter):
         # estimate max_heights/max_widths for the underlying images
         # this is only necessary if keep_size is False as then the underlying
         # image sizes change and we need to update them here
-        # TODO this was re-used from before _augment_batch() -- reoptimize
+        # TODO this was re-used from before _augment_batch_() -- reoptimize
         if self.keep_size:
             max_heights_imgs = samples.max_heights
             max_widths_imgs = samples.max_widths
@@ -3608,7 +3624,7 @@ class PerspectiveTransform(meta.Augmenter):
                 if not map_has_zero_sized_axis:
                     warped = [
                         cv2.warpPerspective(
-                            arr[..., c],
+                            _normalize_cv2_input_arr_(arr[..., c]),
                             matrix,
                             (max_width, max_height),
                             borderValue=cval_i,
@@ -3658,7 +3674,7 @@ class PerspectiveTransform(meta.Augmenter):
                         kp.x = coords[0]
                         kp.y = coords[1]
                 if self.keep_size:
-                    kpsoi = kpsoi.on(shape_orig)
+                    kpsoi = kpsoi.on_(shape_orig)
                 result[i] = kpsoi
 
         return result
@@ -3755,11 +3771,13 @@ class PerspectiveTransform(meta.Augmenter):
             # (i.e. top-down view) of the image, again specifying points
             # in the top-left, top-right, bottom-right, and bottom-left
             # order
+            # do not use width-1 or height-1 here, as for e.g. width=3, height=2
+            # the bottom right coordinate is at (3.0, 2.0) and not (2.0, 1.0)
             dst = np.array([
                 [0, 0],
-                [max_width - 1, 0],
-                [max_width - 1, max_height - 1],
-                [0, max_height - 1]
+                [max_width, 0],
+                [max_width, max_height],
+                [0, max_height]
             ], dtype=np.float32)
 
             # compute the perspective transform matrix and then apply it
@@ -3804,11 +3822,13 @@ class PerspectiveTransform(meta.Augmenter):
     @classmethod
     def _expand_transform(cls, matrix, shape):
         height, width = shape
+        # do not use width-1 or height-1 here, as for e.g. width=3, height=2
+        # the bottom right coordinate is at (3.0, 2.0) and not (2.0, 1.0)
         rect = np.array([
             [0, 0],
-            [width - 1, 0],
-            [width - 1, height - 1],
-            [0, height - 1]], dtype=np.float32)
+            [width, 0],
+            [width, height],
+            [0, height]], dtype=np.float32)
         dst = cv2.perspectiveTransform(np.array([rect]), matrix)[0]
 
         # get min x, y over transformed 4 points
@@ -3818,11 +3838,11 @@ class PerspectiveTransform(meta.Augmenter):
         dst = np.around(dst, decimals=0)
 
         matrix_expanded = cv2.getPerspectiveTransform(rect, dst)
-        max_width, max_height = dst.max(axis=0) + 1
+        max_width, max_height = dst.max(axis=0)
         return matrix_expanded, max_width, max_height
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.jitter, self.keep_size, self.cval, self.mode,
                 self.fit_output]
 
@@ -3874,7 +3894,8 @@ class ElasticTransformation(meta.Augmenter):
         which will make it significantly slower for such inputs than other
         augmenters. See :ref:`performance`.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested (1)
         * ``uint16``: yes; tested (1)
@@ -3984,16 +4005,16 @@ class ElasticTransformation(meta.Augmenter):
         If ``None``, no polygon recoverer will be used.
         If an object, then that object will be used and must provide a
         ``recover_from()`` method, similar to
-        :class:`imgaug.augmentables.polygons._ConcavePolygonRecoverer`.
+        :class:`~imgaug.augmentables.polygons._ConcavePolygonRecoverer`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -4035,10 +4056,10 @@ class ElasticTransformation(meta.Augmenter):
     }
 
     def __init__(self, alpha=0, sigma=0, order=3, cval=0, mode="constant",
-                 polygon_recoverer="auto", name=None, deterministic=False,
-                 random_state=None):
+                 polygon_recoverer="auto",
+                 seed=None, name=None, **old_kwargs):
         super(ElasticTransformation, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.alpha = iap.handle_continuous_param(
             alpha, "alpha", value_range=(0, None), tuple_to_uniform=True,
@@ -4104,7 +4125,7 @@ class ElasticTransformation(meta.Augmenter):
         return _ElasticTransformationSamplingResult(
             rss[0:-5], alphas, sigmas, orders, cvals, modes)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         # pylint: disable=invalid-name
         if batch.images is not None:
             iadt.gate_dtypes(
@@ -4311,7 +4332,7 @@ class ElasticTransformation(meta.Augmenter):
         return self._apply_to_cbaois_as_keypoints(bbsoi, func)
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.alpha, self.sigma, self.order, self.cval, self.mode]
 
     @classmethod
@@ -4350,115 +4371,116 @@ class ElasticTransformation(meta.Augmenter):
     def _map_coordinates(cls, image, dx, dy, order=1, cval=0, mode="constant"):
         """Remap pixels in an image according to x/y shift maps.
 
-        dtype support::
+        Supported dtypes
+        ----------------
 
-            if (backend="scipy" and order=0)::
+        if (backend="scipy" and order=0):
 
-                * ``uint8``: yes
-                * ``uint16``: yes
-                * ``uint32``: yes
-                * ``uint64``: no (1)
-                * ``int8``: yes
-                * ``int16``: yes
-                * ``int32``: yes
-                * ``int64``: no (2)
-                * ``float16``: yes
-                * ``float32``: yes
-                * ``float64``: yes
-                * ``float128``: no (3)
-                * ``bool``: yes
+            * ``uint8``: yes
+            * ``uint16``: yes
+            * ``uint32``: yes
+            * ``uint64``: no (1)
+            * ``int8``: yes
+            * ``int16``: yes
+            * ``int32``: yes
+            * ``int64``: no (2)
+            * ``float16``: yes
+            * ``float32``: yes
+            * ``float64``: yes
+            * ``float128``: no (3)
+            * ``bool``: yes
 
-                - (1) produces array filled with only 0
-                - (2) produces array filled with <min_value> when testing
-                      with <max_value>
-                - (3) causes: 'data type no supported'
+            - (1) produces array filled with only 0
+            - (2) produces array filled with <min_value> when testing
+                  with <max_value>
+            - (3) causes: 'data type no supported'
 
-            if (backend="scipy" and order>0)::
+        if (backend="scipy" and order>0):
 
-                * ``uint8``: yes (1)
-                * ``uint16``: yes (1)
-                * ``uint32``: yes (1)
-                * ``uint64``: yes (1)
-                * ``int8``: yes (1)
-                * ``int16``: yes (1)
-                * ``int32``: yes (1)
-                * ``int64``: yes (1)
-                * ``float16``: yes (1)
-                * ``float32``: yes (1)
-                * ``float64``: yes (1)
-                * ``float128``: no (2)
-                * ``bool``: yes
+            * ``uint8``: yes (1)
+            * ``uint16``: yes (1)
+            * ``uint32``: yes (1)
+            * ``uint64``: yes (1)
+            * ``int8``: yes (1)
+            * ``int16``: yes (1)
+            * ``int32``: yes (1)
+            * ``int64``: yes (1)
+            * ``float16``: yes (1)
+            * ``float32``: yes (1)
+            * ``float64``: yes (1)
+            * ``float128``: no (2)
+            * ``bool``: yes
 
-                - (1) rather loose test, to avoid having to re-compute the
-                      interpolation
-                - (2) causes: 'data type no supported'
+            - (1) rather loose test, to avoid having to re-compute the
+                  interpolation
+            - (2) causes: 'data type no supported'
 
-            if (backend="cv2" and order=0)::
+        if (backend="cv2" and order=0):
 
-                * ``uint8``: yes
-                * ``uint16``: yes
-                * ``uint32``: no (1)
-                * ``uint64``: no (2)
-                * ``int8``: yes
-                * ``int16``: yes
-                * ``int32``: yes
-                * ``int64``: no (2)
-                * ``float16``: yes
-                * ``float32``: yes
-                * ``float64``: yes
-                * ``float128``: no (3)
-                * ``bool``: no (4)
+            * ``uint8``: yes
+            * ``uint16``: yes
+            * ``uint32``: no (1)
+            * ``uint64``: no (2)
+            * ``int8``: yes
+            * ``int16``: yes
+            * ``int32``: yes
+            * ``int64``: no (2)
+            * ``float16``: yes
+            * ``float32``: yes
+            * ``float64``: yes
+            * ``float128``: no (3)
+            * ``bool``: no (4)
 
-                - (1) causes: src data type = 6 is not supported
-                - (2) silently converts to int32
-                - (3) causes: src data type = 13 is not supported
-                - (4) causes: src data type = 0 is not supported
+            - (1) causes: src data type = 6 is not supported
+            - (2) silently converts to int32
+            - (3) causes: src data type = 13 is not supported
+            - (4) causes: src data type = 0 is not supported
 
-            if (backend="cv2" and order=1)::
+        if (backend="cv2" and order=1):
 
-                * ``uint8``: yes
-                * ``uint16``: yes
-                * ``uint32``: no (1)
-                * ``uint64``: no (2)
-                * ``int8``: no (2)
-                * ``int16``: no (2)
-                * ``int32``: no (2)
-                * ``int64``: no (2)
-                * ``float16``: yes
-                * ``float32``: yes
-                * ``float64``: yes
-                * ``float128``: no (3)
-                * ``bool``: no (4)
+            * ``uint8``: yes
+            * ``uint16``: yes
+            * ``uint32``: no (1)
+            * ``uint64``: no (2)
+            * ``int8``: no (2)
+            * ``int16``: no (2)
+            * ``int32``: no (2)
+            * ``int64``: no (2)
+            * ``float16``: yes
+            * ``float32``: yes
+            * ``float64``: yes
+            * ``float128``: no (3)
+            * ``bool``: no (4)
 
-                - (1) causes: src data type = 6 is not supported
-                - (2) causes: OpenCV(3.4.5) (...)/imgwarp.cpp:1805:
-                      error: (-215:Assertion failed) ifunc != 0 in function
-                      'remap'
-                - (3) causes: src data type = 13 is not supported
-                - (4) causes: src data type = 0 is not supported
+            - (1) causes: src data type = 6 is not supported
+            - (2) causes: OpenCV(3.4.5) (...)/imgwarp.cpp:1805:
+                  error: (-215:Assertion failed) ifunc != 0 in function
+                  'remap'
+            - (3) causes: src data type = 13 is not supported
+            - (4) causes: src data type = 0 is not supported
 
-            if (backend="cv2" and order>=2)::
+        if (backend="cv2" and order>=2):
 
-                * ``uint8``: yes
-                * ``uint16``: yes
-                * ``uint32``: no (1)
-                * ``uint64``: no (2)
-                * ``int8``: no (2)
-                * ``int16``: yes
-                * ``int32``: no (2)
-                * ``int64``: no (2)
-                * ``float16``: yes
-                * ``float32``: yes
-                * ``float64``: yes
-                * ``float128``: no (3)
-                * ``bool``: no (4)
+            * ``uint8``: yes
+            * ``uint16``: yes
+            * ``uint32``: no (1)
+            * ``uint64``: no (2)
+            * ``int8``: no (2)
+            * ``int16``: yes
+            * ``int32``: no (2)
+            * ``int64``: no (2)
+            * ``float16``: yes
+            * ``float32``: yes
+            * ``float64``: yes
+            * ``float128``: no (3)
+            * ``bool``: no (4)
 
-                - (1) causes: src data type = 6 is not supported
-                - (2) causes: OpenCV(3.4.5) (...)/imgwarp.cpp:1805:
-                      error: (-215:Assertion failed) ifunc != 0 in function
-                      'remap'
-                - (3) causes: src data type = 13 is not supported
-                - (4) causes: src data type = 0 is not supported
+            - (1) causes: src data type = 6 is not supported
+            - (2) causes: OpenCV(3.4.5) (...)/imgwarp.cpp:1805:
+                  error: (-215:Assertion failed) ifunc != 0 in function
+                  'remap'
+            - (3) causes: src data type = 13 is not supported
+            - (4) causes: src data type = 0 is not supported
 
         """
         # pylint: disable=invalid-name
@@ -4560,8 +4582,9 @@ class ElasticTransformation(meta.Augmenter):
             # remap only supports up to 4 channels
             if nb_channels <= 4:
                 result = cv2.remap(
-                    image, map1, map2, interpolation=interpolation,
-                    borderMode=border_mode, borderValue=cval)
+                    _normalize_cv2_input_arr_(image),
+                    map1, map2, interpolation=interpolation,
+                    borderMode=border_mode, borderValue=(cval, cval, cval))
                 if image.ndim == 3 and result.ndim == 2:
                     result = result[..., np.newaxis]
             else:
@@ -4570,8 +4593,9 @@ class ElasticTransformation(meta.Augmenter):
                 while current_chan_idx < nb_channels:
                     channels = image[..., current_chan_idx:current_chan_idx+4]
                     result_c = cv2.remap(
-                        channels, map1, map2, interpolation=interpolation,
-                        borderMode=border_mode, borderValue=cval)
+                        _normalize_cv2_input_arr_(channels),
+                        map1, map2, interpolation=interpolation,
+                        borderMode=border_mode, borderValue=(cval, cval, cval))
                     if result_c.ndim == 2:
                         result_c = result_c[..., np.newaxis]
                     result.append(result_c)
@@ -4591,30 +4615,31 @@ class Rot90(meta.Augmenter):
     This could also be achieved using ``Affine``, but ``Rot90`` is
     significantly more efficient.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        if (keep_size=False)::
+    if (keep_size=False):
 
-            * ``uint8``: yes; fully tested
-            * ``uint16``: yes; tested
-            * ``uint32``: yes; tested
-            * ``uint64``: yes; tested
-            * ``int8``: yes; tested
-            * ``int16``: yes; tested
-            * ``int32``: yes; tested
-            * ``int64``: yes; tested
-            * ``float16``: yes; tested
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: yes; tested
-            * ``bool``: yes; tested
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
 
-        if (keep_size=True)::
+    if (keep_size=True):
 
-            minimum of (
-                ``imgaug.augmenters.geometric.Rot90(keep_size=False)``,
-                :func:`imgaug.imgaug.imresize_many_images`
-            )
+        minimum of (
+            ``imgaug.augmenters.geometric.Rot90(keep_size=False)``,
+            :func:`~imgaug.imgaug.imresize_many_images`
+        )
 
     Parameters
     ----------
@@ -4637,14 +4662,14 @@ class Rot90(meta.Augmenter):
         image will be resized to the input image's size. Note that this might
         also cause the augmented image to look distorted.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -4678,10 +4703,10 @@ class Rot90(meta.Augmenter):
 
     """
 
-    def __init__(self, k, keep_size=True, name=None, deterministic=False,
-                 random_state=None):
+    def __init__(self, k, keep_size=True,
+                 seed=None, name=None, **old_kwargs):
         super(Rot90, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         if k == ia.ALL:
             k = [0, 1, 2, 3]
@@ -4694,7 +4719,7 @@ class Rot90(meta.Augmenter):
     def _draw_samples(self, nb_images, random_state):
         return self.k.draw_samples((nb_images,), random_state=random_state)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         # pylint: disable=invalid-name
         ks = self._draw_samples(batch.nb_rows, random_state)
 
@@ -4800,14 +4825,14 @@ class Rot90(meta.Augmenter):
                 kpsoi_i.shape = shape_aug
 
                 if self.keep_size and (h, w) != (h_aug, w_aug):
-                    kpsoi_i = kpsoi_i.on(shape_orig)
+                    kpsoi_i = kpsoi_i.on_(shape_orig)
                     kpsoi_i.shape = shape_orig
 
                 result.append(kpsoi_i)
         return result
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.k, self.keep_size]
 
 
@@ -4863,7 +4888,8 @@ class WithPolarWarping(meta.Augmenter):
         recovery are currently ``PerspectiveTransform``, ``PiecewiseAffine``
         and ``ElasticTransformation``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -4891,14 +4917,14 @@ class WithPolarWarping(meta.Augmenter):
         One or more augmenters to apply to images after they were transformed
         to polar representation.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -4926,13 +4952,13 @@ class WithPolarWarping(meta.Augmenter):
 
     """
 
-    def __init__(self, children, name=None, deterministic=False,
-                 random_state=None):
+    def __init__(self, children,
+                 seed=None, name=None, **old_kwargs):
         super(WithPolarWarping, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.children = meta.handle_children_list(children, self.name, "then")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is not None:
             iadt.gate_dtypes(
                 batch.images,
@@ -4955,9 +4981,9 @@ class WithPolarWarping(meta.Augmenter):
                 setattr(batch, column.attr_name, col_aug)
                 inv_data[column.name] = inv_data_col
 
-            batch = self.children.augment_batch(batch,
-                                                parents=parents + [self],
-                                                hooks=hooks)
+            batch = self.children.augment_batch_(batch,
+                                                 parents=parents + [self],
+                                                 hooks=hooks)
             for column in batch.columns:
                 func = getattr(self, "_invert_warp_%s_" % (column.name,))
                 col_unaug = func(column.value, inv_data[column.name])
@@ -4974,7 +5000,7 @@ class WithPolarWarping(meta.Augmenter):
             return batch, (False, batch_contained_polygons)
 
         psois = [bbsoi.to_polygons_on_image() for bbsoi in batch.bounding_boxes]
-        psois = [psoi.subdivide(2) for psoi in psois]
+        psois = [psoi.subdivide_(2) for psoi in psois]
 
         # Mark Polygons that are really Bounding Boxes
         for psoi in psois:
@@ -5139,13 +5165,14 @@ class WithPolarWarping(meta.Augmenter):
 
             if arr.ndim == 3 and arr.shape[-1] > 512:
                 arr_warped = np.stack(
-                    [cv2.warpPolar(arr[..., c_idx], dest_size, center_xy,
-                                   max_radius, flags)
+                    [cv2.warpPolar(_normalize_cv2_input_arr_(arr[..., c_idx]),
+                                   dest_size, center_xy, max_radius, flags)
                      for c_idx in np.arange(arr.shape[-1])],
                     axis=-1)
             else:
-                arr_warped = cv2.warpPolar(arr, dest_size, center_xy,
-                                           max_radius, flags)
+                arr_warped = cv2.warpPolar(_normalize_cv2_input_arr_(arr),
+                                           dest_size, center_xy, max_radius,
+                                           flags)
                 if arr_warped.ndim == 2 and arr.ndim == 3:
                     arr_warped = arr_warped[:, :, np.newaxis]
 
@@ -5200,13 +5227,15 @@ class WithPolarWarping(meta.Augmenter):
 
             if arr_warped.ndim == 3 and arr_warped.shape[-1] > 512:
                 arr_inv = np.stack(
-                    [cv2.warpPolar(arr_warped[..., c_idx], dest_size,
-                                   center_xy, max_radius, flags)
+                    [cv2.warpPolar(
+                        _normalize_cv2_input_arr_(arr_warped[..., c_idx]),
+                        dest_size, center_xy, max_radius, flags)
                      for c_idx in np.arange(arr_warped.shape[-1])],
                     axis=-1)
             else:
-                arr_inv = cv2.warpPolar(arr_warped, dest_size, center_xy,
-                                        max_radius, flags)
+                arr_inv = cv2.warpPolar(
+                    _normalize_cv2_input_arr_(arr_warped),
+                    dest_size, center_xy, max_radius, flags)
                 if arr_inv.ndim == 2 and arr_warped.ndim == 3:
                     arr_inv = arr_inv[:, :, np.newaxis]
 
@@ -5442,11 +5471,11 @@ class WithPolarWarping(meta.Augmenter):
             return np.concatenate([rho, phi], axis=1)
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []
 
     def get_children_lists(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_children_lists`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_children_lists`."""
         return [self.children]
 
     def _to_deterministic(self):
@@ -5489,9 +5518,10 @@ class Jigsaw(meta.Augmenter):
         heatmaps, segmentation maps and keypoints. Other augmentables,
         i.e. bounding boxes, polygons and line strings, will result in errors.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`apply_jigsaw`.
+    See :func:`~imgaug.augmenters.geometric.apply_jigsaw`.
 
     Parameters
     ----------
@@ -5532,14 +5562,14 @@ class Jigsaw(meta.Augmenter):
         Whether to allow automatically padding images until they are evenly
         divisible by ``nb_rows`` and ``nb_cols``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -5563,9 +5593,9 @@ class Jigsaw(meta.Augmenter):
     """
 
     def __init__(self, nb_rows, nb_cols, max_steps=2, allow_pad=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(Jigsaw, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.nb_rows = iap.handle_discrete_param(
             nb_rows, "nb_rows", value_range=(1, None), tuple_to_uniform=True,
@@ -5578,7 +5608,7 @@ class Jigsaw(meta.Augmenter):
             tuple_to_uniform=True, list_to_choice=True, allow_floats=False)
         self.allow_pad = allow_pad
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         samples = self._draw_samples(batch, random_state)
 
         # We resize here heatmaps/segmaps early to the image size in order to
@@ -5602,10 +5632,12 @@ class Jigsaw(meta.Augmenter):
             for i in np.arange(len(samples.destinations)):
                 padder = size_lib.CenterPadToMultiplesOf(
                     width_multiple=samples.nb_cols[i],
-                    height_multiple=samples.nb_rows[i])
+                    height_multiple=samples.nb_rows[i],
+                    seed=random_state
+                )
                 row = batch.subselect_rows_by_indices([i])
-                row = padder.augment_batch(row, parents=parents + [self],
-                                           hooks=hooks)
+                row = padder.augment_batch_(row, parents=parents + [self],
+                                            hooks=hooks)
                 batch = batch.invert_subselect_rows_by_indices_([i], row)
 
         if batch.images is not None:
@@ -5659,7 +5691,7 @@ class Jigsaw(meta.Augmenter):
             destinations.append(
                 generate_jigsaw_destinations(
                     nb_rows[i], nb_cols[i], max_steps[i],
-                    random_state=random_state)
+                    seed=random_state)
             )
 
         samples = _JigsawSamples(nb_rows, nb_cols, max_steps, destinations)

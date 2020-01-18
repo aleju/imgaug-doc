@@ -1,26 +1,14 @@
 """
 Augmenters that blur images.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.GaussianBlur((0.0, 3.0)),
-        iaa.AverageBlur((2, 5))
-    ])
-
 List of augmenters:
 
-    * GaussianBlur
-    * AverageBlur
-    * MedianBlur
-    * BilateralBlur
-    * MotionBlur
-    * MeanShiftBlur
+    * :class:`GaussianBlur`
+    * :class:`AverageBlur`
+    * :class:`MedianBlur`
+    * :class:`BilateralBlur`
+    * :class:`MotionBlur`
+    * :class:`MeanShiftBlur`
 
 """
 from __future__ import print_function, division, absolute_import
@@ -31,6 +19,7 @@ import cv2
 import six.moves as sm
 
 import imgaug as ia
+from imgaug.imgaug import _normalize_cv2_input_arr_
 from . import meta
 from . import convolutional as iaa_convolutional
 from .. import parameters as iap
@@ -43,89 +32,90 @@ def blur_gaussian_(image, sigma, ksize=None, backend="auto", eps=1e-3):
 
     This operation *may* change the input image in-place.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        if (backend="auto")::
+    if (backend="auto"):
 
-            * ``uint8``: yes; fully tested (1)
-            * ``uint16``: yes; tested (1)
-            * ``uint32``: yes; tested (2)
-            * ``uint64``: yes; tested (2)
-            * ``int8``: yes; tested (1)
-            * ``int16``: yes; tested (1)
-            * ``int32``: yes; tested (1)
-            * ``int64``: yes; tested (2)
-            * ``float16``: yes; tested (1)
-            * ``float32``: yes; tested (1)
-            * ``float64``: yes; tested (1)
-            * ``float128``: no
-            * ``bool``: yes; tested (1)
+        * ``uint8``: yes; fully tested (1)
+        * ``uint16``: yes; tested (1)
+        * ``uint32``: yes; tested (2)
+        * ``uint64``: yes; tested (2)
+        * ``int8``: yes; tested (1)
+        * ``int16``: yes; tested (1)
+        * ``int32``: yes; tested (1)
+        * ``int64``: yes; tested (2)
+        * ``float16``: yes; tested (1)
+        * ``float32``: yes; tested (1)
+        * ``float64``: yes; tested (1)
+        * ``float128``: no
+        * ``bool``: yes; tested (1)
 
-            - (1) Handled by ``cv2``. See ``backend="cv2"``.
-            - (2) Handled by ``scipy``. See ``backend="scipy"``.
+        - (1) Handled by ``cv2``. See ``backend="cv2"``.
+        - (2) Handled by ``scipy``. See ``backend="scipy"``.
 
-        if (backend="cv2")::
+    if (backend="cv2"):
 
-            * ``uint8``: yes; fully tested
-            * ``uint16``: yes; tested
-            * ``uint32``: no (2)
-            * ``uint64``: no (3)
-            * ``int8``: yes; tested (4)
-            * ``int16``: yes; tested
-            * ``int32``: yes; tested (5)
-            * ``int64``: no (6)
-            * ``float16``: yes; tested (7)
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: no (8)
-            * ``bool``: yes; tested (1)
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: no (2)
+        * ``uint64``: no (3)
+        * ``int8``: yes; tested (4)
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested (5)
+        * ``int64``: no (6)
+        * ``float16``: yes; tested (7)
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: no (8)
+        * ``bool``: yes; tested (1)
 
-            - (1) Mapped internally to ``float32``. Otherwise causes
-                  ``TypeError: src data type = 0 is not supported``.
-            - (2) Causes ``TypeError: src data type = 6 is not supported``.
-            - (3) Causes ``cv2.error: OpenCV(3.4.5) (...)/filter.cpp:2957:
-                  error: (-213:The function/feature is not implemented)
-                  Unsupported combination of source format (=4), and buffer
-                  format (=5) in function 'getLinearRowFilter'``.
-            - (4) Mapped internally to ``int16``. Otherwise causes
-                  ``cv2.error: OpenCV(3.4.5) (...)/filter.cpp:2957: error:
-                  (-213:The function/feature is not implemented) Unsupported
-                  combination of source format (=1), and buffer format (=5)
-                  in function 'getLinearRowFilter'``.
-            - (5) Mapped internally to ``float64``. Otherwise causes
-                  ``cv2.error: OpenCV(3.4.5) (...)/filter.cpp:2957: error:
-                  (-213:The function/feature is not implemented) Unsupported
-                  combination of source format (=4), and buffer format (=5)
-                  in function 'getLinearRowFilter'``.
-            - (6) Causes ``cv2.error: OpenCV(3.4.5) (...)/filter.cpp:2957:
-                  error: (-213:The function/feature is not implemented)
-                  Unsupported combination of source format (=4), and buffer
-                  format (=5) in function 'getLinearRowFilter'``.
-            - (7) Mapped internally to ``float32``. Otherwise causes
-                  ``TypeError: src data type = 23 is not supported``.
-            - (8) Causes ``TypeError: src data type = 13 is not supported``.
+        - (1) Mapped internally to ``float32``. Otherwise causes
+              ``TypeError: src data type = 0 is not supported``.
+        - (2) Causes ``TypeError: src data type = 6 is not supported``.
+        - (3) Causes ``cv2.error: OpenCV(3.4.5) (...)/filter.cpp:2957:
+              error: (-213:The function/feature is not implemented)
+              Unsupported combination of source format (=4), and buffer
+              format (=5) in function 'getLinearRowFilter'``.
+        - (4) Mapped internally to ``int16``. Otherwise causes
+              ``cv2.error: OpenCV(3.4.5) (...)/filter.cpp:2957: error:
+              (-213:The function/feature is not implemented) Unsupported
+              combination of source format (=1), and buffer format (=5)
+              in function 'getLinearRowFilter'``.
+        - (5) Mapped internally to ``float64``. Otherwise causes
+              ``cv2.error: OpenCV(3.4.5) (...)/filter.cpp:2957: error:
+              (-213:The function/feature is not implemented) Unsupported
+              combination of source format (=4), and buffer format (=5)
+              in function 'getLinearRowFilter'``.
+        - (6) Causes ``cv2.error: OpenCV(3.4.5) (...)/filter.cpp:2957:
+              error: (-213:The function/feature is not implemented)
+              Unsupported combination of source format (=4), and buffer
+              format (=5) in function 'getLinearRowFilter'``.
+        - (7) Mapped internally to ``float32``. Otherwise causes
+              ``TypeError: src data type = 23 is not supported``.
+        - (8) Causes ``TypeError: src data type = 13 is not supported``.
 
-        if (backend="scipy")::
+    if (backend="scipy"):
 
-            * ``uint8``: yes; fully tested
-            * ``uint16``: yes; tested
-            * ``uint32``: yes; tested
-            * ``uint64``: yes; tested
-            * ``int8``: yes; tested
-            * ``int16``: yes; tested
-            * ``int32``: yes; tested
-            * ``int64``: yes; tested
-            * ``float16``: yes; tested (1)
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: no (2)
-            * ``bool``: yes; tested (3)
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested (1)
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: no (2)
+        * ``bool``: yes; tested (3)
 
-            - (1) Mapped internally to ``float32``. Otherwise causes
-                  ``RuntimeError: array type dtype('float16') not supported``.
-            - (2) Causes ``RuntimeError: array type dtype('float128') not
-                  supported``.
-            - (3) Mapped internally to ``float32``. Otherwise too inaccurate.
+        - (1) Mapped internally to ``float32``. Otherwise causes
+              ``RuntimeError: array type dtype('float16') not supported``.
+        - (2) Causes ``RuntimeError: array type dtype('float128') not
+              supported``.
+        - (3) Mapped internally to ``float32``. Otherwise too inaccurate.
 
     Parameters
     ----------
@@ -258,7 +248,10 @@ def blur_gaussian_(image, sigma, ksize=None, backend="auto", eps=1e-3):
 
             if ksize > 0:
                 image_warped = cv2.GaussianBlur(
-                    image, (ksize, ksize), sigmaX=sigma, sigmaY=sigma,
+                    _normalize_cv2_input_arr_(image),
+                    (ksize, ksize),
+                    sigmaX=sigma,
+                    sigmaY=sigma,
                     borderType=cv2.BORDER_REFLECT_101)
 
                 # re-add channel axis removed by cv2 if input was (H, W, 1)
@@ -294,7 +287,8 @@ def blur_mean_shift_(image, spatial_window_radius, color_window_radius):
 
         This function is quite slow.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no (1)
@@ -355,13 +349,10 @@ def blur_mean_shift_(image, spatial_window_radius, color_window_radius):
     elif shape_is_hw1:
         image = np.tile(image, (1, 1, 3))
 
-    # prevent image from becoming cv2.UMat
-    if image.flags["C_CONTIGUOUS"] is False:
-        image = np.ascontiguousarray(image)
-
     spatial_window_radius = max(spatial_window_radius, 0)
     color_window_radius = max(color_window_radius, 0)
 
+    image = _normalize_cv2_input_arr_(image)
     image = cv2.pyrMeanShiftFiltering(
         image,
         sp=spatial_window_radius,
@@ -397,9 +388,10 @@ def _compute_gaussian_blur_ksize(sigma):
 class GaussianBlur(meta.Augmenter):
     """Augmenter to blur images using gaussian kernels.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.blur.blur_gaussian_(backend="auto")`.
+    See ``~imgaug.augmenters.blur.blur_gaussian_(backend="auto")``.
 
     Parameters
     ----------
@@ -417,14 +409,14 @@ class GaussianBlur(meta.Augmenter):
             * If a ``StochasticParameter``, then ``N`` samples will be drawn
               from that parameter per ``N`` input images.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -441,10 +433,10 @@ class GaussianBlur(meta.Augmenter):
 
     """
 
-    def __init__(self, sigma=0, name=None, deterministic=False,
-                 random_state=None):
+    def __init__(self, sigma=0,
+                 seed=None, name=None, **old_kwargs):
         super(GaussianBlur, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.sigma = iap.handle_continuous_param(
             sigma, "sigma", value_range=(0, None), tuple_to_uniform=True,
@@ -454,7 +446,7 @@ class GaussianBlur(meta.Augmenter):
         # apply the blur
         self.eps = 1e-3
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -467,7 +459,7 @@ class GaussianBlur(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.sigma]
 
 
@@ -477,7 +469,8 @@ class AverageBlur(meta.Augmenter):
     The padding behaviour around the image borders is cv2's
     ``BORDER_REFLECT_101``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -525,14 +518,14 @@ class AverageBlur(meta.Augmenter):
               above. This leads to different values for height and width of
               the kernel.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -554,9 +547,9 @@ class AverageBlur(meta.Augmenter):
 
     """
 
-    def __init__(self, k=1, name=None, deterministic=False, random_state=None):
+    def __init__(self, k=1, seed=None, name=None, **old_kwargs):
         super(AverageBlur, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         # TODO replace this by iap.handle_discrete_kernel_size()
         self.mode = "single"
@@ -604,7 +597,7 @@ class AverageBlur(meta.Augmenter):
                 "Expected int, tuple/list with 2 entries or "
                 "StochasticParameter. Got %s." % (type(k),))
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -646,7 +639,9 @@ class AverageBlur(meta.Augmenter):
                     image = image.astype(np.int16, copy=False)
 
                 if image.ndim == 2 or image.shape[-1] <= 512:
-                    image_aug = cv2.blur(image, (ksize_h, ksize_w))
+                    image_aug = cv2.blur(
+                        _normalize_cv2_input_arr_(image),
+                        (ksize_h, ksize_w))
                     # cv2.blur() removes channel axis for single-channel images
                     if image_aug.ndim == 2:
                         image_aug = image_aug[..., np.newaxis]
@@ -654,7 +649,9 @@ class AverageBlur(meta.Augmenter):
                     # TODO this is quite inefficient
                     # handling more than 512 channels in cv2.blur()
                     channels = [
-                        cv2.blur(image[..., c], (ksize_h, ksize_w))
+                        cv2.blur(
+                            _normalize_cv2_input_arr_(image[..., c]),
+                            (ksize_h, ksize_w))
                         for c in sm.xrange(image.shape[-1])
                     ]
                     image_aug = np.stack(channels, axis=-1)
@@ -668,7 +665,7 @@ class AverageBlur(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.k]
 
 
@@ -678,7 +675,8 @@ class MedianBlur(meta.Augmenter):
     Median blurring can be used to remove small dirt from images.
     At larger kernel sizes, its effects have some similarity with Superpixels.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: ?
@@ -712,14 +710,14 @@ class MedianBlur(meta.Augmenter):
               a sampled value is not odd, then that value will be increased
               by ``1``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -736,9 +734,9 @@ class MedianBlur(meta.Augmenter):
 
     """
 
-    def __init__(self, k=1, name=None, deterministic=False, random_state=None):
+    def __init__(self, k=1, seed=None, name=None, **old_kwargs):
         super(MedianBlur, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         # TODO replace this by iap.handle_discrete_kernel_size()
         self.k = iap.handle_discrete_param(
@@ -753,7 +751,7 @@ class MedianBlur(meta.Augmenter):
                 "Expected all values in iterable k to be odd, but at least "
                 "one was not. Add or subtract 1 to/from that value.")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -765,7 +763,8 @@ class MedianBlur(meta.Augmenter):
             if ksize > 1 and not has_zero_sized_axes:
                 ksize = ksize + 1 if ksize % 2 == 0 else ksize
                 if image.ndim == 2 or image.shape[-1] <= 512:
-                    image_aug = cv2.medianBlur(image, ksize)
+                    image_aug = cv2.medianBlur(
+                        _normalize_cv2_input_arr_(image), ksize)
                     # cv2.medianBlur() removes channel axis for single-channel
                     # images
                     if image_aug.ndim == 2:
@@ -774,7 +773,8 @@ class MedianBlur(meta.Augmenter):
                     # TODO this is quite inefficient
                     # handling more than 512 channels in cv2.medainBlur()
                     channels = [
-                        cv2.medianBlur(image[..., c], ksize)
+                        cv2.medianBlur(
+                            _normalize_cv2_input_arr_(image[..., c]), ksize)
                         for c in sm.xrange(image.shape[-1])
                     ]
                     image_aug = np.stack(channels, axis=-1)
@@ -783,7 +783,7 @@ class MedianBlur(meta.Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.k]
 
 
@@ -798,7 +798,8 @@ class BilateralBlur(meta.Augmenter):
     http://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html#bilateralfilter
     for more information regarding the parameters.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; not tested
         * ``uint16``: ?
@@ -864,14 +865,14 @@ class BilateralBlur(meta.Augmenter):
               from that parameter per ``N`` input images, each representing
               the diameter for the n-th image. Expected to be discrete.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -886,10 +887,10 @@ class BilateralBlur(meta.Augmenter):
     """
 
     def __init__(self, d=1, sigma_color=(10, 250), sigma_space=(10, 250),
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         # pylint: disable=invalid-name
         super(BilateralBlur, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.d = iap.handle_discrete_param(
             d, "d", value_range=(1, None), tuple_to_uniform=True,
@@ -901,7 +902,7 @@ class BilateralBlur(meta.Augmenter):
             sigma_space, "sigma_space", value_range=(1, None),
             tuple_to_uniform=True, list_to_choice=True)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         # pylint: disable=invalid-name
         if batch.images is None:
             return batch
@@ -926,12 +927,13 @@ class BilateralBlur(meta.Augmenter):
         for i, (image, di, sigma_color_i, sigma_space_i) in gen:
             has_zero_sized_axes = (image.size == 0)
             if di != 1 and not has_zero_sized_axes:
-                batch.images[i] = cv2.bilateralFilter(image, di, sigma_color_i,
-                                                      sigma_space_i)
+                batch.images[i] = cv2.bilateralFilter(
+                    _normalize_cv2_input_arr_(image),
+                    di, sigma_color_i, sigma_space_i)
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.d, self.sigma_color, self.sigma_space]
 
 
@@ -939,9 +941,10 @@ class BilateralBlur(meta.Augmenter):
 class MotionBlur(iaa_convolutional.Convolve):
     """Blur images in a way that fakes camera or object movements.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.convolutional.Convolve``.
+    See :class:`~imgaug.augmenters.convolutional.Convolve`.
 
     Parameters
     ----------
@@ -988,19 +991,19 @@ class MotionBlur(iaa_convolutional.Convolve):
     order : int or iterable of int or imgaug.ALL or imgaug.parameters.StochasticParameter, optional
         Interpolation order to use when rotating the kernel according to
         `angle`.
-        See :func:`imgaug.augmenters.geometric.Affine.__init__`.
+        See :func:`~imgaug.augmenters.geometric.Affine.__init__`.
         Recommended to be ``0`` or ``1``, with ``0`` being faster, but less
         continuous/smooth as `angle` is changed, particularly around multiple
         of ``45`` degrees.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1017,7 +1020,7 @@ class MotionBlur(iaa_convolutional.Convolve):
     """
 
     def __init__(self, k=5, angle=(0, 360), direction=(-1.0, 1.0), order=1,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         # TODO allow (1, None) and set to identity matrix if k == 1
         k_param = iap.handle_discrete_param(
             k, "k", value_range=(3, None), tuple_to_uniform=True,
@@ -1033,8 +1036,8 @@ class MotionBlur(iaa_convolutional.Convolve):
                                                 direction_param, order)
 
         super(MotionBlur, self).__init__(
-            matrix_gen, name=name, deterministic=deterministic,
-            random_state=random_state)
+            matrix_gen,
+            seed=seed, name=name, **old_kwargs)
 
 
 class _MotionBlurMatrixGenerator(object):
@@ -1091,9 +1094,10 @@ class MeanShiftBlur(meta.Augmenter):
 
         This augmenter is quite slow.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.augmenters.blur.blur_mean_shift_`.
+    See :func:`~imgaug.augmenters.blur.blur_mean_shift_`.
 
     Parameters
     ----------
@@ -1121,14 +1125,14 @@ class MeanShiftBlur(meta.Augmenter):
               per batch for ``(N,)`` values with ``N`` denoting the number of
               images.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1139,9 +1143,9 @@ class MeanShiftBlur(meta.Augmenter):
 
     """
     def __init__(self, spatial_radius=(5.0, 40.0), color_radius=(5.0, 40.0),
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(MeanShiftBlur, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.spatial_window_radius = iap.handle_continuous_param(
             spatial_radius, "spatial_radius",
             value_range=(0.01, None), tuple_to_uniform=True,
@@ -1151,7 +1155,7 @@ class MeanShiftBlur(meta.Augmenter):
             value_range=(0.01, None), tuple_to_uniform=True,
             list_to_choice=True)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is not None:
             samples = self._draw_samples(batch, random_state)
             for i, image in enumerate(batch.images):
@@ -1173,5 +1177,5 @@ class MeanShiftBlur(meta.Augmenter):
         )
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.spatial_window_radius, self.color_window_radius]

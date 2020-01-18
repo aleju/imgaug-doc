@@ -1,7 +1,6 @@
 """Classes dealing with polygons."""
 from __future__ import print_function, division, absolute_import
 
-import copy
 import traceback
 import collections
 
@@ -14,8 +13,11 @@ import skimage.measure
 from .. import imgaug as ia
 from .. import random as iarandom
 from .base import IAugmentable
-from .utils import (normalize_shape, interpolate_points,
-                    _remove_out_of_image_fraction)
+from .utils import (normalize_shape,
+                    interpolate_points,
+                    _remove_out_of_image_fraction_,
+                    project_coords_,
+                    _normalize_shift_args)
 
 
 def recover_psois_(psois, psois_orig, recoverer, random_state):
@@ -34,7 +36,7 @@ def recover_psois_(psois, psois_orig, recoverer, random_state):
     recoverer : imgaug.augmentables.polys._ConcavePolygonRecoverer
         The polygon recoverer used to repair broken input polygons.
 
-    random_state : None or int or RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
+    random_state : None or int or RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
         An RNG to use during the polygon recovery.
 
     Returns
@@ -82,7 +84,7 @@ class Polygon(object):
     ----------
     exterior : list of imgaug.augmentables.kps.Keypoint or list of tuple of float or (N,2) ndarray
         List of points defining the polygon. May be either a ``list`` of
-        :class:`imgaug.augmentables.kps.Keypoint` objects or a ``list`` of
+        :class:`~imgaug.augmentables.kps.Keypoint` objects or a ``list`` of
         ``tuple`` s in xy-form or a numpy array of shape (N,2) for ``N``
         points in xy-form.
         All coordinates are expected to be the absolute subpixel-coordinates
@@ -275,6 +277,35 @@ class Polygon(object):
         xx = self.xx
         return max(xx) - min(xx)
 
+    def project_(self, from_shape, to_shape):
+        """Project the polygon onto an image with different shape in-place.
+
+        The relative coordinates of all points remain the same.
+        E.g. a point at ``(x=20, y=20)`` on an image
+        ``(width=100, height=200)`` will be projected on a new
+        image ``(width=200, height=100)`` to ``(x=40, y=10)``.
+
+        This is intended for cases where the original image is resized.
+        It cannot be used for more complex changes (e.g. padding, cropping).
+
+        Parameters
+        ----------
+        from_shape : tuple of int
+            Shape of the original image. (Before resize.)
+
+        to_shape : tuple of int
+            Shape of the new image. (After resize.)
+
+        Returns
+        -------
+        imgaug.augmentables.polys.Polygon
+            Polygon object with new coordinates.
+            The object may have been modified in-place.
+
+        """
+        self.exterior = project_coords_(self.coords, from_shape, to_shape)
+        return self
+
     def project(self, from_shape, to_shape):
         """Project the polygon onto an image with different shape.
 
@@ -300,11 +331,7 @@ class Polygon(object):
             Polygon object with new coordinates.
 
         """
-        if from_shape[0:2] == to_shape[0:2]:
-            return self.copy()
-        ls_proj = self.to_line_string(closed=False).project(
-            from_shape, to_shape)
-        return self.copy(exterior=ls_proj.coords)
+        return self.deepcopy().project_(from_shape, to_shape)
 
     def find_closest_point_index(self, x, y, return_distance=False):
         """Find the index of the exterior point closest to given coordinates.
@@ -614,24 +641,86 @@ class Polygon(object):
 
         return polygons_reordered
 
-    def shift(self, top=None, right=None, bottom=None, left=None):
-        """Move this polygon along the x/y-axis.
+    def shift_(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
+        """Move this polygon along the x/y-axis in-place.
+
+        The origin ``(0, 0)`` is at the top left of the image.
 
         Parameters
         ----------
+        x : number, optional
+            Value to be added to all x-coordinates. Positive values shift
+            towards the right images.
+
+        y : number, optional
+            Value to be added to all y-coordinates. Positive values shift
+            towards the bottom images.
+
         top : None or int, optional
+            **Deprecated.**
             Amount of pixels by which to shift this object *from* the
             top (towards the bottom).
 
         right : None or int, optional
+            **Deprecated.**
             Amount of pixels by which to shift this object *from* the
             right (towards the left).
 
         bottom : None or int, optional
+            **Deprecated.**
             Amount of pixels by which to shift this object *from* the
             bottom (towards the top).
 
         left : None or int, optional
+            **Deprecated.**
+            Amount of pixels by which to shift this object *from* the
+            left (towards the right).
+
+        Returns
+        -------
+        imgaug.augmentables.polys.Polygon
+            Shifted polygon.
+            The object may have been modified in-place.
+
+        """
+        x, y = _normalize_shift_args(
+            x, y, top=top, right=right, bottom=bottom, left=left)
+        self.exterior[:, 0] += x
+        self.exterior[:, 1] += y
+        return self
+
+    def shift(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
+        """Move this polygon along the x/y-axis.
+
+        The origin ``(0, 0)`` is at the top left of the image.
+
+        Parameters
+        ----------
+        x : number, optional
+            Value to be added to all x-coordinates. Positive values shift
+            towards the right images.
+
+        y : number, optional
+            Value to be added to all y-coordinates. Positive values shift
+            towards the bottom images.
+
+        top : None or int, optional
+            **Deprecated.**
+            Amount of pixels by which to shift this object *from* the
+            top (towards the bottom).
+
+        right : None or int, optional
+            **Deprecated.**
+            Amount of pixels by which to shift this object *from* the
+            right (towards the left).
+
+        bottom : None or int, optional
+            **Deprecated.**
+            Amount of pixels by which to shift this object *from* the
+            bottom (towards the top).
+
+        left : None or int, optional
+            **Deprecated.**
             Amount of pixels by which to shift this object *from* the
             left (towards the right).
 
@@ -641,9 +730,9 @@ class Polygon(object):
             Shifted polygon.
 
         """
-        ls_shifted = self.to_line_string(closed=False).shift(
-            top=top, right=right, bottom=bottom, left=left)
-        return self.copy(exterior=ls_shifted.coords)
+        return self.deepcopy().shift_(x=x, y=y,
+                                      top=top, right=right,
+                                      bottom=bottom, left=left)
 
     # TODO separate this into draw_face_on_image() and draw_border_on_image()
     # TODO add tests for line thickness
@@ -963,10 +1052,36 @@ class Polygon(object):
         )
         return self.deepcopy(exterior=exterior)
 
+    def subdivide_(self, points_per_edge):
+        """Derive a new poly with ``N`` interpolated points per edge in-place.
+
+        See :func:`~imgaug.augmentables.lines.LineString.subdivide` for details.
+
+        Parameters
+        ----------
+        points_per_edge : int
+            Number of points to interpolate on each edge.
+
+        Returns
+        -------
+        imgaug.augmentables.polys.Polygon
+            Polygon with subdivided edges.
+            The object may have been modified in-place.
+
+        """
+        if len(self.exterior) == 1:
+            return self
+        ls = self.to_line_string(closed=True)
+        ls_sub = ls.subdivide(points_per_edge)
+        # [:-1] even works if the polygon contains zero points
+        exterior_subdivided = ls_sub.coords[:-1]
+        self.exterior = exterior_subdivided
+        return self
+
     def subdivide(self, points_per_edge):
         """Derive a new polygon with ``N`` interpolated points per edge.
 
-        See :func:`imgaug.augmentables.lines.LineString.subdivide` for details.
+        See :func:`~imgaug.augmentables.lines.LineString.subdivide` for details.
 
         Parameters
         ----------
@@ -979,13 +1094,7 @@ class Polygon(object):
             Polygon with subdivided edges.
 
         """
-        if len(self.exterior) == 1:
-            return self.deepcopy()
-        ls = self.to_line_string(closed=True)
-        ls_sub = ls.subdivide(points_per_edge)
-        # [:-1] even works if the polygon contains zero points
-        exterior_subdivided = ls_sub.coords[:-1]
-        return Polygon(exterior_subdivided, label=self.label)
+        return self.deepcopy().subdivide_(points_per_edge)
 
     def to_shapely_polygon(self):
         """Convert this polygon to a ``Shapely`` ``Polygon``.
@@ -1048,7 +1157,7 @@ class Polygon(object):
         Returns
         -------
         list of imgaug.augmentables.kps.Keypoint
-            Exterior vertices as :class:`imgaug.augmentables.kps.Keypoint`
+            Exterior vertices as :class:`~imgaug.augmentables.kps.Keypoint`
             instances.
 
         """
@@ -1129,15 +1238,15 @@ class Polygon(object):
         ----------
         other : imgaug.augmentables.polys.Polygon or (N,2) ndarray or list of tuple
             See
-            :func:`imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
+            :func:`~imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
 
         max_distance : number, optional
             See
-            :func:`imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
+            :func:`~imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
 
         points_per_edge : int, optional
             See
-            :func:`imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
+            :func:`~imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
 
         Returns
         -------
@@ -1213,7 +1322,7 @@ class Polygon(object):
         Estimate if this polygon's and another's geometry/labels are similar.
 
         This is the same as
-        :func:`imgaug.augmentables.polys.Polygon.exterior_almost_equals` but
+        :func:`~imgaug.augmentables.polys.Polygon.exterior_almost_equals` but
         additionally compares the labels.
 
         Parameters
@@ -1223,11 +1332,11 @@ class Polygon(object):
 
         max_distance : float, optional
             See
-            :func:`imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
+            :func:`~imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
 
         points_per_edge : int, optional
             See
-            :func:`imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
+            :func:`~imgaug.augmentables.polys.Polygon.exterior_almost_equals`.
 
         Returns
         -------
@@ -1248,7 +1357,7 @@ class Polygon(object):
         ----------
         exterior : list of imgaug.augmentables.kps.Keypoint or list of tuple or (N,2) ndarray, optional
             List of points defining the polygon. See
-            :func:`imgaug.augmentables.polys.Polygon.__init__` for details.
+            :func:`~imgaug.augmentables.polys.Polygon.__init__` for details.
 
         label : None or str, optional
             If not ``None``, the ``label`` of the copied object will be set
@@ -1362,6 +1471,18 @@ class PolygonsOnImage(IAugmentable):
         """
         return self.polygons
 
+    @items.setter
+    def items(self, value):
+        """Set the polygons in this container.
+
+        Parameters
+        ----------
+        value : list of Polygon
+            Polygons within this container.
+
+        """
+        self.polygons = value
+
     @property
     def empty(self):
         """Estimate whether this object contains zero polygons.
@@ -1373,6 +1494,33 @@ class PolygonsOnImage(IAugmentable):
 
         """
         return len(self.polygons) == 0
+
+    def on_(self, image):
+        """Project all polygons from one image shape to a new one in-place.
+
+        Parameters
+        ----------
+        image : ndarray or tuple of int
+            New image onto which the polygons are to be projected.
+            May also simply be that new image's shape ``tuple``.
+
+        Returns
+        -------
+        imgaug.augmentables.polys.PolygonsOnImage
+            Object containing all projected polygons.
+            The object and its items may have been modified in-place.
+
+        """
+        # pylint: disable=invalid-name
+        on_shape = normalize_shape(image)
+        if on_shape[0:2] == self.shape[0:2]:
+            self.shape = on_shape  # channels may differ
+            return self
+
+        for i, item in enumerate(self.items):
+            self.polygons[i] = item.project_(self.shape, on_shape)
+        self.shape = on_shape
+        return self
 
     def on(self, image):
         """Project all polygons from one image shape to a new one.
@@ -1390,12 +1538,7 @@ class PolygonsOnImage(IAugmentable):
 
         """
         # pylint: disable=invalid-name
-        shape = normalize_shape(image)
-        if shape[0:2] == self.shape[0:2]:
-            return self.deepcopy()
-        polygons = [poly.project(self.shape, shape) for poly in self.polygons]
-        # TODO use deepcopy() here
-        return PolygonsOnImage(polygons, shape)
+        return self.deepcopy().on_(image)
 
     def draw_on_image(self,
                       image,
@@ -1507,6 +1650,33 @@ class PolygonsOnImage(IAugmentable):
             )
         return image
 
+    def remove_out_of_image_(self, fully=True, partly=False):
+        """Remove all polygons that are fully/partially OOI in-place.
+
+        'OOI' is the abbreviation for 'out of image'.
+
+        Parameters
+        ----------
+        fully : bool, optional
+            Whether to remove polygons that are fully outside of the image.
+
+        partly : bool, optional
+            Whether to remove polygons that are partially outside of the image.
+
+        Returns
+        -------
+        imgaug.augmentables.polys.PolygonsOnImage
+            Reduced set of polygons. Those that are fully/partially
+            outside of the given image plane are removed.
+            The object and its items may have been modified in-place.
+
+        """
+        self.polygons = [
+            poly for poly in self.polygons
+            if not poly.is_out_of_image(self.shape, fully=fully, partly=partly)
+        ]
+        return self
+
     def remove_out_of_image(self, fully=True, partly=False):
         """Remove all polygons that are fully/partially outside of an image.
 
@@ -1525,12 +1695,28 @@ class PolygonsOnImage(IAugmentable):
             outside of the given image plane are removed.
 
         """
-        polys_clean = [
-            poly for poly in self.polygons
-            if not poly.is_out_of_image(self.shape, fully=fully, partly=partly)
-        ]
-        # TODO use deepcopy() here
-        return PolygonsOnImage(polys_clean, shape=self.shape)
+        return self.deepcopy().remove_out_of_image_(fully, partly)
+
+    def remove_out_of_image_fraction_(self, fraction):
+        """Remove all Polys with an OOI fraction of ``>=fraction`` in-place.
+
+        Parameters
+        ----------
+        fraction : number
+            Minimum out of image fraction that a polygon has to have in
+            order to be removed. A fraction of ``1.0`` removes only polygons
+            that are ``100%`` outside of the image. A fraction of ``0.0``
+            removes all polygons.
+
+        Returns
+        -------
+        imgaug.augmentables.polys.PolygonsOnImage
+            Reduced set of polygons, with those that had an out of image
+            fraction greater or equal the given one removed.
+            The object and its items may have been modified in-place.
+
+        """
+        return _remove_out_of_image_fraction_(self, fraction)
 
     def remove_out_of_image_fraction(self, fraction):
         """Remove all Polys with an out of image fraction of ``>=fraction``.
@@ -1550,7 +1736,39 @@ class PolygonsOnImage(IAugmentable):
             fraction greater or equal the given one removed.
 
         """
-        return _remove_out_of_image_fraction(self, fraction, PolygonsOnImage)
+        return self.copy().remove_out_of_image_fraction_(fraction)
+
+    def clip_out_of_image_(self):
+        """Clip off all parts from all polygons that are OOI in-place.
+
+        'OOI' is the abbreviation for 'out of image'.
+
+        .. note::
+
+            The result can contain fewer polygons than the input did. That
+            happens when a polygon is fully outside of the image plane.
+
+        .. note::
+
+            The result can also contain *more* polygons than the input
+            did. That happens when distinct parts of a polygon are only
+            connected by areas that are outside of the image plane and hence
+            will be clipped off, resulting in two or more unconnected polygon
+            parts that are left in the image plane.
+
+        Returns
+        -------
+        imgaug.augmentables.polys.PolygonsOnImage
+            Polygons, clipped to fall within the image dimensions.
+            The count of output polygons may differ from the input count.
+            The object and its items may have been modified in-place.
+
+        """
+        self.polygons = [
+            poly_clipped
+            for poly in self.polygons
+            for poly_clipped in poly.clip_out_of_image(self.shape)]
+        return self
 
     def clip_out_of_image(self):
         """Clip off all parts from all polygons that are outside of an image.
@@ -1575,34 +1793,40 @@ class PolygonsOnImage(IAugmentable):
             The count of output polygons may differ from the input count.
 
         """
-        polys_cut = [
-            poly.clip_out_of_image(self.shape)
-            for poly
-            in self.polygons
-            if poly.is_partly_within_image(self.shape)
-        ]
-        polys_cut_flat = [poly for poly_lst in polys_cut for poly in poly_lst]
-        # TODO use deepcopy() here
-        return PolygonsOnImage(polys_cut_flat, shape=self.shape)
+        return self.copy().clip_out_of_image_()
 
-    def shift(self, top=None, right=None, bottom=None, left=None):
-        """Move the polygons along the x/y-axis.
+    def shift_(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
+        """Move the polygons along the x/y-axis in-place.
+
+        The origin ``(0, 0)`` is at the top left of the image.
 
         Parameters
         ----------
+        x : number, optional
+            Value to be added to all x-coordinates. Positive values shift
+            towards the right images.
+
+        y : number, optional
+            Value to be added to all y-coordinates. Positive values shift
+            towards the bottom images.
+
         top : None or int, optional
+            **Deprecated.**
             Amount of pixels by which to shift all objects *from* the
             top (towards the bottom).
 
         right : None or int, optional
+            **Deprecated.**
             Amount of pixels by which to shift all objects *from* the
             right (towads the left).
 
         bottom : None or int, optional
+            **Deprecated.**
             Amount of pixels by which to shift all objects *from* the
             bottom (towards the top).
 
         left : None or int, optional
+            **Deprecated.**
             Amount of pixels by which to shift all objects *from* the
             left (towards the right).
 
@@ -1612,12 +1836,74 @@ class PolygonsOnImage(IAugmentable):
             Shifted polygons.
 
         """
-        polys_new = [
-            poly.shift(top=top, right=right, bottom=bottom, left=left)
-            for poly
-            in self.polygons
-        ]
-        return PolygonsOnImage(polys_new, shape=self.shape)
+        for i, poly in enumerate(self.polygons):
+            self.polygons[i] = poly.shift_(x=x, y=y,
+                                           top=top, right=right,
+                                           bottom=bottom, left=left)
+        return self
+
+    def shift(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
+        """Move the polygons along the x/y-axis.
+
+        The origin ``(0, 0)`` is at the top left of the image.
+
+        Parameters
+        ----------
+        x : number, optional
+            Value to be added to all x-coordinates. Positive values shift
+            towards the right images.
+
+        y : number, optional
+            Value to be added to all y-coordinates. Positive values shift
+            towards the bottom images.
+
+        top : None or int, optional
+            **Deprecated.**
+            Amount of pixels by which to shift all objects *from* the
+            top (towards the bottom).
+
+        right : None or int, optional
+            **Deprecated.**
+            Amount of pixels by which to shift all objects *from* the
+            right (towads the left).
+
+        bottom : None or int, optional
+            **Deprecated.**
+            Amount of pixels by which to shift all objects *from* the
+            bottom (towards the top).
+
+        left : None or int, optional
+            **Deprecated.**
+            Amount of pixels by which to shift all objects *from* the
+            left (towards the right).
+
+        Returns
+        -------
+        imgaug.augmentables.polys.PolygonsOnImage
+            Shifted polygons.
+
+        """
+        return self.deepcopy().shift_(x=x, y=y,
+                                      top=top, right=right,
+                                      bottom=bottom, left=left)
+
+    def subdivide_(self, points_per_edge):
+        """Interpolate ``N`` points on each polygon.
+
+        Parameters
+        ----------
+        points_per_edge : int
+            Number of points to interpolate on each edge.
+
+        Returns
+        -------
+        imgaug.augmentables.polys.PolygonsOnImage
+            Subdivided polygons.
+
+        """
+        for i, poly in enumerate(self.polygons):
+            self.polygons[i] = poly.subdivide_(points_per_edge)
+        return self
 
     def subdivide(self, points_per_edge):
         """Interpolate ``N`` points on each polygon.
@@ -1633,8 +1919,7 @@ class PolygonsOnImage(IAugmentable):
             Subdivided polygons.
 
         """
-        polys_new = [poly.subdivide(points_per_edge) for poly in self.polygons]
-        return PolygonsOnImage(polys_new, shape=self.shape)
+        return self.deepcopy().subdivide_(points_per_edge)
 
     def to_xy_array(self):
         """Convert all polygon coordinates to one array of shape ``(N,2)``.
@@ -1759,8 +2044,22 @@ class PolygonsOnImage(IAugmentable):
         self.shape = kpsoi.shape
         return self
 
-    def copy(self):
+    def copy(self, polygons=None, shape=None):
         """Create a shallow copy of this object.
+
+        Parameters
+        ----------
+        polygons : None or list of imgaug.augmentables.polys.Polygons, optional
+            List of polygons on the image.
+            If not ``None``, then the ``polygons`` attribute of the copied
+            object will be set to this value.
+
+        shape : None or tuple of int or ndarray, optional
+            The shape of the image on which the objects are placed.
+            Either an image with shape ``(H,W,[C])`` or a tuple denoting
+            such an image shape.
+            If not ``None``, then the ``shape`` attribute of the copied object
+            will be set to this value.
 
         Returns
         -------
@@ -1768,10 +2067,30 @@ class PolygonsOnImage(IAugmentable):
             Shallow copy.
 
         """
-        return copy.copy(self)
+        if polygons is None:
+            polygons = self.polygons[:]
+        if shape is None:
+            # use tuple() here in case the shape was provided as a list
+            shape = tuple(self.shape)
 
-    def deepcopy(self):
+        return PolygonsOnImage(polygons, shape)
+
+    def deepcopy(self, polygons=None, shape=None):
         """Create a deep copy of this object.
+
+        Parameters
+        ----------
+        polygons : None or list of imgaug.augmentables.polys.Polygons, optional
+            List of polygons on the image.
+            If not ``None``, then the ``polygons`` attribute of the copied
+            object will be set to this value.
+
+        shape : None or tuple of int or ndarray, optional
+            The shape of the image on which the objects are placed.
+            Either an image with shape ``(H,W,[C])`` or a tuple denoting
+            such an image shape.
+            If not ``None``, then the ``shape`` attribute of the copied object
+            will be set to this value.
 
         Returns
         -------
@@ -1779,10 +2098,25 @@ class PolygonsOnImage(IAugmentable):
             Deep copy.
 
         """
-        # Manual copy is far faster than deepcopy for PolygonsOnImage,
-        # so use manual copy here too
-        polys = [poly.deepcopy() for poly in self.polygons]
-        return PolygonsOnImage(polys, tuple(self.shape))
+        # Manual copy is far faster than deepcopy, so use manual copy here.
+        if polygons is None:
+            polygons = [poly.deepcopy() for poly in self.polygons]
+        if shape is None:
+            # use tuple() here in case the shape was provided as a list
+            shape = tuple(self.shape)
+
+        return PolygonsOnImage(polygons, shape)
+
+    def __getitem__(self, indices):
+        """Get the polygon(s) with given indices.
+
+        Returns
+        -------
+        list of imgaug.augmentables.polys.Polygon
+            Polygon(s) with given indices.
+
+        """
+        return self.polygons[indices]
 
     def __iter__(self):
         """Iterate over the polygons in this container.
@@ -1796,6 +2130,17 @@ class PolygonsOnImage(IAugmentable):
 
         """
         return iter(self.polygons)
+
+    def __len__(self):
+        """Get the number of items in this instance.
+
+        Returns
+        -------
+        int
+            Number of items in this instance.
+
+        """
+        return len(self.items)
 
     def __repr__(self):
         return self.__str__()

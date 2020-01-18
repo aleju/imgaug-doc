@@ -1,18 +1,8 @@
 """Augmenters that help with debugging.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.SaveDebugImageEveryNBatches(...)
-    ])
-
 List of augmenters:
-    * SaveDebugImageEveryNBatches
+
+    * :class:`SaveDebugImageEveryNBatches`
 
 """
 from __future__ import print_function, division, absolute_import
@@ -249,11 +239,9 @@ class _DebugGridCBAsOICell(_IDebugGridCell):
         image_rsp, size_rs, paddings = _resizepad_to_size(
             self.image, (height, width), cval=_COLOR_GRID_BACKGROUND)
 
-        cbasoi = self.cbasoi.on(size_rs)
-        if isinstance(cbasoi, ia.KeypointsOnImage):
-            cbasoi = cbasoi.shift(y=paddings[0], x=paddings[3])
-        else:
-            cbasoi = cbasoi.shift(top=paddings[0], left=paddings[3])
+        cbasoi = self.cbasoi.deepcopy()
+        cbasoi = cbasoi.on_(size_rs)
+        cbasoi = cbasoi.shift_(y=paddings[0], x=paddings[3])
         cbasoi.shape = image_rsp.shape
 
         return cbasoi.draw_on_image(image_rsp)
@@ -322,6 +310,23 @@ def draw_debug_image(images, heatmaps=None, segmentation_maps=None,
                      line_strings=None):
     """Generate a debug image grid of a single batch and various datatypes.
 
+    Supported dtypes
+    ----------------
+
+        * ``uint8``: yes; tested
+        * ``uint16``: ?
+        * ``uint32``: ?
+        * ``uint64``: ?
+        * ``int8``: ?
+        * ``int16``: ?
+        * ``int32``: ?
+        * ``int64``: ?
+        * ``float16``: ?
+        * ``float32``: ?
+        * ``float64``: ?
+        * ``float128``: ?
+        * ``bool``: ?
+
     Parameters
     ----------
     images : ndarray or list of ndarray
@@ -364,7 +369,7 @@ def draw_debug_image(images, heatmaps=None, segmentation_maps=None,
     >>> kpsoi = KeypointsOnImage.from_xy_array([(10.5, 20.5), (30.5, 30.5)],
     >>>                                        shape=image.shape)
     >>> debug_image = iaa.draw_debug_image(images=[image, image],
-    >>>                                    keypoints=[kpsoi, kpsoi)
+    >>>                                    keypoints=[kpsoi, kpsoi])
 
     Generate a debug image for two empty images, each having two keypoints
     drawn on them.
@@ -1003,25 +1008,25 @@ class _SaveDebugImage(meta.Augmenter):
         The schedule to use to determine for which batches an image is
         supposed to be generated.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     """
 
     def __init__(self, destination, schedule,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(_SaveDebugImage, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.destination = destination
         self.schedule = schedule
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         save = self.schedule.on_batch(batch)
         self.destination.on_batch(batch)
 
@@ -1043,6 +1048,11 @@ class _SaveDebugImage(meta.Augmenter):
 class SaveDebugImageEveryNBatches(_SaveDebugImage):
     """Visualize data in batches and save corresponding plots to a folder.
 
+    Supported dtypes
+    ----------------
+
+    See :func:`~imgaug.augmenters.debug.draw_debug_image`.
+
     Parameters
     ----------
     destination : str or _IImageDestination
@@ -1058,14 +1068,14 @@ class SaveDebugImageEveryNBatches(_SaveDebugImage):
         executed conditionally or re-instantiated, it may not see all batches
         or the counter may be wrong in other ways.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -1083,7 +1093,7 @@ class SaveDebugImageEveryNBatches(_SaveDebugImage):
     """
 
     def __init__(self, destination, interval,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         schedule = _EveryNBatchesSchedule(interval)
         if not isinstance(destination, _IImageDestination):
             assert os.path.isdir(destination), (
@@ -1096,7 +1106,7 @@ class SaveDebugImageEveryNBatches(_SaveDebugImage):
             ])
         super(SaveDebugImageEveryNBatches, self).__init__(
             destination=destination, schedule=schedule,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
     def get_parameters(self):
         dests = self.destination.destinations

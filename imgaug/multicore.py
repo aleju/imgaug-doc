@@ -9,6 +9,7 @@ import random
 import platform
 
 import numpy as np
+import cv2
 
 import imgaug.imgaug as ia
 import imgaug.random as iarandom
@@ -25,27 +26,61 @@ elif sys.version_info[0] == 3:
     from queue import Empty as QueueEmpty, Full as QueueFull
 
 
-# Fix random hanging code in NixOS by switching to spawn method, see #414
-# We use a function call here so that we can test the code block.
-# We could also place this e.g. in Pool.pool, possibly combined with
-# get_start_method() to reset it again at the end, but for now we use this
-# simple approach.
-# TODO This is only a workaround and doesn't really fix the underlying issue.
-#      The cause of the underlying issue is currently unknown.
-# TODO this might break the semaphore used to prevent out of memory errors
-def _switch_to_spawn_if_nixos():
+_CONTEXT = None
+
+
+def _get_context_method():
+    vinfo = sys.version_info
+
+    # get_context() is only supported in 3.5 and later (same for
+    # set_start_method)
+    get_context_unsupported = (
+        vinfo[0] == 2
+        or (vinfo[0] == 3 and vinfo[1] <= 3))
+
+    method = None
+    # Fix random hanging code in NixOS by switching to spawn method,
+    # see issue #414
+    # TODO This is only a workaround and doesn't really fix the underlying
+    #      issue. The cause of the underlying issue is currently unknown.
+    #      Its possible that #535 fixes the issue, though earlier tests
+    #      indicated that the cause was something else.
+    # TODO this might break the semaphore used to prevent out of memory
+    #      errors
     if "NixOS" in platform.version():
-        if sys.version_info[0] == 2:
-            ia.warn("Detected usage of python 2 in NixOS. This can "
-                    "potentially lead to endlessly hanging programs when "
-                    "also making use of multicore augmentation (aka "
-                    "background augmentation). Use python 3 to prevent "
-                    "this.")
-        else:
-            multiprocessing.set_start_method("spawn")
+        method = "spawn"
+        if get_context_unsupported:
+            ia.warn("Detected usage of imgaug.multicore in python <=3.4 "
+                    "and NixOS. This is known to sometimes cause endlessly "
+                    "hanging programs when also making use of multicore "
+                    "augmentation (aka background augmentation). Use "
+                    "python 3.5 or later to prevent this.")
+
+    if get_context_unsupported:
+        return False
+    return method
 
 
-_switch_to_spawn_if_nixos()
+def _set_context(method):
+    # method=False indicates that multiprocessing module (i.e. no context)
+    # should be used, e.g. because get_context() is not supported
+    globals()["_CONTEXT"] = (
+        multiprocessing if method is False
+        else multiprocessing.get_context(method))
+
+
+def _reset_context():
+    globals()["_CONTEXT"] = None
+
+
+def _autoset_context():
+    _set_context(_get_context_method())
+
+
+def _get_context():
+    if _CONTEXT is None:
+        _autoset_context()
+    return _CONTEXT
 
 
 class Pool(object):
@@ -54,7 +89,7 @@ class Pool(object):
 
     Parameters
     ----------
-    augseq : imgaug.meta.Augmenter
+    augseq : imgaug.augmenters.meta.Augmenter
         The augmentation sequence to apply to batches.
 
     processes : None or int, optional
@@ -160,7 +195,7 @@ class Pool(object):
                 # TODO make this also check if os.cpu_count exists as a
                 #      fallback
                 try:
-                    processes = multiprocessing.cpu_count() - abs(processes)
+                    processes = _get_context().cpu_count() - abs(processes)
                     processes = max(processes, 1)
                 except (ImportError, NotImplementedError):
                     ia.warn(
@@ -170,7 +205,7 @@ class Pool(object):
                         "intended.")
                     processes = None
 
-            self._pool = multiprocessing.Pool(
+            self._pool = _get_context().Pool(
                 processes,
                 initializer=_Pool_initialize_worker,
                 initargs=(self.augseq, self.seed),
@@ -386,8 +421,8 @@ class Pool(object):
         Wait for the workers to exit.
 
         This may only be called after first calling
-        :func:`imgaug.multicore.Pool.close` or
-        :func:`imgaug.multicore.Pool.terminate`.
+        :func:`~imgaug.multicore.Pool.close` or
+        :func:`~imgaug.multicore.Pool.terminate`.
 
         """
         if self._pool is not None:
@@ -419,7 +454,7 @@ def _create_output_buffer_left(output_buffer_size):
         assert output_buffer_size > 0, (
             "Expected buffer size to be greater than zero, but got size %d "
             "instead." % (output_buffer_size,))
-        output_buffer_left = multiprocessing.Semaphore(output_buffer_size)
+        output_buffer_left = _get_context().Semaphore(output_buffer_size)
     return output_buffer_left
 
 
@@ -427,12 +462,19 @@ def _create_output_buffer_left(output_buffer_size):
 # leads to pickle errors.
 def _Pool_initialize_worker(augseq, seed_start):
     # pylint: disable=invalid-name, protected-access
+
+    # Not using this seems to have caused infinite hanging in the case
+    # of gaussian blur on at least MacOSX.
+    # It is also in most cases probably not sensible to use multiple
+    # threads while already running augmentation in multiple processes.
+    cv2.setNumThreads(0)
+
     if seed_start is None:
         # pylint falsely thinks in older versions that
         # multiprocessing.current_process() was not callable, see
         # https://github.com/PyCQA/pylint/issues/1699
         # pylint: disable=not-callable
-        process_name = multiprocessing.current_process().name
+        process_name = _get_context().current_process().name
         # pylint: enable=not-callable
 
         # time_ns() exists only in 3.7+
@@ -471,7 +513,7 @@ def _Pool_worker(batch_idx, batch):
     if Pool._WORKER_SEED_START is not None:
         seed = Pool._WORKER_SEED_START + batch_idx
         _reseed_global_local(seed, augseq)
-    result = augseq.augment_batch(batch)
+    result = augseq.augment_batch_(batch)
     return result
 
 
@@ -837,7 +879,7 @@ class BackgroundAugmenter(object):
                     # loading queue is finished
                     queue_source.put(pickle.dumps(None, protocol=-1))
                 else:
-                    batch_aug = augseq.augment_batch(batch)
+                    batch_aug = augseq.augment_batch_(batch)
 
                     # send augmented batch to output queue
                     batch_str = pickle.dumps(batch_aug, protocol=-1)

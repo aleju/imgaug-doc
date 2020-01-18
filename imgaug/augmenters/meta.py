@@ -2,31 +2,22 @@
 Augmenters that don't apply augmentations themselves, but are needed
 for meta usage.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([...])
-
 List of augmenters:
 
-    * Augmenter (base class for all augmenters)
-    * Sequential
-    * SomeOf
-    * OneOf
-    * Sometimes
-    * WithChannels
-    * Identity
-    * Noop
-    * Lambda
-    * AssertLambda
-    * AssertShape
-    * ChannelShuffle
+    * :class:`Augmenter` (base class for all augmenters)
+    * :class:`Sequential`
+    * :class:`SomeOf`
+    * :class:`OneOf`
+    * :class:`Sometimes`
+    * :class:`WithChannels`
+    * :class:`Identity`
+    * :class:`Noop`
+    * :class:`Lambda`
+    * :class:`AssertLambda`
+    * :class:`AssertShape`
+    * :class:`ChannelShuffle`
 
-Note: WithColorspace is in ``color.py``.
+Note: :class:`~imgaug.augmenters.color.WithColorspace` is in ``color.py``.
 
 """
 from __future__ import print_function, division, absolute_import
@@ -235,6 +226,37 @@ class Augmenter(object):
 
     Parameters
     ----------
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Seed to use for this augmenter's random number generator (RNG) or
+        alternatively an RNG itself. Setting this parameter allows to
+        control/influence the random number sampling of this specific
+        augmenter without affecting other augmenters. Usually, there is no
+        need to set this parameter.
+
+            * If ``None``: The global RNG is used (shared by all
+              augmenters).
+            * If ``int``: The value will be used as a seed for a new
+              :class:`~imgaug.random.RNG` instance.
+            * If :class:`~imgaug.random.RNG`: The ``RNG`` instance will be
+              used without changes.
+            * If :class:`~imgaug.random.Generator`: A new
+              :class:`~imgaug.random.RNG` instance will be
+              created, containing that generator.
+            * If :class:`~imgaug.random.bit_generator.BitGenerator`: Will
+              be wrapped in a :class:`~imgaug.random.Generator`. Then
+              similar behaviour to :class:`~imgaug.random.Generator`
+              parameters.
+            * If :class:`~imgaug.random.SeedSequence`: Will
+              be wrapped in a new bit generator and
+              :class:`~imgaug.random.Generator`. Then
+              similar behaviour to :class:`~imgaug.random.Generator`
+              parameters.
+            * If :class:`~imgaug.random.RandomState`: Similar behaviour to
+              :class:`~imgaug.random.Generator`. Outdated in numpy 1.17+.
+
+        If a new bit generator has to be created, it will be an instance
+        of :class:`numpy.random.SFC64`.
+
     name : None or str, optional
         Name given to the Augmenter instance. This name is used when
         converting the instance to a string, e.g. for ``print`` statements.
@@ -255,43 +277,22 @@ class Augmenter(object):
         corresponding data (e.g. keypoints or segmentation maps) on these
         images. Usually, there is no need to set this variable by hand.
         Instead, instantiate the augmenter and then use
-        :func:`imgaug.augmenters.Augmenter.to_deterministic`.
+        :func:`~imgaug.augmenters.Augmenter.to_deterministic`.
 
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        The RNG (random number generator) to use for this augmenter.
-        Setting this parameter allows to control/influence the random
-        number sampling of the augmenter. Usually, there is no need to
-        set this parameter.
-
-            * If ``None``: The global RNG is used (shared by all
-              augmenters).
-            * If ``int``: The value will be used as a seed for a new
-              :class:`imgaug.random.RNG` instance.
-            * If :class:`imgaug.random.RNG`: The ``RNG`` instance will be
-              used without changes.
-            * If :class:`imgaug.random.Generator`: A new
-              :class:`imgaug.random.RNG` instance will be
-              created, containing that generator.
-            * If :class:`imgaug.random.bit_generator.BitGenerator`: Will
-              be wrapped in a :class:`imgaug.random.Generator`. Then
-              similar behaviour to :class:`imgaug.random.Generator`
-              parameters.
-            * If :class:`imgaug.random.SeedSequence`: Will
-              be wrapped in a new bit generator and
-              :class:`imgaug.random.Generator`. Then
-              similar behaviour to :class:`imgaug.random.Generator`
-              parameters.
-            * If :class:`imgaug.random.RandomState`: Similar behaviour to
-              :class:`imgaug.random.Generator`. Outdated in numpy 1.17+.
-
-        If a new bit generator has to be created, it will be an instance
-        of :class:`numpy.random.SFC64`.
+    **old_kwargs
+        Catch-all for deprecated parameters that should not be used anymore.
 
     """
 
-    def __init__(self, name=None, deterministic=False, random_state=None):
+    def __init__(self, seed=None, name=None, **old_kwargs):
         """Create a new Augmenter instance."""
         super(Augmenter, self).__init__()
+
+        valid_old_kwargs = {"random_state", "deterministic"}
+        for key in old_kwargs:
+            assert key in valid_old_kwargs, (
+                "Got an unknown parameter `%s` in "
+                "`imgaug.augmenters.meta.Augmenter`." % (key,))
 
         assert name is None or ia.is_string(name), (
             "Expected name to be None or string-like, got %s." % (
@@ -301,19 +302,32 @@ class Augmenter(object):
         else:
             self.name = name
 
+        deterministic = False
+        if "deterministic" in old_kwargs:
+            ia.warn_deprecated(
+                "The parameter `deterministic` is deprecated "
+                "in `imgaug.augmenters.meta.Augmenter`. Use "
+                "`.to_deterministic()` to switch into deterministic mode.",
+                stacklevel=4)
+            deterministic = old_kwargs["deterministic"]
+
         assert ia.is_single_bool(deterministic), (
             "Expected deterministic to be a boolean, got %s." % (
                 type(deterministic),))
         self.deterministic = deterministic
 
-        if deterministic and random_state is None:
+        if "random_state" in old_kwargs:
+            assert seed is None, "Cannot set both `seed` and `random_state`."
+            seed = old_kwargs["random_state"]
+
+        if deterministic and seed is None:
             # Usually if None is provided, the global RNG will be used.
             # In case of deterministic mode we most likely rather want a local
             # RNG, which is here created.
             self.random_state = iarandom.RNG.create_pseudo_random_()
         else:
             # self.random_state = iarandom.normalize_rng_(random_state)
-            self.random_state = iarandom.RNG(random_state)
+            self.random_state = iarandom.RNG(seed)
 
         self.activated = True
 
@@ -326,7 +340,7 @@ class Augmenter(object):
 
         This method also also supports augmentation on multiple cpu cores,
         activated via the `background` flag. If the `background` flag
-        is activated, an instance of :class:`imgaug.multicore.Pool` will
+        is activated, an instance of :class:`~imgaug.multicore.Pool` will
         be spawned using all available logical CPU cores and an
         ``output_buffer_size`` of ``C*10``, where ``C`` is the number of
         logical CPU cores. I.e. a maximum of ``C*10`` batches will be somewhere
@@ -484,7 +498,7 @@ class Augmenter(object):
 
             for idx, batch in enumerate(batches):
                 batch_normalized, batch_orig_dt = _normalize_batch(idx, batch)
-                batch_normalized = self.augment_batch(
+                batch_normalized = self.augment_batch_(
                     batch_normalized, hooks=hooks)
                 batch_unnormalized = _unnormalize_batch(
                     batch_normalized, batch, batch_orig_dt)
@@ -520,14 +534,40 @@ class Augmenter(object):
                     del id_to_batch_orig[idx]
                     yield batch_unnormalized
 
-    def augment_batch(self, batch, parents=None, hooks=None):
+    # we deprecate here so that users switch to `augment_batch_()` and in the
+    # future we can add a `parents` parameter here without having to consider
+    # that a breaking change
+    @ia.deprecated("augment_batch_()",
+                   comment="`augment_batch()` was renamed to "
+                           "`augment_batch_()` as it changes all `*_unaug` "
+                           "attributes of batches in-place. Note that "
+                           "`augment_batch_()` has now a `parents` parameter. "
+                           "Calls of the style `augment_batch(batch, hooks)` "
+                           "must be changed to "
+                           "`augment_batch(batch, hooks=hooks)`.")
+    def augment_batch(self, batch, hooks=None):
+        """Augment a single batch."""
+        # We call augment_batch_() directly here without copy, because this
+        # method never copies. Would make sense to add a copy here if the
+        # method is un-deprecated at some point.
+        return self.augment_batch_(batch, hooks=hooks)
+
+    # TODO add more tests
+    def augment_batch_(self, batch, parents=None, hooks=None):
         """
-        Augment a single batch.
+        Augment a single batch in-place.
 
         Parameters
         ----------
         batch : imgaug.augmentables.batches.Batch or imgaug.augmentables.batches.UnnormalizedBatch or imgaug.augmentables.batch.BatchInAugmentation
             A single batch to augment.
+
+            If :class:`imgaug.augmentables.batches.UnnormalizedBatch`
+            or :class:`imgaug.augmentables.batches.Batch`, then the ``*_aug``
+            attributes may be modified in-place, while the ``*_unaug``
+            attributes will not be modified.
+            If :class:`imgaug.augmentables.batches.BatchInAugmentation`,
+            then all attributes may be modified in-place.
 
         parents : None or list of imgaug.augmenters.Augmenter, optional
             Parent augmenters that have previously been called before the
@@ -592,14 +632,14 @@ class Augmenter(object):
                     set_to_none.append(column)
                     setattr(batch_inaug, column.attr_name, None)
 
-        # If _augment_batch() follows legacy-style and ends up calling
+        # If _augment_batch_() follows legacy-style and ends up calling
         # _augment_images() and similar methods, we don't need the
         # deterministic context here. But if there is a custom implementation
-        # of _augment_batch(), then we should have this here. It causes very
+        # of _augment_batch_(), then we should have this here. It causes very
         # little overhead.
         with _maybe_deterministic_ctx(self):
             if not batch_inaug.empty:
-                batch_inaug = self._augment_batch(
+                batch_inaug = self._augment_batch_(
                     batch_inaug,
                     random_state=self.random_state,
                     parents=parents if parents is not None else [],
@@ -611,7 +651,7 @@ class Augmenter(object):
 
         # hooks postprocess
         if hooks is not None:
-            # refresh as contents may have been changed in _augment_batch()
+            # refresh as contents may have been changed in _augment_batch_()
             columns = batch_inaug.columns
 
             for column in columns:
@@ -620,10 +660,9 @@ class Augmenter(object):
                 setattr(batch_inaug, column.attr_name, augm_value)
 
         if batch_unnorm is not None:
-            # TODO make fill_from_augmented_normalized_batch inplace
             batch_norm = batch_norm.fill_from_batch_in_augmentation_(
                 batch_inaug)
-            batch_unnorm = batch_unnorm.fill_from_augmented_normalized_batch(
+            batch_unnorm = batch_unnorm.fill_from_augmented_normalized_batch_(
                 batch_norm)
             return batch_unnorm
         if batch_norm is not None:
@@ -632,11 +671,11 @@ class Augmenter(object):
             return batch_norm
         return batch_inaug
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
-        """Augment a batch in-place.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        """Augment a single batch in-place.
 
-        This is the internal version of :func:`Augmenter.augment_batch`.
-        It is called from :func:`Augmenter.augment_batch` and should usually
+        This is the internal version of :func:`Augmenter.augment_batch_`.
+        It is called from :func:`Augmenter.augment_batch_` and should usually
         not be called directly.
         This method may transform the batches in-place.
         This method does not have to care about determinism or the
@@ -653,10 +692,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_batch`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_batch_`.
 
         hooks : imgaug.imgaug.HooksImages or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_batch`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_batch_`.
 
         Returns
         ----------
@@ -664,6 +703,12 @@ class Augmenter(object):
             The augmented batch.
 
         """
+        # The code below covers the case of older augmenters that still have
+        # _augment_images(), _augment_keypoints(), ... methods that augment
+        # each input type on its own (including re-sampling from random
+        # variables). The code block can be safely overwritten by a method
+        # augmenting a whole batch of data in one step.
+
         columns = batch.columns
         multiple_columns = len(columns) > 1
 
@@ -742,7 +787,7 @@ class Augmenter(object):
             ``None``. It is set automatically for child augmenters.
 
         hooks : None or imgaug.imgaug.HooksImages, optional
-            :class:`imgaug.imgaug.HooksImages` object to dynamically
+            :class:`~imgaug.imgaug.HooksImages` object to dynamically
             interfere with the augmentation process.
 
         Returns
@@ -779,7 +824,7 @@ class Augmenter(object):
                     "augment_images([image]), otherwise you will not get "
                     "the expected augmentations." % (images.shape,))
 
-        return self.augment_batch(
+        return self.augment_batch_(
             UnnormalizedBatch(images=images),
             parents=parents,
             hooks=hooks
@@ -800,7 +845,7 @@ class Augmenter(object):
         .. note::
 
             This method exists mostly for legacy-support.
-            Overwriting :func:`imgaug.augmenters.meta.Augmenter._augment_batch`
+            Overwriting :func:`~imgaug.augmenters.meta.Augmenter._augment_batch`
             is now the preferred way of implementing custom augmentation
             routines.
 
@@ -820,10 +865,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_images`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_images`.
 
         hooks : imgaug.imgaug.HooksImages or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_images`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_images`.
 
         Returns
         ----------
@@ -849,7 +894,7 @@ class Augmenter(object):
             It is set automatically for child augmenters.
 
         hooks : None or imaug.imgaug.HooksHeatmaps, optional
-            :class:`imgaug.imgaug.HooksHeatmaps` object to dynamically
+            :class:`~imgaug.imgaug.HooksHeatmaps` object to dynamically
             interfere with the augmentation process.
 
         Returns
@@ -858,7 +903,7 @@ class Augmenter(object):
             Corresponding augmented heatmap(s).
 
         """
-        return self.augment_batch(
+        return self.augment_batch_(
             UnnormalizedBatch(heatmaps=heatmaps), parents=parents, hooks=hooks
         ).heatmaps_aug
 
@@ -876,7 +921,7 @@ class Augmenter(object):
         .. note::
 
             This method exists mostly for legacy-support.
-            Overwriting :func:`imgaug.augmenters.meta.Augmenter._augment_batch`
+            Overwriting :func:`~imgaug.augmenters.meta.Augmenter._augment_batch`
             is now the preferred way of implementing custom augmentation
             routines.
 
@@ -886,10 +931,10 @@ class Augmenter(object):
             Heatmaps to augment. They may be changed in-place.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_heatmaps`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_heatmaps`.
 
         hooks : imgaug.imgaug.HooksHeatmaps or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_heatmaps`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_heatmaps`.
 
         Returns
         ----------
@@ -914,7 +959,7 @@ class Augmenter(object):
             ``None``. It is set automatically for child augmenters.
 
         hooks : None or imgaug.HooksHeatmaps, optional
-            :class:`imgaug.imgaug.HooksHeatmaps` object to dynamically
+            :class:`~imgaug.imgaug.HooksHeatmaps` object to dynamically
             interfere with the augmentation process.
 
         Returns
@@ -923,7 +968,7 @@ class Augmenter(object):
             Corresponding augmented segmentation map(s).
 
         """
-        return self.augment_batch(
+        return self.augment_batch_(
             UnnormalizedBatch(segmentation_maps=segmaps),
             parents=parents,
             hooks=hooks
@@ -944,7 +989,7 @@ class Augmenter(object):
         .. note::
 
             This method exists mostly for legacy-support.
-            Overwriting :func:`imgaug.augmenters.meta.Augmenter._augment_batch`
+            Overwriting :func:`~imgaug.augmenters.meta.Augmenter._augment_batch`
             is now the preferred way of implementing custom augmentation
             routines.
 
@@ -955,11 +1000,11 @@ class Augmenter(object):
 
         parents : list of imgaug.augmenters.meta.Augmenter
             See
-            :func:`imgaug.augmenters.meta.Augmenter.augment_segmentation_maps`.
+            :func:`~imgaug.augmenters.meta.Augmenter.augment_segmentation_maps`.
 
         hooks : imgaug.imgaug.HooksHeatmaps or None
             See
-            :func:`imgaug.augmenters.meta.Augmenter.augment_segmentation_maps`.
+            :func:`~imgaug.augmenters.meta.Augmenter.augment_segmentation_maps`.
 
         Returns
         ----------
@@ -1009,7 +1054,7 @@ class Augmenter(object):
         keypoints_on_images : imgaug.augmentables.kps.KeypointsOnImage or list of imgaug.augmentables.kps.KeypointsOnImage
             The keypoints/landmarks to augment.
             Either a single instance of
-            :class:`imgaug.augmentables.kps.KeypointsOnImage` or a list of
+            :class:`~imgaug.augmentables.kps.KeypointsOnImage` or a list of
             such instances. Each instance must contain the keypoints of a
             single image.
 
@@ -1019,7 +1064,7 @@ class Augmenter(object):
             ``None``. It is set automatically for child augmenters.
 
         hooks : None or imgaug.imgaug.HooksKeypoints, optional
-            :class:`imgaug.imgaug.HooksKeypoints` object to dynamically
+            :class:`~imgaug.imgaug.HooksKeypoints` object to dynamically
             interfere with the augmentation process.
 
         Returns
@@ -1028,7 +1073,7 @@ class Augmenter(object):
             Augmented keypoints.
 
         """
-        return self.augment_batch(
+        return self.augment_batch_(
             UnnormalizedBatch(keypoints=keypoints_on_images),
             parents=parents,
             hooks=hooks
@@ -1049,7 +1094,7 @@ class Augmenter(object):
         .. note::
 
             This method exists mostly for legacy-support.
-            Overwriting :func:`imgaug.augmenters.meta.Augmenter._augment_batch`
+            Overwriting :func:`~imgaug.augmenters.meta.Augmenter._augment_batch`
             is now the preferred way of implementing custom augmentation
             routines.
 
@@ -1062,10 +1107,10 @@ class Augmenter(object):
             The random state to use for all sampling tasks during the augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_keypoints`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_keypoints`.
 
         hooks : imgaug.imgaug.HooksKeypoints or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_keypoints`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_keypoints`.
 
         Returns
         ----------
@@ -1118,7 +1163,7 @@ class Augmenter(object):
         bounding_boxes_on_images : imgaug.augmentables.bbs.BoundingBoxesOnImage or list of imgaug.augmentables.bbs.BoundingBoxesOnImage
             The bounding boxes to augment.
             Either a single instance of
-            :class:`imgaug.augmentables.bbs.BoundingBoxesOnImage` or a list of
+            :class:`~imgaug.augmentables.bbs.BoundingBoxesOnImage` or a list of
             such instances, with each one of them containing the bounding
             boxes of a single image.
 
@@ -1128,7 +1173,7 @@ class Augmenter(object):
             ``None``. It is set automatically for child augmenters.
 
         hooks : None or imgaug.imgaug.HooksKeypoints, optional
-            :class:`imgaug.imgaug.HooksKeypoints` object to dynamically
+            :class:`~imgaug.imgaug.HooksKeypoints` object to dynamically
             interfere with the augmentation process.
 
         Returns
@@ -1137,7 +1182,7 @@ class Augmenter(object):
             Augmented bounding boxes.
 
         """
-        return self.augment_batch(
+        return self.augment_batch_(
             UnnormalizedBatch(bounding_boxes=bounding_boxes_on_images),
             parents=parents,
             hooks=hooks
@@ -1184,7 +1229,7 @@ class Augmenter(object):
         polygons_on_images : imgaug.augmentables.polys.PolygonsOnImage or list of imgaug.augmentables.polys.PolygonsOnImage
             The polygons to augment.
             Either a single instance of
-            :class:`imgaug.augmentables.polys.PolygonsOnImage` or a list of
+            :class:`~imgaug.augmentables.polys.PolygonsOnImage` or a list of
             such instances, with each one of them containing the polygons of
             a single image.
 
@@ -1194,7 +1239,7 @@ class Augmenter(object):
             ``None``. It is set automatically for child augmenters.
 
         hooks : None or imgaug.imgaug.HooksKeypoints, optional
-            :class:`imgaug.imgaug.HooksKeypoints` object to dynamically
+            :class:`~imgaug.imgaug.HooksKeypoints` object to dynamically
             interfere with the augmentation process.
 
         Returns
@@ -1203,7 +1248,7 @@ class Augmenter(object):
             Augmented polygons.
 
         """
-        return self.augment_batch(
+        return self.augment_batch_(
             UnnormalizedBatch(polygons=polygons_on_images),
             parents=parents,
             hooks=hooks
@@ -1253,7 +1298,7 @@ class Augmenter(object):
         line_strings_on_images : imgaug.augmentables.lines.LineStringsOnImage or list of imgaug.augmentables.lines.LineStringsOnImage
             The line strings to augment.
             Either a single instance of
-            :class:`imgaug.augmentables.lines.LineStringsOnImage` or a list of
+            :class:`~imgaug.augmentables.lines.LineStringsOnImage` or a list of
             such instances, with each one of them containing the line strings
             of a single image.
 
@@ -1263,7 +1308,7 @@ class Augmenter(object):
             It is set automatically for child augmenters.
 
         hooks : None or imgaug.imgaug.HooksKeypoints, optional
-            :class:`imgaug.imgaug.HooksKeypoints` object to dynamically
+            :class:`~imgaug.imgaug.HooksKeypoints` object to dynamically
             interfere with the augmentation process.
 
         Returns
@@ -1272,7 +1317,7 @@ class Augmenter(object):
             Augmented line strings.
 
         """
-        return self.augment_batch(
+        return self.augment_batch_(
             UnnormalizedBatch(line_strings=line_strings_on_images),
             parents=parents,
             hooks=hooks
@@ -1294,7 +1339,7 @@ class Augmenter(object):
         .. note::
 
             This method exists mostly for legacy-support.
-            Overwriting :func:`imgaug.augmenters.meta.Augmenter._augment_batch`
+            Overwriting :func:`~imgaug.augmenters.meta.Augmenter._augment_batch`
             is now the preferred way of implementing custom augmentation
             routines.
 
@@ -1308,10 +1353,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_bounding_boxes`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_bounding_boxes`.
 
         hooks : imgaug.imgaug.HooksKeypoints or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_bounding_boxes`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_bounding_boxes`.
 
         Returns
         -------
@@ -1336,7 +1381,7 @@ class Augmenter(object):
         .. note::
 
             This method exists mostly for legacy-support.
-            Overwriting :func:`imgaug.augmenters.meta.Augmenter._augment_batch`
+            Overwriting :func:`~imgaug.augmenters.meta.Augmenter._augment_batch`
             is now the preferred way of implementing custom augmentation
             routines.
 
@@ -1350,10 +1395,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_polygons`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_polygons`.
 
         hooks : imgaug.imgaug.HooksKeypoints or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_polygons`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_polygons`.
 
         Returns
         -------
@@ -1379,7 +1424,7 @@ class Augmenter(object):
         .. note::
 
             This method exists mostly for legacy-support.
-            Overwriting :func:`imgaug.augmenters.meta.Augmenter._augment_batch`
+            Overwriting :func:`~imgaug.augmenters.meta.Augmenter._augment_batch`
             is now the preferred way of implementing custom augmentation
             routines.
 
@@ -1393,10 +1438,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_line_strings`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_line_strings`.
 
         hooks : imgaug.imgaug.HooksKeypoints or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_line_strings`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_line_strings`.
 
         Returns
         -------
@@ -1421,10 +1466,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_polygons`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_polygons`.
 
         hooks : imgaug.imgaug.HooksKeypoints or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_polygons`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_polygons`.
 
         Returns
         -------
@@ -1445,7 +1490,7 @@ class Augmenter(object):
         .. warning::
 
             This method calls
-            :func:`imgaug.augmenters.meta.Augmenter._augment_keypoints` and
+            :func:`~imgaug.augmenters.meta.Augmenter._augment_keypoints` and
             expects it to do keypoint augmentation. The default for that
             method is to do nothing. It must therefore be overwritten,
             otherwise the polygon augmentation will also do nothing.
@@ -1460,10 +1505,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_polygons`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_polygons`.
 
         hooks : imgaug.imgaug.HooksKeypoints or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_polygons`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_polygons`.
 
         recoverer : None or imgaug.augmentables.polys._ConcavePolygonRecoverer
             An instance used to repair invalid polygons after augmentation.
@@ -1500,10 +1545,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_polygons`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_polygons`.
 
         hooks : imgaug.imgaug.HooksKeypoints or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_polygons`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_polygons`.
 
         Returns
         -------
@@ -1532,10 +1577,10 @@ class Augmenter(object):
             augmentation.
 
         parents : list of imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_batch`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_batch`.
 
         hooks : imgaug.imgaug.HooksKeypoints or None
-            See :func:`imgaug.augmenters.meta.Augmenter.augment_batch`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.augment_batch`.
 
         Returns
         -------
@@ -1562,7 +1607,7 @@ class Augmenter(object):
 
         func : callable
             The function to apply. Receives a list of
-            :class:`imgaug.augmentables.kps.KeypointsOnImage` instances as its
+            :class:`~imgaug.augmentables.kps.KeypointsOnImage` instances as its
             only parameter.
 
         recoverer : None or imgaug.augmentables.polys._ConcavePolygonRecoverer
@@ -1620,7 +1665,7 @@ class Augmenter(object):
 
         func : callable
             The function to apply. Receives a list of
-            :class:`imgaug.augmentables.kps.KeypointsOnImage` instances as its
+            :class:`~imgaug.augmentables.kps.KeypointsOnImage` instances as its
             only parameter.
 
         Returns
@@ -1640,10 +1685,10 @@ class Augmenter(object):
         """Augment a batch.
 
         This method is a wrapper around
-        :class:`imgaug.augmentables.batches.UnnormalizedBatch` and
-        :func:`imgaug.augmenters.meta.Augmenter.augment_batch`. Hence, it
+        :class:`~imgaug.augmentables.batches.UnnormalizedBatch` and
+        :func:`~imgaug.augmenters.meta.Augmenter.augment_batch`. Hence, it
         supports the same datatypes as
-        :class:`imgaug.augmentables.batches.UnnormalizedBatch`.
+        :class:`~imgaug.augmentables.batches.UnnormalizedBatch`.
 
         If `return_batch` was set to ``False`` (the default), the method will
         return a tuple of augmentables. It will return the same types of
@@ -1670,7 +1715,7 @@ class Augmenter(object):
               tuple of images and something (like images + segmentation maps).
 
         If `return_batch` was set to ``True``, an instance of
-        :class:`imgaug.augmentables.batches.UnnormalizedBatch` will be
+        :class:`~imgaug.augmentables.batches.UnnormalizedBatch` will be
         returned. The output is the same for all python version and any
         number or combination of augmentables may be provided.
 
@@ -1700,7 +1745,7 @@ class Augmenter(object):
         heatmaps : None or (N,H,W,C) ndarray or imgaug.augmentables.heatmaps.HeatmapsOnImage or iterable of (H,W,C) ndarray or iterable of imgaug.augmentables.heatmaps.HeatmapsOnImage, optional
             The heatmaps to augment.
             If anything else than
-            :class:`imgaug.augmentables.heatmaps.HeatmapsOnImage`, then the
+            :class:`~imgaug.augmentables.heatmaps.HeatmapsOnImage`, then the
             number of heatmaps must match the number of images provided via
             parameter `images`. The number is contained either in ``N`` or the
             first iterable's size.
@@ -1708,7 +1753,7 @@ class Augmenter(object):
         segmentation_maps : None or (N,H,W) ndarray or imgaug.augmentables.segmaps.SegmentationMapsOnImage or iterable of (H,W) ndarray or iterable of imgaug.augmentables.segmaps.SegmentationMapsOnImage, optional
             The segmentation maps to augment.
             If anything else than
-            :class:`imgaug.augmentables.segmaps.SegmentationMapsOnImage`, then
+            :class:`~imgaug.augmentables.segmaps.SegmentationMapsOnImage`, then
             the number of segmaps must match the number of images provided via
             parameter `images`. The number is contained either in ``N`` or the
             first iterable's size.
@@ -1720,12 +1765,12 @@ class Augmenter(object):
             A single tuple represents a single coordinate on one image, an
             iterable of tuples the coordinates on one image and an iterable of
             iterable of tuples the coordinates on several images. Analogous if
-            :class:`imgaug.augmentables.kps.Keypoint` instances are used
+            :class:`~imgaug.augmentables.kps.Keypoint` instances are used
             instead of tuples.
             If an ndarray, then ``N`` denotes the number of images and ``K``
             the number of keypoints on each image.
             If anything else than
-            :class:`imgaug.augmentables.kps.KeypointsOnImage` is provided, then
+            :class:`~imgaug.augmentables.kps.KeypointsOnImage` is provided, then
             the number of keypoint groups must match the number of images
             provided via parameter `images`. The number is contained e.g. in
             ``N`` or in case of "iterable of iterable of tuples" in the first
@@ -1774,7 +1819,7 @@ class Augmenter(object):
 
         return_batch : bool, optional
             Whether to return an instance of
-            :class:`imgaug.augmentables.batches.UnnormalizedBatch`. If the
+            :class:`~imgaug.augmentables.batches.UnnormalizedBatch`. If the
             python version is below 3.6 and more than two augmentables were
             provided (e.g. images, keypoints and polygons), then this must be
             set to ``True``. Otherwise an error will be raised.
@@ -1811,8 +1856,9 @@ class Augmenter(object):
         between image and keypoints. Note that in python <3.6, augmented
         images will always be returned first, independent of the order of
         the named input arguments. So
-        ``kps_aug, imgs_aug = aug.augment(keypoints=keypoints, image=image)``
-        would **not** be correct (but in python 3.6+ it would be).
+        ``keypoints_aug, images_aug = aug.augment(keypoints=keypoints,
+        image=image)`` would **not** be correct (but in python 3.6+ it would
+        be).
 
         >>> import numpy as np
         >>> import imgaug as ia
@@ -1839,7 +1885,7 @@ class Augmenter(object):
         rotations between ``-25`` deg and ``+25`` deg to them. The rotation
         values are sampled by image and aligned between all augmentables on
         the same image. The method finally returns an instance of
-        :class:`imgaug.augmentables.batches.UnnormalizedBatch` from which the
+        :class:`~imgaug.augmentables.batches.UnnormalizedBatch` from which the
         augmented data can be retrieved via ``batch_aug.images_aug``,
         ``batch_aug.keypoints_aug``, and ``batch_aug.bounding_boxes_aug``.
         In python 3.6+, `return_batch` can be kept at ``False`` and the
@@ -1923,7 +1969,7 @@ class Augmenter(object):
             line_strings=kwargs.get("line_strings", None)
         )
 
-        batch_aug = self.augment_batch(batch, hooks=hooks)
+        batch_aug = self.augment_batch_(batch, hooks=hooks)
 
         # return either batch or tuple of augmentables, depending on what
         # was requested by user
@@ -1951,7 +1997,7 @@ class Augmenter(object):
         return tuple(result)
 
     def __call__(self, *args, **kwargs):
-        """Alias for :func:`imgaug.augmenters.meta.Augmenter.augment`."""
+        """Alias for :func:`~imgaug.augmenters.meta.Augmenter.augment`."""
         return self.augment(*args, **kwargs)
 
     def pool(self, processes=None, maxtasksperchild=None, seed=None):
@@ -1960,7 +2006,7 @@ class Augmenter(object):
         Parameters
         ----------
         processes : None or int, optional
-            Same as in :func:`imgaug.multicore.Pool.__init__`.
+            Same as in :func:`~imgaug.multicore.Pool.__init__`.
             The number of background workers. If ``None``, the number of the
             machine's CPU cores will be used (this counts hyperthreads as CPU
             cores). If this is set to a negative value ``p``, then
@@ -1969,13 +2015,13 @@ class Augmenter(object):
             to e.g. reserve one core to feed batches to the GPU).
 
         maxtasksperchild : None or int, optional
-            Same as for :func:`imgaug.multicore.Pool.__init__`.
+            Same as for :func:`~imgaug.multicore.Pool.__init__`.
             The number of tasks done per worker process before the process
             is killed and restarted. If ``None``, worker processes will not
             be automatically restarted.
 
         seed : None or int, optional
-            Same as for :func:`imgaug.multicore.Pool.__init__`.
+            Same as for :func:`~imgaug.multicore.Pool.__init__`.
             The seed to use for child processes. If ``None``, a random seed
             will be used.
 
@@ -2137,7 +2183,7 @@ class Augmenter(object):
     def show_grid(self, images, rows, cols):
         """Augment images and plot the results as a single grid-like image.
 
-        This calls :func:`imgaug.augmenters.meta.Augmenter.draw_grid` and
+        This calls :func:`~imgaug.augmenters.meta.Augmenter.draw_grid` and
         simply shows the results. See that method for details.
 
         Parameters
@@ -2183,10 +2229,10 @@ class Augmenter(object):
         ----------
         n : None or int, optional
             Number of deterministic augmenters to return.
-            If ``None`` then only one :class:`imgaug.augmenters.meta.Augmenter`
+            If ``None`` then only one :class:`~imgaug.augmenters.meta.Augmenter`
             instance will be returned.
             If ``1`` or higher, a list containing ``n``
-            :class:`imgaug.augmenters.meta.Augmenter` instances will be
+            :class:`~imgaug.augmenters.meta.Augmenter` instances will be
             returned.
 
         Returns
@@ -2206,9 +2252,9 @@ class Augmenter(object):
         """Convert this augmenter from a stochastic to a deterministic one.
 
         Augmenter-specific implementation of
-        :func:`imgaug.augmenters.meta.to_deterministic`. This function is
+        :func:`~imgaug.augmenters.meta.to_deterministic`. This function is
         expected to return a single new deterministic
-        :class:`imgaug.augmenters.meta.Augmenter` instance of this augmenter.
+        :class:`~imgaug.augmenters.meta.Augmenter` instance of this augmenter.
 
         Returns
         -------
@@ -2235,7 +2281,7 @@ class Augmenter(object):
 
     @ia.deprecated("imgaug.augmenters.meta.Augmenter.seed_")
     def reseed(self, random_state=None, deterministic_too=False):
-        """Old name of :func:`imgaug.augmenters.meta.Augmenter.seed_`."""
+        """Old name of :func:`~imgaug.augmenters.meta.Augmenter.seed_`."""
         self.seed_(entropy=random_state, deterministic_too=deterministic_too)
 
     # TODO mark this as in-place
@@ -2252,13 +2298,13 @@ class Augmenter(object):
         If this augmenter or any child augmenter had a random number generator
         that pointed to the global random state, it will automatically be
         replaced with a local random state. This is similar to what
-        :func:`imgaug.augmenters.meta.Augmenter.localize_random_state`
+        :func:`~imgaug.augmenters.meta.Augmenter.localize_random_state`
         does.
 
         This method is useful when augmentations are run in the
         background (i.e. on multiple cores).
         It should be called before sending this
-        :class:`imgaug.augmenters.meta.Augmenter` instance to a
+        :class:`~imgaug.augmenters.meta.Augmenter` instance to a
         background worker or once within each worker with different seeds
         (i.e., if ``N`` workers are used, the function should be called
         ``N`` times). Otherwise, all background workers will
@@ -2268,7 +2314,7 @@ class Augmenter(object):
 
         Parameters
         ----------
-        entropy : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        entropy : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
             A seed or random number generator that is used to derive new
             random number generators for this augmenter and its children.
             If an ``int`` is provided, it will be interpreted as a seed.
@@ -2323,7 +2369,7 @@ class Augmenter(object):
         ----------
         recursive : bool, optional
             See
-            :func:`imgaug.augmenters.meta.Augmenter.localize_random_state_`.
+            :func:`~imgaug.augmenters.meta.Augmenter.localize_random_state_`.
 
         Returns
         -------
@@ -2365,9 +2411,9 @@ class Augmenter(object):
               A and B would differ.)
 
         The case of determinism is handled automatically by
-        :func:`imgaug.augmenters.meta.Augmenter.to_deterministic`.
+        :func:`~imgaug.augmenters.meta.Augmenter.to_deterministic`.
         Only when you copy RNGs (via
-        :func:`imgaug.augmenters.meta.Augmenter.copy_random_state`),
+        :func:`~imgaug.augmenters.meta.Augmenter.copy_random_state`),
         you need to call this function first.
 
         Parameters
@@ -2397,19 +2443,19 @@ class Augmenter(object):
         Parameters
         ----------
         source : imgaug.augmenters.meta.Augmenter
-            See :func:`imgaug.augmenters.meta.Augmenter.copy_random_state_`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.copy_random_state_`.
 
         recursive : bool, optional
-            See :func:`imgaug.augmenters.meta.Augmenter.copy_random_state_`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.copy_random_state_`.
 
         matching : {'position', 'name'}, optional
-            See :func:`imgaug.augmenters.meta.Augmenter.copy_random_state_`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.copy_random_state_`.
 
         matching_tolerant : bool, optional
-            See :func:`imgaug.augmenters.meta.Augmenter.copy_random_state_`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.copy_random_state_`.
 
         copy_determinism : bool, optional
-            See :func:`imgaug.augmenters.meta.Augmenter.copy_random_state_`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.copy_random_state_`.
 
         Returns
         -------
@@ -2435,7 +2481,7 @@ class Augmenter(object):
 
             The source augmenters are not allowed to use the global RNG.
             Call
-            :func:`imgaug.augmenters.meta.Augmenter.localize_random_state_`
+            :func:`~imgaug.augmenters.meta.Augmenter.localize_random_state_`
             once on the source to localize all random states.
 
         Parameters
@@ -2443,7 +2489,7 @@ class Augmenter(object):
         source : imgaug.augmenters.meta.Augmenter
             The source augmenter(s) from where to copy the RNG(s).
             The source may have children (e.g. the source can be a
-            :class:`imgaug.augmenters.meta.Sequential`).
+            :class:`~imgaug.augmenters.meta.Sequential`).
 
         recursive : bool, optional
             Whether to copy the RNGs of the source augmenter *and*
@@ -2561,7 +2607,7 @@ class Augmenter(object):
         -------
         list
             List of parameters of arbitrary types (usually child class
-            of :class:`imgaug.parameters.StochasticParameter`, but not
+            of :class:`~imgaug.parameters.StochasticParameter`, but not
             guaranteed to be).
 
         """
@@ -2589,11 +2635,11 @@ class Augmenter(object):
         ``IfElse(condition, [A1, A2], [B1, B2, B3])`` returns
         ``[[A1, A2], [B1, B2, B3]]``
         for a call to
-        :func:`imgaug.augmenters.meta.Augmenter.get_children_lists` and
+        :func:`~imgaug.augmenters.meta.Augmenter.get_children_lists` and
         ``A2`` is removed inplace from ``[A1, A2]``, then the children lists
         of ``IfElse(...)`` must also change to ``[A1], [B1, B2, B3]``. This
         is used in
-        :func:`imgaug.augmeneters.meta.Augmenter.remove_augmenters_`.
+        :func:`~imgaug.augmeneters.meta.Augmenter.remove_augmenters_`.
 
         Returns
         -------
@@ -2646,8 +2692,8 @@ class Augmenter(object):
         ----------
         func : callable
             A function that receives a
-            :class:`imgaug.augmenters.meta.Augmenter` instance and a list of
-            parent :class:`imgaug.augmenters.meta.Augmenter` instances and
+            :class:`~imgaug.augmenters.meta.Augmenter` instance and a list of
+            parent :class:`~imgaug.augmenters.meta.Augmenter` instances and
             must return ``True``, if that augmenter is valid match or
             ``False`` otherwise.
 
@@ -2709,7 +2755,7 @@ class Augmenter(object):
             Whether `name` parameter is a regular expression.
 
         flat : bool, optional
-            See :func:`imgaug.augmenters.meta.Augmenter.find_augmenters`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.find_augmenters`.
 
         Returns
         -------
@@ -2734,7 +2780,7 @@ class Augmenter(object):
             of these expressions is a match.
 
         flat : boolean, optional
-            See :func:`imgaug.augmenters.meta.Augmenter.find_augmenters`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.find_augmenters`.
 
         Returns
         -------
@@ -2780,7 +2826,7 @@ class Augmenter(object):
             If ``True`` and the condition (lambda function) leads to the
             removal of the topmost augmenter (the one this function is called
             on initially), then that topmost augmenter will be replaced by an
-            instance of :class:`imgaug.augmenters.meta.Noop` (i.e. an
+            instance of :class:`~imgaug.augmenters.meta.Noop` (i.e. an
             augmenter that doesn't change its inputs). If ``False``, ``None``
             will be returned in these cases.
             This can only be ``False`` if copy is set to ``True``.
@@ -2830,7 +2876,7 @@ class Augmenter(object):
 
     @ia.deprecated("remove_augmenters_")
     def remove_augmenters_inplace(self, func, parents=None):
-        """Old name for :func:`imgaug.meta.Augmenter.remove_augmenters_`."""
+        """Old name for :func:`~imgaug.meta.Augmenter.remove_augmenters_`."""
         self.remove_augmenters_(func=func, parents=parents)
 
     # TODO allow first arg to be string name, class type or func
@@ -2839,17 +2885,17 @@ class Augmenter(object):
         """Remove in-place children of this augmenter that match a condition.
 
         This is functionally identical to
-        :func:`imgaug.augmenters.meta.remove_augmenters` with
+        :func:`~imgaug.augmenters.meta.remove_augmenters` with
         ``copy=False``, except that it does not affect the topmost augmenter
         (the one on which this function is initially called on).
 
         Parameters
         ----------
         func : callable
-            See :func:`imgaug.augmenters.meta.Augmenter.remove_augmenters`.
+            See :func:`~imgaug.augmenters.meta.Augmenter.remove_augmenters`.
 
         parents : None or list of imgaug.augmenters.meta.Augmenter, optional
-            List of parent :class:`imgaug.augmenters.meta.Augmenter` instances
+            List of parent :class:`~imgaug.augmenters.meta.Augmenter` instances
             that lead to this augmenter. If ``None``, an empty list will be
             used. This parameter can usually be left empty and will be set
             automatically for children.
@@ -2934,7 +2980,7 @@ class Sequential(Augmenter, list):
 
     .. note::
 
-        You are *not* forced to use :class:`imgaug.augmenters.meta.Sequential`
+        You are *not* forced to use :class:`~imgaug.augmenters.meta.Sequential`
         in order to use other augmenters. Each augmenter can be used on its
         own, e.g the following defines an augmenter for horizontal flips and
         then augments a single image:
@@ -2945,7 +2991,8 @@ class Sequential(Augmenter, list):
         >>> aug = iaa.Fliplr(0.5)
         >>> image_aug = aug.augment_image(image)
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -2970,14 +3017,14 @@ class Sequential(Augmenter, list):
         Whether to apply the child augmenters in random order.
         If ``True``, the order will be randomly sampled once per batch.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -2990,7 +3037,7 @@ class Sequential(Augmenter, list):
     >>> ])
     >>> imgs_aug = seq.augment_images(imgs)
 
-    Create a :class:`imgaug.augmenters.meta.Sequential` that always first
+    Create a :class:`~imgaug.augmenters.meta.Sequential` that always first
     applies a horizontal flip augmenter and then a vertical flip augmenter.
     Each of these two augmenters has a ``50%`` probability of actually
     flipping the image.
@@ -3001,7 +3048,7 @@ class Sequential(Augmenter, list):
     >>> ], random_order=True)
     >>> imgs_aug = seq.augment_images(imgs)
 
-    Create a :class:`imgaug.augmenters.meta.Sequential` that sometimes first
+    Create a :class:`~imgaug.augmenters.meta.Sequential` that sometimes first
     applies a horizontal flip augmenter (followed by a vertical flip
     augmenter) and sometimes first a vertical flip augmenter (followed by a
     horizontal flip augmenter). Again, each of them has a ``50%`` probability
@@ -3009,10 +3056,9 @@ class Sequential(Augmenter, list):
 
     """
 
-    def __init__(self, children=None, random_order=False, name=None,
-                 deterministic=False, random_state=None):
-        Augmenter.__init__(self, name=name, deterministic=deterministic,
-                           random_state=random_state)
+    def __init__(self, children=None, random_order=False,
+                 seed=None, name=None, **old_kwargs):
+        Augmenter.__init__(self, seed=seed, name=name, **old_kwargs)
 
         if children is None:
             list.__init__(self, [])
@@ -3036,7 +3082,7 @@ class Sequential(Augmenter, list):
                 type(random_order),))
         self.random_order = random_order
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             if self.random_order:
                 order = random_state.permutation(len(self))
@@ -3044,7 +3090,7 @@ class Sequential(Augmenter, list):
                 order = sm.xrange(len(self))
 
             for index in order:
-                batch = self[index].augment_batch(
+                batch = self[index].augment_batch_(
                     batch,
                     parents=parents + [self],
                     hooks=hooks
@@ -3060,7 +3106,7 @@ class Sequential(Augmenter, list):
         return seq
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.random_order]
 
     def add(self, augmenter):
@@ -3075,7 +3121,7 @@ class Sequential(Augmenter, list):
         self.append(augmenter)
 
     def get_children_lists(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_children_lists`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_children_lists`."""
         return [self]
 
     def __str__(self):
@@ -3092,20 +3138,21 @@ class Sequential(Augmenter, list):
 class SomeOf(Augmenter, list):
     """List augmenter that applies only some of its children to inputs.
 
-    This augmenter is similar to :class:`imgaug.augmenters.meta.Sequential`,
+    This augmenter is similar to :class:`~imgaug.augmenters.meta.Sequential`,
     but may apply only a fixed or random subset of its child augmenters to
     inputs. E.g. the augmenter could be initialized with a list of 20 child
     augmenters and then apply 5 randomly chosen child augmenters to images.
 
     The subset of augmenters to apply (and their order) is sampled once
     *per image*. If `random_order` is ``True``, the order will be sampled once
-    *per batch* (similar to :class:`imgaug.augmenters.meta.Sequential`).
+    *per batch* (similar to :class:`~imgaug.augmenters.meta.Sequential`).
 
     This augmenter currently does not support replacing (i.e. picking the same
     child multiple times) due to implementation difficulties in connection
     with deterministic augmenters.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3142,20 +3189,20 @@ class SomeOf(Augmenter, list):
     children : imgaug.augmenters.meta.Augmenter or list of imgaug.augmenters.meta.Augmenter or None, optional
         The augmenters to apply to images.
         If this is a list of augmenters, it will be converted to a
-        :class:`imgaug.augmenters.meta.Sequential`.
+        :class:`~imgaug.augmenters.meta.Sequential`.
 
     random_order : boolean, optional
         Whether to apply the child augmenters in random order.
         If ``True``, the order will be randomly sampled once per batch.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3197,9 +3244,8 @@ class SomeOf(Augmenter, list):
     """
 
     def __init__(self, n=None, children=None, random_order=False,
-                 name=None, deterministic=False, random_state=None):
-        Augmenter.__init__(self, name=name, deterministic=deterministic,
-                           random_state=random_state)
+                 seed=None, name=None, **old_kwargs):
+        Augmenter.__init__(self, seed=seed, name=name, **old_kwargs)
 
         # TODO use handle_children_list() here?
         if children is None:
@@ -3285,7 +3331,7 @@ class SomeOf(Augmenter, list):
             random_state.shuffle(row)
         return augmenter_active
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             # This must happen before creating the augmenter_active array,
             # otherwise in case of determinism the number of augmented images
@@ -3311,7 +3357,7 @@ class SomeOf(Augmenter, list):
 
                 if len(active) > 0:
                     batch_sub = batch.subselect_rows_by_indices(active)
-                    batch_sub = self[augmenter_index].augment_batch(
+                    batch_sub = self[augmenter_index].augment_batch_(
                         batch_sub,
                         parents=parents + [self],
                         hooks=hooks
@@ -3330,7 +3376,7 @@ class SomeOf(Augmenter, list):
         return seq
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.n]
 
     def add(self, augmenter):
@@ -3345,7 +3391,7 @@ class SomeOf(Augmenter, list):
         self.append(augmenter)
 
     def get_children_lists(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_children_lists`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_children_lists`."""
         return [self]
 
     def __str__(self):
@@ -3362,23 +3408,24 @@ class SomeOf(Augmenter, list):
 class OneOf(SomeOf):
     """Augmenter that always executes exactly one of its children.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See ``imgaug.augmenters.meta.SomeOf``.
+    See :class:`imgaug.augmenters.meta.SomeOf`.
 
     Parameters
     ----------
     children : imgaug.augmenters.meta.Augmenter or list of imgaug.augmenters.meta.Augmenter
         The choices of augmenters to apply.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3409,28 +3456,27 @@ class OneOf(SomeOf):
 
     """
 
-    def __init__(self, children, name=None, deterministic=False,
-                 random_state=None):
+    def __init__(self, children,
+                 seed=None, name=None, **old_kwargs):
         super(OneOf, self).__init__(
             n=1,
             children=children,
             random_order=False,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 class Sometimes(Augmenter):
     """Apply child augmenter(s) with a probability of `p`.
 
     Let ``C`` be one or more child augmenters given to
-    :class:`imgaug.augmenters.meta.Sometimes`.
+    :class:`~imgaug.augmenters.meta.Sometimes`.
     Let ``p`` be the fraction of images (or other data) to augment.
     Let ``I`` be the input images (or other data).
     Let ``N`` be the number of input images (or other entities).
     Then (on average) ``p*N`` images of ``I`` will be augmented using ``C``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3456,23 +3502,23 @@ class Sometimes(Augmenter):
     then_list : None or imgaug.augmenters.meta.Augmenter or list of imgaug.augmenters.meta.Augmenter, optional
         Augmenter(s) to apply to `p%` percent of all images.
         If this is a list of augmenters, it will be converted to a
-        :class:`imgaug.augmenters.meta.Sequential`.
+        :class:`~imgaug.augmenters.meta.Sequential`.
 
     else_list : None or imgaug.augmenters.meta.Augmenter or list of imgaug.augmenters.meta.Augmenter, optional
         Augmenter(s) to apply to ``(1-p)`` percent of all images.
         These augmenters will be applied only when the ones in `then_list`
         are *not* applied (either-or-relationship).
         If this is a list of augmenters, it will be converted to a
-        :class:`imgaug.augmenters.meta.Sequential`.
+        :class:`~imgaug.augmenters.meta.Sequential`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3488,10 +3534,10 @@ class Sometimes(Augmenter):
 
     """
 
-    def __init__(self, p=0.5, then_list=None, else_list=None, name=None,
-                 deterministic=False, random_state=None):
+    def __init__(self, p=0.5, then_list=None, else_list=None,
+                 seed=None, name=None, **old_kwargs):
         super(Sometimes, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.p = iap.handle_probability_param(p, "p")
 
@@ -3500,7 +3546,7 @@ class Sometimes(Augmenter):
         self.else_list = handle_children_list(else_list, self.name, "else",
                                               default=None)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             samples = self.p.draw_samples((batch.nb_rows,),
                                           random_state=random_state)
@@ -3522,7 +3568,7 @@ class Sometimes(Augmenter):
             for indices, augmenters in zip(indice_lists, augmenter_lists):
                 if augmenters is not None and len(augmenters) > 0:
                     batch_sub = batch.subselect_rows_by_indices(indices)
-                    batch_sub = augmenters.augment_batch(
+                    batch_sub = augmenters.augment_batch_(
                         batch_sub,
                         parents=parents + [self],
                         hooks=hooks
@@ -3545,11 +3591,11 @@ class Sometimes(Augmenter):
         return aug
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p]
 
     def get_children_lists(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_children_lists`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_children_lists`."""
         result = []
         if self.then_list is not None:
             result.append(self.then_list)
@@ -3578,7 +3624,8 @@ class WithChannels(Augmenter):
     The result of the augmentation will be merged back into the original
     images.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3605,14 +3652,14 @@ class WithChannels(Augmenter):
         One or more augmenters to apply to images, after the channels
         are extracted.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -3625,9 +3672,9 @@ class WithChannels(Augmenter):
     """
 
     def __init__(self, channels=None, children=None,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(WithChannels, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         # TODO change this to a stochastic parameter
         if channels is None:
@@ -3647,7 +3694,7 @@ class WithChannels(Augmenter):
 
         self.children = handle_children_list(children, self.name, "then")
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if self.channels is not None and len(self.channels) == 0:
             return batch
 
@@ -3664,7 +3711,7 @@ class WithChannels(Augmenter):
             # of columns leads to potential RNG misalignments.
             # We replace non-image data that was not supposed to be augmented
             # further below.
-            batch = self.children.augment_batch(
+            batch = self.children.augment_batch_(
                 batch, parents=parents + [self], hooks=hooks)
 
             # If the shapes changed we cannot insert the augmented channels
@@ -3779,11 +3826,11 @@ class WithChannels(Augmenter):
         return aug
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.channels]
 
     def get_children_lists(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_children_lists`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_children_lists`."""
         return [self.children]
 
     def __str__(self):
@@ -3801,7 +3848,8 @@ class Identity(Augmenter):
     This augmenter is useful e.g. during validation/testing as it allows
     to re-use the training code without actually performing any augmentation.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3819,26 +3867,25 @@ class Identity(Augmenter):
 
     Parameters
     ----------
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     """
 
-    def __init__(self, name=None, deterministic=False, random_state=None):
-        super(Identity, self).__init__(name=name, deterministic=deterministic,
-                                       random_state=random_state)
+    def __init__(self, seed=None, name=None, **old_kwargs):
+        super(Identity, self).__init__(seed=seed, name=name, **old_kwargs)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []
 
 
@@ -3848,26 +3895,26 @@ class Noop(Identity):
     It is recommended to now use :class:`Identity`. :class:`Noop` might be
     deprecated in the future.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :class:`imgaug.augmenters.meta.Identity`.
+    See :class:`~imgaug.augmenters.meta.Identity`.
 
     Parameters
     ----------
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     """
 
-    def __init__(self, name=None, deterministic=False, random_state=None):
-        super(Noop, self).__init__(name=name, deterministic=deterministic,
-                                   random_state=random_state)
+    def __init__(self, seed=None, name=None, **old_kwargs):
+        super(Noop, self).__init__(seed=seed, name=name, **old_kwargs)
 
 
 class Lambda(Augmenter):
@@ -3875,7 +3922,8 @@ class Lambda(Augmenter):
 
     This is useful to add missing functions to a list of augmenters.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3901,7 +3949,7 @@ class Lambda(Augmenter):
 
         and return the changed images (may be transformed in-place).
         This is essentially the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_images`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_images`.
         If this is ``None`` instead of a function, the images will not be
         altered.
 
@@ -3913,7 +3961,7 @@ class Lambda(Augmenter):
 
         and return the changed heatmaps (may be transformed in-place).
         This is essentially the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_heatmaps`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_heatmaps`.
         If this is ``None`` instead of a function, the heatmaps will not be
         altered.
 
@@ -3925,7 +3973,7 @@ class Lambda(Augmenter):
 
         and return the changed segmaps (may be transformed in-place).
         This is essentially the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_segmentation_maps`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_segmentation_maps`.
         If this is ``None`` instead of a function, the segmentatio maps will
         not be altered.
 
@@ -3937,7 +3985,7 @@ class Lambda(Augmenter):
 
         and return the changed keypoints (may be transformed in-place).
         This is essentially the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_keypoints`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_keypoints`.
         If this is ``None`` instead of a function, the keypoints will not be
         altered.
 
@@ -3949,7 +3997,7 @@ class Lambda(Augmenter):
 
         and return the changed bounding boxes (may be transformed in-place).
         This is essentially the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_bounding_boxes`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_bounding_boxes`.
         If this is ``None`` instead of a function, the bounding boxes will not
         be altered.
         If this is the string ``"keypoints"`` instead of a function, the
@@ -3964,7 +4012,7 @@ class Lambda(Augmenter):
 
         and return the changed polygons (may be transformed in-place).
         This is essentially the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_polygons`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_polygons`.
         If this is ``None`` instead of a function, the polygons will not
         be altered.
         If this is the string ``"keypoints"`` instead of a function, the
@@ -3979,21 +4027,21 @@ class Lambda(Augmenter):
 
         and return the changed line strings (may be transformed in-place).
         This is essentially the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_line_strings`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_line_strings`.
         If this is ``None`` instead of a function, the line strings will not
         be altered.
         If this is the string ``"keypoints"`` instead of a function, the
         line strings will automatically be augmented by transforming their
         corner vertices to keypoints and calling `func_keypoints`.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -4038,9 +4086,8 @@ class Lambda(Augmenter):
                  func_segmentation_maps=None, func_keypoints=None,
                  func_bounding_boxes="keypoints", func_polygons="keypoints",
                  func_line_strings="keypoints",
-                 name=None, deterministic=False, random_state=None):
-        super(Lambda, self).__init__(name=name, deterministic=deterministic,
-                                     random_state=random_state)
+                 seed=None, name=None, **old_kwargs):
+        super(Lambda, self).__init__(seed=seed, name=name, **old_kwargs)
         self.func_images = func_images
         self.func_heatmaps = func_heatmaps
         self.func_segmentation_maps = func_segmentation_maps
@@ -4180,7 +4227,7 @@ class Lambda(Augmenter):
         return bounding_boxes_on_images
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []
 
 
@@ -4194,7 +4241,8 @@ class AssertLambda(Lambda):
     This is useful to ensure that generic assumption about the input data
     are actually the case and error out early otherwise.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -4220,7 +4268,7 @@ class AssertLambda(Lambda):
 
         and return either ``True`` (valid input) or ``False`` (invalid input).
         It essentially re-uses the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_images`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_images`.
 
     func_heatmaps : None or callable, optional
         The function to call for each batch of heatmaps.
@@ -4230,7 +4278,7 @@ class AssertLambda(Lambda):
 
         and return either ``True`` (valid input) or ``False`` (invalid input).
         It essentially re-uses the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_heatmaps`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_heatmaps`.
 
     func_segmentation_maps : None or callable, optional
         The function to call for each batch of segmentation maps.
@@ -4240,7 +4288,7 @@ class AssertLambda(Lambda):
 
         and return either ``True`` (valid input) or ``False`` (invalid input).
         It essentially re-uses the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_segmentation_maps`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_segmentation_maps`.
 
     func_keypoints : None or callable, optional
         The function to call for each batch of keypoints.
@@ -4250,7 +4298,7 @@ class AssertLambda(Lambda):
 
         and return either ``True`` (valid input) or ``False`` (invalid input).
         It essentially re-uses the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_keypoints`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_keypoints`.
 
     func_bounding_boxes : None or callable, optional
         The function to call for each batch of bounding boxes.
@@ -4260,7 +4308,7 @@ class AssertLambda(Lambda):
 
         and return either ``True`` (valid input) or ``False`` (invalid input).
         It essentially re-uses the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_bounding_boxes`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_bounding_boxes`.
 
     func_polygons : None or callable, optional
         The function to call for each batch of polygons.
@@ -4270,7 +4318,7 @@ class AssertLambda(Lambda):
 
         and return either ``True`` (valid input) or ``False`` (invalid input).
         It essentially re-uses the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_polygons`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_polygons`.
 
     func_line_strings : None or callable, optional
         The function to call for each batch of line strings.
@@ -4280,16 +4328,16 @@ class AssertLambda(Lambda):
 
         and return either ``True`` (valid input) or ``False`` (invalid input).
         It essentially re-uses the interface of
-        :func:`imgaug.augmenters.meta.Augmenter._augment_line_strings`.
+        :func:`~imgaug.augmenters.meta.Augmenter._augment_line_strings`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     """
 
@@ -4297,7 +4345,7 @@ class AssertLambda(Lambda):
                  func_segmentation_maps=None, func_keypoints=None,
                  func_bounding_boxes=None, func_polygons=None,
                  func_line_strings=None,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         def _default(var, augmentable_name):
             return (
                 _AssertLambdaCallback(var, augmentable_name=augmentable_name)
@@ -4314,7 +4362,7 @@ class AssertLambda(Lambda):
             func_bounding_boxes=_default(func_bounding_boxes, "bounding_boxes"),
             func_polygons=_default(func_polygons, "polygons"),
             func_line_strings=_default(func_line_strings, "line_strings"),
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
 
 class _AssertLambdaCallback(object):
@@ -4335,7 +4383,8 @@ class _AssertLambdaCallback(object):
 class AssertShape(Lambda):
     """Assert that inputs have a specified shape.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -4358,7 +4407,7 @@ class AssertShape(Lambda):
         the ``tuple`` must match the number of dimensions, i.e. it must
         contain four entries for ``(N, H, W, C)``. If only a single entity
         is augmented, e.g. via
-        :func:`imgaug.augmenters.meta.Augmenter.augment_image`, then ``N`` is
+        :func:`~imgaug.augmenters.meta.Augmenter.augment_image`, then ``N`` is
         ``1`` in the input to this augmenter. Images that don't have
         a channel axis will automatically have one assigned, i.e. ``C`` is
         at least ``1``.
@@ -4381,49 +4430,49 @@ class AssertShape(Lambda):
     check_heatmaps : bool, optional
         Whether to validate input heatmaps via the given shape.
         The number of heatmaps will be verified as ``N``. For each
-        :class:`imgaug.augmentables.heatmaps.HeatmapsOnImage` instance
+        :class:`~imgaug.augmentables.heatmaps.HeatmapsOnImage` instance
         its array's height and width will be verified as ``H`` and ``W``,
         but not the channel count.
 
     check_segmentation_maps : bool, optional
         Whether to validate input segmentation maps via the given shape.
         The number of segmentation maps will be verified as ``N``. For each
-        :class:`imgaug.augmentables.segmaps.SegmentationMapOnImage` instance
+        :class:`~imgaug.augmentables.segmaps.SegmentationMapOnImage` instance
         its array's height and width will be verified as ``H`` and ``W``,
         but not the channel count.
 
     check_keypoints : bool, optional
         Whether to validate input keypoints via the given shape.
         This will check (a) the number of keypoints and (b) for each
-        :class:`imgaug.augmentables.kps.KeypointsOnImage` instance the
+        :class:`~imgaug.augmentables.kps.KeypointsOnImage` instance the
         ``.shape`` attribute, i.e. the shape of the corresponding image.
 
     check_bounding_boxes : bool, optional
         Whether to validate input bounding boxes via the given shape.
         This will check (a) the number of bounding boxes and (b) for each
-        :class:`imgaug.augmentables.bbs.BoundingBoxesOnImage` instance the
+        :class:`~imgaug.augmentables.bbs.BoundingBoxesOnImage` instance the
         ``.shape`` attribute, i.e. the shape of the corresponding image.
 
     check_polygons : bool, optional
         Whether to validate input polygons via the given shape.
         This will check (a) the number of polygons and (b) for each
-        :class:`imgaug.augmentables.polys.PolygonsOnImage` instance the
+        :class:`~imgaug.augmentables.polys.PolygonsOnImage` instance the
         ``.shape`` attribute, i.e. the shape of the corresponding image.
 
     check_line_strings : bool, optional
         Whether to validate input line strings via the given shape.
         This will check (a) the number of line strings and (b) for each
-        :class:`imgaug.augmentables.lines.LineStringsOnImage` instance the
+        :class:`~imgaug.augmentables.lines.LineStringsOnImage` instance the
         ``.shape`` attribute, i.e. the shape of the corresponding image.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -4452,7 +4501,7 @@ class AssertShape(Lambda):
                  check_segmentation_maps=True, check_keypoints=True,
                  check_bounding_boxes=True, check_polygons=True,
                  check_line_strings=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         assert len(shape) == 4, (
             "Expected shape to have length 4, got %d with shape: %s." % (
                 len(shape), str(shape)))
@@ -4476,9 +4525,7 @@ class AssertShape(Lambda):
                                    check_polygons),
             func_line_strings=_default(_AssertShapeLineStringsCheck(shape),
                                        check_line_strings),
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
     @classmethod
     def _compare(cls, observed, expected, dimension, image_index):
@@ -4602,7 +4649,8 @@ class _AssertShapeLineStringsCheck(object):
 class ChannelShuffle(Augmenter):
     """Randomize the order of channels in input images.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -4623,7 +4671,7 @@ class ChannelShuffle(Augmenter):
     p : float or imgaug.parameters.StochasticParameter, optional
         Probability of shuffling channels in any given image.
         May be a fixed probability as a ``float``, or a
-        :class:`imgaug.parameters.StochasticParameter` that returns ``0`` s
+        :class:`~imgaug.parameters.StochasticParameter` that returns ``0`` s
         and ``1`` s.
 
     channels : None or imgaug.ALL or list of int, optional
@@ -4634,14 +4682,14 @@ class ChannelShuffle(Augmenter):
         (Values start at ``0``. All channel indices in the list must exist in
         each image.)
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -4660,9 +4708,9 @@ class ChannelShuffle(Augmenter):
     """
 
     def __init__(self, p=1.0, channels=None,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(ChannelShuffle, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.p = iap.handle_probability_param(p, "p")
         valid_channels = (
             channels is None
@@ -4676,7 +4724,7 @@ class ChannelShuffle(Augmenter):
                 type(channels),))
         self.channels = channels
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
@@ -4692,14 +4740,15 @@ class ChannelShuffle(Augmenter):
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p, self.channels]
 
 
 def shuffle_channels(image, random_state, channels=None):
     """Randomize the order of (color) channels in an image.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; indirectly tested (1)
@@ -4715,7 +4764,7 @@ def shuffle_channels(image, random_state, channels=None):
         * ``float128``: yes; indirectly tested (1)
         * ``bool``: yes; indirectly tested (1)
 
-        - (1) Indirectly tested via ``ChannelShuffle``.
+        - (1) Indirectly tested via :class:`ChannelShuffle`.
 
     Parameters
     ----------
@@ -4772,7 +4821,8 @@ class RemoveCBAsByOutOfImageFraction(Augmenter):
     augmentable's area that is outside of the image, e.g. for a bounding box
     that has half of its area outside of the image it would be ``0.5``.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -4795,14 +4845,14 @@ class RemoveCBAsByOutOfImageFraction(Augmenter):
         where ``fraction_{actual}`` denotes the estimated out of image
         fraction.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -4842,24 +4892,24 @@ class RemoveCBAsByOutOfImageFraction(Augmenter):
     """
 
     def __init__(self, fraction,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(RemoveCBAsByOutOfImageFraction, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
         self.fraction = fraction
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         for column in batch.columns:
             if column.name in ["keypoints", "bounding_boxes", "polygons",
                                "line_strings"]:
                 for i, cbaoi in enumerate(column.value):
-                    column.value[i] = cbaoi.remove_out_of_image_fraction(
+                    column.value[i] = cbaoi.remove_out_of_image_fraction_(
                         self.fraction)
 
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.fraction]
 
 
@@ -4873,7 +4923,8 @@ class ClipCBAsToImagePlanes(Augmenter):
     it removes any single points outside of the image plane. Any augmentable
     that is completely outside of the image plane will be removed.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -4891,14 +4942,14 @@ class ClipCBAsToImagePlanes(Augmenter):
 
     Parameters
     ----------
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -4914,19 +4965,19 @@ class ClipCBAsToImagePlanes(Augmenter):
 
     """
 
-    def __init__(self, name=None, deterministic=False, random_state=None):
+    def __init__(self, seed=None, name=None, **old_kwargs):
         super(ClipCBAsToImagePlanes, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         for column in batch.columns:
             if column.name in ["keypoints", "bounding_boxes", "polygons",
                                "line_strings"]:
                 for i, cbaoi in enumerate(column.value):
-                    column.value[i] = cbaoi.clip_out_of_image()
+                    column.value[i] = cbaoi.clip_out_of_image_()
 
         return batch
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []

@@ -1,7 +1,7 @@
 """Classes and functions related to pseudo-random number generation.
 
 This module deals with the generation of pseudo-random numbers.
-It provides the :class:`imgaug.random.RNG` class, which is the primary
+It provides the :class:`~imgaug.random.RNG` class, which is the primary
 random number generator in ``imgaug``. It also provides various utility
 functions related random number generation, such as copying random number
 generators or setting their state.
@@ -22,8 +22,8 @@ Definitions
   Note that outside of this module, the term "random state" often roughly
   translates to "any random number generator with numpy-like interface
   in a given state", i.e. it can then include instances of
-  :class:`numpy.random.Generator` or :class:`imgaug.random.RNG`.
-- *RNG*: An instance of :class:`imgaug.random.RNG`.
+  :class:`numpy.random.Generator` or :class:`~imgaug.random.RNG`.
+- *RNG*: An instance of :class:`~imgaug.random.RNG`.
 
 Examples
 --------
@@ -57,6 +57,16 @@ _NP_VERSION = list(map(int, np.__version__.split(".")[0:2]))
 if _NP_VERSION[0] > 1 or _NP_VERSION[1] >= 17:
     SUPPORTS_NEW_NP_RNG_STYLE = True
     BIT_GENERATOR = np.random.SFC64  # pylint: disable=invalid-name
+
+    # interface of BitGenerator
+    # in 1.17 this was at numpy.random.bit_generator.BitGenerator
+    # in 1.18 this was moved to numpy.random.BitGenerator
+    # pylint: disable=invalid-name, no-member
+    if _NP_VERSION[1] == 17:
+        _BIT_GENERATOR_INTERFACE = np.random.bit_generator.BitGenerator
+    else:
+        _BIT_GENERATOR_INTERFACE = np.random.BitGenerator
+    # pylint: enable=invalid-name, no-member
 
 # We instantiate a current/global random state here once.
 GLOBAL_RNG = None
@@ -94,12 +104,12 @@ class RNG(object):
     * :func:`numpy.random.RandomState.get_state`
     * :func:`numpy.random.RandomState.set_state`
 
-    In :func:`imgaug.random.RNG.choice`, the `axis` argument is not yet
+    In :func:`~imgaug.random.RNG.choice`, the `axis` argument is not yet
     supported.
 
     Parameters
     ----------
-    generator : None or int or RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
+    generator : None or int or RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
         The numpy random number generator to use. In case of numpy
         version 1.17 or later, this shouldn't be a ``RandomState`` as that
         class is outdated.
@@ -118,7 +128,7 @@ class RNG(object):
             as the generator for this RNG, i.e. the same as
             ``RNG(other_rng.generator)``.
           * If :class:`numpy.random.Generator`: That generator will be wrapped.
-          * If :class:`numpy.random.bit_generator.BitGenerator`: A numpy
+          * If :class:`numpy.random.BitGenerator`: A numpy
             generator will be created (and wrapped by this RNG) that contains
             the bit generator.
           * If :class:`numpy.random.SeedSequence`: A numpy
@@ -193,11 +203,10 @@ class RNG(object):
     def use_state_of_(self, other):
         """Copy and use (in-place) the state of another RNG.
 
-        .. note ::
+        .. note::
 
             It is often sensible to first verify that neither this RNG nor
             `other` are identical to the global RNG.
-
 
         Parameters
         ----------
@@ -345,12 +354,12 @@ class RNG(object):
 
         This advances the underlying generator's state.
 
-        .. note ::
+        .. note::
 
             This simply samples one or more random values. This means that
             a call of this method will not completely change the outputs of
             the next called sampling method. To achieve more drastic output
-            changes, call :func:`imgaug.random.RNG.derive_rng_`.
+            changes, call :func:`~imgaug.random.RNG.derive_rng_`.
 
         Returns
         -------
@@ -390,7 +399,7 @@ class RNG(object):
         """Create a list containing `n` times this RNG.
 
         This method was mainly introduced as a replacement for previous
-        calls of :func:`imgaug.random.RNG.derive_rngs_`. These calls
+        calls of :func:`~imgaug.random.RNG.derive_rngs_`. These calls
         turned out to be very slow in numpy 1.17+ and were hence replaced
         by simple duplication (except for the cases where child RNGs
         absolutely *had* to be created).
@@ -456,7 +465,7 @@ class RNG(object):
                  endpoint=False):
         """Call numpy's ``integers()`` or ``randint()``.
 
-        .. note ::
+        .. note::
 
             Changed `dtype` argument default value from numpy's ``int64`` to
             ``int32``.
@@ -469,7 +478,7 @@ class RNG(object):
     def random(self, size, dtype="float32", out=None):
         """Call numpy's ``random()`` or ``random_sample()``.
 
-        .. note ::
+        .. note::
 
             Changed `dtype` argument default value from numpy's ``d`` to
             ``float32``.
@@ -613,7 +622,7 @@ class RNG(object):
                              out=None):
         """Call :func:`numpy.random.Generator.standard_exponential`.
 
-        .. note ::
+        .. note::
 
             Changed `dtype` argument default value from numpy's ``d`` to
             ``float32``.
@@ -634,7 +643,7 @@ class RNG(object):
     def standard_gamma(self, shape, size=None, dtype="float32", out=None):
         """Call :func:`numpy.random.Generator.standard_gamma`.
 
-        .. note ::
+        .. note::
 
             Changed `dtype` argument default value from numpy's ``d`` to
             ``float32``.
@@ -656,7 +665,7 @@ class RNG(object):
     def standard_normal(self, size=None, dtype="float32", out=None):
         """Call :func:`numpy.random.Generator.standard_normal`.
 
-        .. note ::
+        .. note::
 
             Changed `dtype` argument default value from numpy's ``d`` to
             ``float32``.
@@ -717,7 +726,7 @@ class RNG(object):
     def rand(self, *args):
         """Call :func:`numpy.random.RandomState.rand`.
 
-        .. warning ::
+        .. warning::
 
             This method is outdated in numpy. Use :func:`RNG.random` instead.
 
@@ -727,12 +736,12 @@ class RNG(object):
     def randint(self, low, high=None, size=None, dtype="int32"):
         """Call :func:`numpy.random.RandomState.randint`.
 
-        .. note ::
+        .. note::
 
             Changed `dtype` argument default value from numpy's ``I`` to
             ``int32``.
 
-        .. warning ::
+        .. warning::
 
             This method is outdated in numpy. Use :func:`RNG.integers`
             instead.
@@ -744,7 +753,7 @@ class RNG(object):
     def randn(self, *args):
         """Call :func:`numpy.random.RandomState.randn`.
 
-        .. warning ::
+        .. warning::
 
             This method is outdated in numpy. Use :func:`RNG.standard_normal`
             instead.
@@ -755,7 +764,7 @@ class RNG(object):
     def random_integers(self, low, high=None, size=None):
         """Call :func:`numpy.random.RandomState.random_integers`.
 
-        .. warning ::
+        .. warning::
 
             This method is outdated in numpy. Use :func:`RNG.integers`
             instead.
@@ -768,7 +777,7 @@ class RNG(object):
     def random_sample(self, size):
         """Call :func:`numpy.random.RandomState.random_sample`.
 
-        .. warning ::
+        .. warning::
 
             This method is outdated in numpy. Use :func:`RNG.uniform`
             instead.
@@ -779,7 +788,7 @@ class RNG(object):
     def tomaxint(self, size=None):
         """Call :func:`numpy.random.RandomState.tomaxint`.
 
-        .. warning ::
+        .. warning::
 
             This method is outdated in numpy. Use :func:`RNG.integers`
             instead.
@@ -861,10 +870,11 @@ def seed(entropy):
 
 
 def _seed_np117_(entropy):
-    # pylint: disable=global-statement
-    global GLOBAL_RNG
-    # TODO any way to seed the Generator object instead of creating a new one?
-    GLOBAL_RNG = RNG(entropy)
+    # We can't easily seed a BitGenerator in-place, nor can we easily modify
+    # a Generator's bit_generator in-place. So instead we create a new
+    # bit generator and set the current global RNG's internal bit generator
+    # state to a copy of the new bit generator's state.
+    get_global_rng().state = BIT_GENERATOR(entropy).state
 
 
 def _seed_np116_(entropy):
@@ -879,7 +889,7 @@ def normalize_generator(generator):
 
     Parameters
     ----------
-    generator : None or int or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
+    generator : None or int or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
         The numpy random number generator to normalize. In case of numpy
         version 1.17 or later, this shouldn't be a ``RandomState`` as that
         class is outdated.
@@ -894,7 +904,7 @@ def normalize_generator(generator):
             which will then be returned.
           * If :class:`numpy.random.Generator`: That generator will be
             returned.
-          * If :class:`numpy.random.bit_generator.BitGenerator`: A numpy
+          * If :class:`numpy.random.BitGenerator`: A numpy
             generator will be created and returned that contains the bit
             generator.
           * If :class:`numpy.random.SeedSequence`: A numpy
@@ -923,8 +933,8 @@ def normalize_generator_(generator):
 
     Parameters
     ----------
-    generator : None or int or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
-        See :func:`imgaug.random.normalize_generator`.
+    generator : None or int or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState
+        See :func:`~imgaug.random.normalize_generator`.
 
     Returns
     -------
@@ -947,7 +957,7 @@ def _normalize_generator_np117_(generator):
             BIT_GENERATOR(generator)
         )
 
-    if isinstance(generator, np.random.bit_generator.BitGenerator):
+    if isinstance(generator, _BIT_GENERATOR_INTERFACE):
         generator = np.random.Generator(generator)
         # TODO is it necessary/sensible here to reset the cache?
         reset_generator_cache_(generator)
@@ -1343,7 +1353,7 @@ def set_generator_state_(generator, state):
     state : tuple or dict
         The new state of the generator.
         Should correspond to the output of
-        :func:`imgaug.random.get_generator_state`.
+        :func:`~imgaug.random.get_generator_state`.
 
     """
     if isinstance(generator, np.random.RandomState):
@@ -1425,12 +1435,12 @@ def advance_generator_(generator):
 
     This advances the generator's state.
 
-    .. note ::
+    .. note::
 
         This simply samples one or more random values. This means that
         a call of this method will not completely change the outputs of
         the next called sampling method. To achieve more drastic output
-        changes, call :func:`imgaug.random.derive_generator_`.
+        changes, call :func:`~imgaug.random.derive_generator_`.
 
     Parameters
     ----------
@@ -1535,3 +1545,36 @@ def polyfill_random(generator, size, dtype="float32", out=None):
             out[...] = result
         return result
     return generator.random(size=size, dtype=dtype, out=out)
+
+
+# TODO add tests
+class temporary_numpy_seed(object):
+    """Context to temporarily alter the random state of ``numpy.random``.
+
+    The random state's internal state will be set back to the original one
+    once the context finishes.
+
+    Parameters
+    ----------
+    entropy : None or int
+        The seed value to use.
+        If `None` then the seed will not be altered and the internal state
+        of ``numpy.random`` will not be reset back upon context exit (i.e.
+        this context will do nothing).
+
+    """
+    # pylint complains about class name
+    # pylint: disable=invalid-name
+
+    def __init__(self, entropy=None):
+        self.old_state = None
+        self.entropy = entropy
+
+    def __enter__(self):
+        if self.entropy is not None:
+            self.old_state = np.random.get_state()
+            np.random.seed(self.entropy)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.entropy is not None:
+            np.random.set_state(self.old_state)

@@ -1,23 +1,12 @@
 """
 Augmenters that apply pooling operations to images.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.AveragePooling((1, 3))
-    ])
-
 List of augmenters:
 
-    * AveragePooling
-    * MaxPooling
-    * MinPooling
-    * MedianPooling
+    * :class:`AveragePooling`
+    * :class:`MaxPooling`
+    * :class:`MinPooling`
+    * :class:`MedianPooling`
 
 """
 from __future__ import print_function, division, absolute_import
@@ -55,9 +44,9 @@ class _AbstractPoolingBase(meta.Augmenter):
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
     def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(_AbstractPoolingBase, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
         self.kernel_size = iap.handle_discrete_kernel_size_param(
             kernel_size,
             "kernel_size",
@@ -87,7 +76,7 @@ class _AbstractPoolingBase(meta.Augmenter):
             np.clip(kernel_sizes_w, 1, None)
         )
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None and self.keep_size:
             return batch
 
@@ -166,7 +155,7 @@ class _AbstractPoolingBase(meta.Augmenter):
                 new_shape = _compute_shape_after_pooling(
                     kpsoi.shape, ksize_h, ksize_w)
 
-                keypoints_on_images[i] = kpsoi.on(new_shape)
+                keypoints_on_images[i] = kpsoi.on_(new_shape)
 
         return keypoints_on_images
 
@@ -189,7 +178,7 @@ class _AbstractPoolingBase(meta.Augmenter):
                                                   func)
 
     def get_parameters(self):
-        """See :func:`imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.kernel_size, self.keep_size]
 
 
@@ -218,9 +207,10 @@ class AveragePooling(_AbstractPoolingBase):
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.imgaug.avg_pool`.
+    See :func:`~imgaug.imgaug.avg_pool`.
 
     Attributes
     ----------
@@ -254,14 +244,14 @@ class AveragePooling(_AbstractPoolingBase):
         to the input image's size, i.e. the augmenter's output shape is always
         identical to the input shape.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -299,10 +289,10 @@ class AveragePooling(_AbstractPoolingBase):
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
     def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(AveragePooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         return ia.avg_pool(
@@ -329,9 +319,10 @@ class MaxPooling(_AbstractPoolingBase):
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.imgaug.max_pool`.
+    See :func:`~imgaug.imgaug.max_pool`.
 
     Attributes
     ----------
@@ -365,14 +356,14 @@ class MaxPooling(_AbstractPoolingBase):
         to the input image's size, i.e. the augmenter's output shape is always
         identical to the input shape.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -410,10 +401,10 @@ class MaxPooling(_AbstractPoolingBase):
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
     def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(MaxPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend max_pool to support pad_mode and set it here
@@ -442,9 +433,10 @@ class MinPooling(_AbstractPoolingBase):
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.imgaug.pool`.
+    See :func:`~imgaug.imgaug.min_pool`.
 
     Attributes
     ----------
@@ -478,14 +470,14 @@ class MinPooling(_AbstractPoolingBase):
         to the input image's size, i.e. the augmenter's output shape is always
         identical to the input shape.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -523,10 +515,10 @@ class MinPooling(_AbstractPoolingBase):
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
     def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(MinPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend pool to support pad_mode and set it here
@@ -555,9 +547,10 @@ class MedianPooling(_AbstractPoolingBase):
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    dtype support::
+    Supported dtypes
+    ----------------
 
-        See :func:`imgaug.imgaug.pool`.
+    See :func:`~imgaug.imgaug.median_pool`.
 
     Attributes
     ----------
@@ -591,14 +584,14 @@ class MedianPooling(_AbstractPoolingBase):
         to the input image's size, i.e. the augmenter's output shape is always
         identical to the input shape.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+    **old_kwargs
+        Outdated parameters. Avoid using these.
 
     Examples
     --------
@@ -636,10 +629,10 @@ class MedianPooling(_AbstractPoolingBase):
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
     def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None, **old_kwargs):
         super(MedianPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name, **old_kwargs)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend pool to support pad_mode and set it here
