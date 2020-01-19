@@ -783,32 +783,6 @@ per image. The thresholding operation happens per channel. ::
     :alt: Solarize
 
 
-ContrastNormalization
----------------------
-
-Augmenter that changes the contrast of images.
-
-API link: :class:`~imgaug.augmenters.arithmetic.ContrastNormalization`
-
-**Example.**
-Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image::
-
-    import imgaug.augmenters as iaa
-    aug = iaa.ContrastNormalization((0.5, 1.5))
-
-.. figure:: ../../images/overview_of_augmenters/arithmetic/contrastnormalization.jpg
-    :alt: ContrastNormalization
-
-**Example.**
-Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image
-and for 50% of all images also independently per channel::
-
-    aug = iaa.ContrastNormalization((0.5, 1.5), per_channel=0.5)
-
-.. figure:: ../../images/overview_of_augmenters/arithmetic/contrastnormalization_per_channel.jpg
-    :alt: ContrastNormalization per channel
-
-
 JpegCompression
 ---------------
 
