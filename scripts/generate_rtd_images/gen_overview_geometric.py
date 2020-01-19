@@ -77,7 +77,7 @@ def chapter_augmenters_scalex():
     aug = iaa.ScaleX((0.5, 1.5))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*2)], cols=4, rows=2)
 
 
 def chapter_augmenters_scaley():
@@ -88,7 +88,7 @@ def chapter_augmenters_scaley():
     aug = iaa.ScaleY((0.5, 1.5))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*2)], cols=4, rows=2)
 
 
 def chapter_augmenters_translatex():
@@ -99,12 +99,12 @@ def chapter_augmenters_translatex():
     aug = iaa.TranslateX(px=(-20, 20))
     run_and_save_augseq(
         fn_start + "_absolute.jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*2)], cols=4, rows=2)
 
     aug = iaa.TranslateX(percent=(-0.1, 0.1))
     run_and_save_augseq(
         fn_start + "_relative.jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*2)], cols=4, rows=2)
 
 
 def chapter_augmenters_translatey():
@@ -115,12 +115,12 @@ def chapter_augmenters_translatey():
     aug = iaa.TranslateY(px=(-20, 20))
     run_and_save_augseq(
         fn_start + "_absolute.jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*1)], cols=4, rows=2)
 
     aug = iaa.TranslateY(percent=(-0.1, 0.1))
     run_and_save_augseq(
         fn_start + "_relative.jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*1)], cols=4, rows=2)
 
 
 def chapter_augmenters_rotate():
@@ -131,7 +131,7 @@ def chapter_augmenters_rotate():
     aug = iaa.Rotate((-45, 45))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*2)], cols=4, rows=2)
 
 
 def chapter_augmenters_shearx():
@@ -142,7 +142,7 @@ def chapter_augmenters_shearx():
     aug = iaa.ShearX((-20, 20))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*2)], cols=4, rows=2)
 
 
 def chapter_augmenters_sheary():
@@ -153,7 +153,7 @@ def chapter_augmenters_sheary():
     aug = iaa.ShearY((0.5, 1.5))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
-        [image for _ in range(4*1)], cols=4, rows=1)
+        [image for _ in range(4*2)], cols=4, rows=2)
 
 
 def chapter_augmenters_piecewiseaffine():

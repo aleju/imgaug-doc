@@ -68,7 +68,10 @@ def chapter_augmenters_blendalphamask():
 
     aug = iaa.BlendAlphaMask(
         iaa.InvertMaskGen(0.5, iaa.VerticalLinearGradientMaskGen()),
-        iaa.Clouds()
+        iaa.Sequential([
+            iaa.Clouds(),
+            iaa.WithChannels([1, 2], iaa.Multiply(0.5))
+        ])
     )
     run_and_save_augseq(
         fn_start + ".jpg", aug,
@@ -84,10 +87,10 @@ def chapter_augmenters_alphaelementwise():
         fn_start + "_050_grayscale.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(4)], cols=4, rows=1)
 
-    aug = aug_cls((0.0, 1.0), iaa.Grayscale(1.0))
+    aug = aug_cls((0.0, 1.0), iaa.AddToHue(100))
     run_and_save_augseq(
         fn_start + "_uniform_factor.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+        [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1)
 
     aug = aug_cls(
         (0.0, 1.0),
@@ -124,14 +127,14 @@ def chapter_augmenters_simplexnoisealpha():
         upscale_method="nearest")
     run_and_save_augseq(
         fn_start + "_nearest.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
     aug = iaa.SimplexNoiseAlpha(
         iaa.EdgeDetect(1.0),
         upscale_method="linear")
     run_and_save_augseq(
         fn_start + "_linear.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
     aug = iaa.SimplexNoiseAlpha(
         iaa.EdgeDetect(1.0),
@@ -154,14 +157,14 @@ def chapter_augmenters_frequencynoisealpha():
         upscale_method="nearest")
     run_and_save_augseq(
         fn_start + "_nearest.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
     aug = iaa.FrequencyNoiseAlpha(
         first=iaa.EdgeDetect(1.0),
         upscale_method="linear")
     run_and_save_augseq(
         fn_start + "_linear.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*1)], cols=4, rows=1)
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
     aug = iaa.FrequencyNoiseAlpha(
         first=iaa.EdgeDetect(1.0),
@@ -193,24 +196,24 @@ def chapter_augmenters_blendalphasomecolors():
     aug = iaa.BlendAlphaSomeColors(iaa.Grayscale(1.0))
     run_and_save_augseq(
         fn_start + "_grayscale.jpg", aug,
-        [image for _ in range(4*2)], cols=4, rows=2)
+        [image for _ in range(4*3)], cols=4, rows=3)
 
     aug = iaa.BlendAlphaSomeColors(iaa.TotalDropout(1.0))
     run_and_save_augseq(
         fn_start + "_total_dropout.jpg", aug,
-        [image for _ in range(4*2)], cols=4, rows=2)
+        [image for _ in range(4*3)], cols=4, rows=3)
 
     aug = iaa.BlendAlphaSomeColors(
         iaa.MultiplySaturation(0.5), iaa.MultiplySaturation(1.5))
     run_and_save_augseq(
         fn_start + "_saturation.jpg", aug,
-        [image for _ in range(4*2)], cols=4, rows=2)
+        [image for _ in range(4*3)], cols=4, rows=3)
 
     aug = iaa.BlendAlphaSomeColors(
         iaa.AveragePooling(7), alpha=[0.0, 1.0], smoothness=0.0)
     run_and_save_augseq(
         fn_start + "_pooling.jpg", aug,
-        [image for _ in range(4*2)], cols=4, rows=2)
+        [image for _ in range(4*3)], cols=4, rows=3)
 
     aug = iaa.BlendAlphaSomeColors(
         iaa.AveragePooling(7), nb_bins=2, smoothness=0.0)
@@ -222,15 +225,16 @@ def chapter_augmenters_blendalphasomecolors():
         iaa.AveragePooling(7), from_colorspace="BGR")
     run_and_save_augseq(
         fn_start + "_pooling_bgr.jpg", aug,
-        [image[:, :, ::-1] for _ in range(4*2)], cols=4, rows=2)
+        [image[:, :, ::-1] for _ in range(4*2)], cols=4, rows=2,
+        image_colorspace=iaa.CSPACE_BGR)
 
 
 def chapter_augmenters_blendalphahorizontallineargradient():
     fn_start = "blend/blendalphahorizontallineargradient"
 
-    aug = iaa.BlendAlphaHorizontalLinearGradient(iaa.Grayscale(1.0))
+    aug = iaa.BlendAlphaHorizontalLinearGradient(iaa.AddToHue((-100, 100)))
     run_and_save_augseq(
-        fn_start + "_grayscale.jpg", aug,
+        fn_start + "_hue.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
     aug = iaa.BlendAlphaHorizontalLinearGradient(
@@ -251,9 +255,9 @@ def chapter_augmenters_blendalphahorizontallineargradient():
 def chapter_augmenters_blendalphaverticallineargradient():
     fn_start = "blend/blendalphaverticallineargradient"
 
-    aug = iaa.BlendAlphaVerticalLinearGradient(iaa.Grayscale(1.0))
+    aug = iaa.BlendAlphaVerticalLinearGradient(iaa.AddToHue((-100, 100)))
     run_and_save_augseq(
-        fn_start + "_grayscale.jpg", aug,
+        fn_start + "_hue.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
     aug = iaa.BlendAlphaVerticalLinearGradient(
@@ -293,29 +297,29 @@ def chapter_augmenters_blendalpharegulargrid():
                                     alpha=[0.0, 0.0, 1.0])
     run_and_save_augseq(
         fn_start + "_two_branches.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+        [ia.quokka(size=(128, 128)) for _ in range(4*3)], cols=4, rows=3)
 
 
 def chapter_augmenters_blendalphacheckerboard():
     fn_start = "blend/blendalphacheckerboard"
 
     aug = iaa.BlendAlphaCheckerboard(nb_rows=2, nb_cols=(1, 4),
-                                     foreground=iaa.Grayscale(1.0))
+                                     foreground=iaa.AddToHue((-100, 100)))
     run_and_save_augseq(
-        fn_start + "_grayscale.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+        fn_start + "_hue.jpg", aug,
+        [ia.quokka(size=(200, 200)) for _ in range(3*4)], cols=3, rows=4)
 
 
 def chapter_augmenters_blendalphasegmapclassids():
     fn_start = "blend/blendalphasegmapclassids"
 
     aug = iaa.BlendAlphaSegMapClassIds(
-        [1, 3], foreground=iaa.Grayscale(1.0))
+        [1, 3], foreground=iaa.AddToHue((-100, 100)))
     batch = ia.Batch(
         images=[ia.quokka(size=(128, 128))] * (4*2),
         segmentation_maps=[ia.quokka_segmentation_map(size=(128, 128))] * (4*2)
     )
-    run_and_save_augseq_batch(fn_start + "_grayscale.jpg", aug, batch,
+    run_and_save_augseq_batch(fn_start + "_hue.jpg", aug, batch,
                               cols=4, rows=2)
 
 

@@ -110,7 +110,7 @@ def grid(images, rows, cols, border=1, border_color=255):
                 #if col_idx > 1:
                 #border_left = 0
                 #image = np.pad(image, ((border_top, border_bottom), (border_left, border_right), (0, 0)), mode="constant", constant_values=border_color)
-                image = ia.pad(
+                image = iaa.pad(
                     image,
                     top=border_top,
                     right=border_right,

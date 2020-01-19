@@ -39,7 +39,7 @@ def chapter_augmenters_sequential():
     ], random_order=True)
     run_and_save_augseq(
         "meta/sequential_random_order.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+        [ia.quokka(size=(128, 128)) for _ in range(4*4)], cols=4, rows=4
     )
 
 

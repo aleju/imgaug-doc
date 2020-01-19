@@ -155,12 +155,12 @@ pixels. ::
     :alt: Alpha-blend images pixelwise with grayscale images
 
 **Example.**
-Same as in the previous example, but the alpha factor is sampled uniformly
-from the interval ``[0.0, 1.0]`` once per pixel, thereby removing a random
-fraction of all colors from each pixel. This is equivalent to
-``iaa.Grayscale((0.0, 1.0))``. ::
+Same as in the previous example, but here with hue-shift instead
+of grayscaling and additionally the alpha factor is sampled uniformly
+from the interval ``[0.0, 1.0]`` once per pixel, thereby shifting the
+hue by a random fraction for each pixel. ::
 
-    aug = iaa.BlendAlphaElementwise((0, 1.0), iaa.Grayscale(1.0))
+    aug = iaa.BlendAlphaElementwise((0, 1.0), iaa.AddToHue(100))
 
 .. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_uniform_factor.jpg
     :alt: Alpha-blend images pixelwise with grayscale images using a random factor
@@ -452,10 +452,10 @@ Create an augmenter that removes more color towards the right of the
 image::
 
     import imgaug.augmenters as iaa
-    aug = iaa.BlendAlphaHorizontalLinearGradient(iaa.Grayscale(1.0))
+    aug = iaa.BlendAlphaHorizontalLinearGradient(iaa.AddToHue((-100, 100)))
 
-.. figure:: ../../images/overview_of_augmenters/blend/blendalphahorizontallineargradient_grayscale.jpg
-    :alt: BlendAlphaHorizontalLinearGradient + Grayscale
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphahorizontallineargradient_hue.jpg
+    :alt: BlendAlphaHorizontalLinearGradient + AddToHue
 
 **Example.**
 Create an augmenter that replaces pixels towards the right with darker
@@ -505,10 +505,10 @@ Create an augmenter that removes more color towards the bottom of the
 image::
 
     import imgaug.augmenters as iaa
-    aug = iaa.BlendAlphaVerticalLinearGradient(iaa.Grayscale(1.0))
+    aug = iaa.BlendAlphaVerticalLinearGradient(iaa.AddToHue((-100, 100)))
 
-.. figure:: ../../images/overview_of_augmenters/blend/blendalphaverticallineargradient_grayscale.jpg
-    :alt: BlendAlphaVerticalLinearGradient + Grayscale
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphaverticallineargradient_hue.jpg
+    :alt: BlendAlphaVerticalLinearGradient + AddToHue
 
 **Example.**
 Create an augmenter that replaces pixels towards the bottom with darker
@@ -622,10 +622,10 @@ grayscaled, the other half is unaltered. ::
 
     import imgaug.augmenters as iaa
     aug = iaa.BlendAlphaCheckerboard(nb_rows=2, nb_cols=(1, 4),
-                                     foreground=iaa.Grayscale(1.0))
+                                     foreground=iaa.AddToHue((-100, 100)))
 
-.. figure:: ../../images/overview_of_augmenters/blend/blendalphacheckerboard_grayscale.jpg
-    :alt: BlendAlphaCheckerboard + Grayscale
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphacheckerboard_hue.jpg
+    :alt: BlendAlphaCheckerboard + AddToHue
 
 
 BlendAlphaSegMapClassIds
@@ -659,10 +659,10 @@ contain the classes ``1`` or ``3``::
 
     import imgaug.augmenters as iaa
     aug = iaa.BlendAlphaSegMapClassIds(
-        [1, 3], foreground=iaa.Grayscale(1.0))
+        foreground=iaa.AddToHue((-100, 100)))
 
-.. figure:: ../../images/overview_of_augmenters/blend/blendalphasegmapclassids_grayscale.jpg
-    :alt: BlendAlphaSegMapClassIds + Grayscale
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphasegmapclassids_hue.jpg
+    :alt: BlendAlphaSegMapClassIds + AddToHue
 
 **Example.**
 Create an augmenter that randomly picks ``2`` classes from the

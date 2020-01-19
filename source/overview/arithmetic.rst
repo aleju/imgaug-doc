@@ -88,7 +88,7 @@ distribution ``N(0, 0.05*255)``::
     :alt: AdditiveGaussianNoise large
 
 **Example.**
-Add laplace noise to an image, sampled channelwise from
+Add gaussian noise to an image, sampled channelwise from
 ``N(0, 0.2*255)`` (i.e. three independent samples per pixel)::
 
     aug = iaa.AdditiveGaussianNoise(scale=0.2*255, per_channel=True)
