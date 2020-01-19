@@ -10,6 +10,7 @@ Overview of Augmenters
    overview/artistic.rst
    overview/blend.rst
    overview/blur.rst
+   overview/collections.rst
    overview/color.rst
    overview/contrast.rst
    overview/convolutional.rst
@@ -17,6 +18,8 @@ Overview of Augmenters
    overview/edges.rst
    overview/flip.rst
    overview/geometric.rst
+   overview/imgcorruptlike.rst
+   overview/pillike.rst
    overview/pooling.rst
    overview/segmentation.rst
    overview/size.rst
