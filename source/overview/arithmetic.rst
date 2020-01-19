@@ -268,6 +268,82 @@ sample one multiplier independently per channel and pixel::
     :alt: MultiplyElementwise per channel
 
 
+Cutout
+------
+
+Fill one or more rectangular areas in an image using a fill mode.
+
+See paper "Improved Regularization of Convolutional Neural Networks with
+Cutout" by DeVries and Taylor.
+
+In contrast to the paper, this implementation also supports replacing
+image sub-areas with gaussian noise, random intensities or random RGB
+colors. It also supports non-squared areas. While the paper uses
+absolute pixel values for the size and position, this implementation
+uses relative values, which seems more appropriate for mixed-size
+datasets. The position parameter furthermore allows more flexibility, e.g.
+gaussian distributions around the center.
+
+.. note::
+
+    This augmenter affects only image data. Other datatypes (e.g.
+    segmentation map pixels or keypoints within the filled areas)
+    are not affected.
+
+.. note::
+
+    Gaussian fill mode will assume that float input images contain values
+    in the interval ``[0.0, 1.0]`` and hence sample values from a
+    gaussian within that interval, i.e. from ``N(0.5, std=0.5/3)``.
+
+API link: :class:`~imgaug.augmenters.arithmetic.MultiplyElementwise`
+
+**Example.**
+Fill per image two random areas, by default with grayish pixels::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Cutout(nb_iterations=2)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_nb_iterations_2.jpg
+    :alt: Cutout with nb_iterations=2
+
+**Example.**
+Fill per image between one and five areas, each having ``20%``
+of the corresponding size of the height and width (for non-square
+images this results in non-square areas to be filled). ::
+
+    aug = iaa.Cutout(nb_iterations=(1, 5), size=0.2, squared=False)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_non_square.jpg
+    :alt: Cutout non-square
+
+**Example.**
+Fill all areas with white pixels::
+
+    aug = iaa.Cutout(fill_mode="constant", cval=255)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_cval_255.jpg
+    :alt: Cutout with cval=255
+
+**Example.**
+Fill ``50%`` of all areas with a random intensity value between
+``0`` and ``256``. Fill the other ``50%`` of all areas with random colors. ::
+
+    aug = iaa.Cutout(fill_mode="constant", cval=(0, 255),
+                     fill_per_channel=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_rgb.jpg
+    :alt: Cutout with RGB filling
+
+**Example.**
+Fill areas with gaussian channelwise noise (i.e. usually RGB). ::
+
+    aug = iaa.Cutout(fill_mode="gaussian", fill_per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_gaussian.jpg
+    :alt: Cutout with gaussian filling
+
+
 Dropout
 -------
 

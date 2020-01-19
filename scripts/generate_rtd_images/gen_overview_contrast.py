@@ -14,8 +14,6 @@ def main():
     chapter_augmenters_sigmoidcontrast()
     chapter_augmenters_logcontrast()
     chapter_augmenters_linearcontrast()
-    chapter_augmenters_equalize()
-    chapter_augmenters_autocontrast()
     chapter_augmenters_allchannelsclahe()
     chapter_augmenters_clahe()
     chapter_augmenters_allchannelshistogramequalization()
@@ -76,29 +74,6 @@ def chapter_augmenters_linearcontrast():
     aug = iaa.LinearContrast((0.6, 1.4), per_channel=True)
     run_and_save_augseq(
         fn_start + "_per_channel.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
-
-
-def chapter_augmenters_equalize():
-    fn_start = "contrast/equalize"
-
-    aug = iaa.Equalize()
-    run_and_save_augseq(
-        fn_start + ".jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
-
-
-def chapter_augmenters_autocontrast():
-    fn_start = "contrast/autocontrast"
-
-    aug = iaa.Autocontrast()
-    run_and_save_augseq(
-        fn_start + ".jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
-
-    aug = iaa.Autocontrast((10, 20), per_channel=True)
-    run_and_save_augseq(
-        fn_start + "_cutoff_per_channel.jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
 

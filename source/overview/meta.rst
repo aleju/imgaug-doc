@@ -161,21 +161,44 @@ Rotate each image's red channel by ``0`` to ``45`` degrees::
     :alt: WithChannels + Affine
 
 
+Identity
+--------
+
+Augmenter that does not change the input data.
+
+This augmenter is useful e.g. during validation/testing as it allows
+to re-use the training code without actually performing any augmentation.
+
+API link: :class:`~imgaug.augmenters.meta.Identity`
+
+**Example.**
+Create an augmenter that does not change inputs::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Identity()
+
+.. figure:: ../../images/overview_of_augmenters/meta/identity.jpg
+    :alt: Identity
+
+
 Noop
 ----
 
-Augmenter that never changes input images ("no operation").
+Alias for augmenter :class:`Identity`.
+
+It is recommended to now use :class:`Identity`. :class:`Noop` might be
+deprecated in the future.
 
 API link: :class:`~imgaug.augmenters.meta.Noop`
 
-**Example.** Create an augmenter that does nothing::
+**Example.**
+Create an augmenter that does nothing::
 
     import imgaug.augmenters as iaa
     aug = iaa.Noop()
 
 .. figure:: ../../images/overview_of_augmenters/meta/noop.jpg
     :alt: Noop
-
 
 
 Lambda

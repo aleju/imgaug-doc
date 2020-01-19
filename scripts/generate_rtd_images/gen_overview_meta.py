@@ -13,6 +13,7 @@ def main():
     chapter_augmenters_oneof()
     chapter_augmenters_sometimes()
     chapter_augmenters_withchannels()
+    chapter_augmenters_identity()
     chapter_augmenters_noop()
     chapter_augmenters_lambda()
     chapter_augmenters_assertlambda()
@@ -123,11 +124,19 @@ def chapter_augmenters_withchannels():
     )
 
 
+def chapter_augmenters_identity():
+    aug = iaa.Identity()
+    run_and_save_augseq(
+        "meta/identity.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4)], cols=4, rows=1
+    )
+
+
 def chapter_augmenters_noop():
     aug = iaa.Noop()
     run_and_save_augseq(
         "meta/noop.jpg", aug,
-        [ia.quokka(size=(128, 128)) for _ in range(8)], cols=4, rows=2
+        [ia.quokka(size=(128, 128)) for _ in range(4)], cols=4, rows=1
     )
 
 

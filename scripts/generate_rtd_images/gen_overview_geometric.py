@@ -15,6 +15,8 @@ def main():
     chapter_augmenters_translatex()
     chapter_augmenters_translatey()
     chapter_augmenters_rotate()
+    chapter_augmenters_shearx()
+    chapter_augmenters_sheary()
     chapter_augmenters_piecewiseaffine()
     chapter_augmenters_perspectivetransform()
     chapter_augmenters_elastictransformation()
@@ -127,6 +129,28 @@ def chapter_augmenters_rotate():
     image = ia.quokka(size=(128, 128))
 
     aug = iaa.Rotate((-45, 45))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+
+def chapter_augmenters_shearx():
+    fn_start = "geometric/shearx"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.ShearX((-20, 20))
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [image for _ in range(4*1)], cols=4, rows=1)
+
+
+def chapter_augmenters_sheary():
+    fn_start = "geometric/sheary"
+
+    image = ia.quokka(size=(128, 128))
+
+    aug = iaa.ShearY((0.5, 1.5))
     run_and_save_augseq(
         fn_start + ".jpg", aug,
         [image for _ in range(4*1)], cols=4, rows=1)

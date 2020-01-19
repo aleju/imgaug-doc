@@ -81,7 +81,7 @@ MultiplyAndAddToBrightness
 Multiply and add to the brightness channels of input images.
 
 This is a wrapper around
-:class:`imgaug.augmenters.color.WithBrightnessChannels` and hence
+:class:`~imgaug.augmenters.color.WithBrightnessChannels` and hence
 performs internally the same projection to random colorspaces.
 
 API link: :class:`~imgaug.augmenters.color.MultiplyAndAddToBrightness`
@@ -105,7 +105,7 @@ MultiplyBrightness
 Multiply the brightness channels of input images.
 
 This is a wrapper around
-:class:`imgaug.augmenters.color.WithBrightnessChannels` and hence
+:class:`~imgaug.augmenters.color.WithBrightnessChannels` and hence
 performs internally the same projection to random colorspaces.
 
 API link: :class:`~imgaug.augmenters.color.MultiplyBrightness`
@@ -128,7 +128,7 @@ AddToBrightness
 Add to the brightness channels of input images.
 
 This is a wrapper around
-:class:`imgaug.augmenters.color.WithBrightnessChannels` and hence
+:class:`~imgaug.augmenters.color.WithBrightnessChannels` and hence
 performs internally the same projection to random colorspaces.
 
 API link: :class:`~imgaug.augmenters.color.AddToBrightness`
@@ -295,7 +295,7 @@ RemoveSaturation
 Decrease the saturation of images by varying degrees.
 
 This creates images looking similar to
-:class:`imgaug.augmenters.color.Grayscale`.
+:class:`~imgaug.augmenters.color.Grayscale`.
 
 This augmenter is the same as ``MultiplySaturation((0.0, 1.0))``.
 
@@ -453,89 +453,6 @@ Visualization of increasing ``alpha`` from ``0.0`` to ``1.0`` in eight steps:
 
 .. figure:: ../../images/overview_of_augmenters/color/grayscale_vary_alpha.jpg
     :alt: Grayscale vary alpha
-
-
-GrayscaleColorwise
-------------------
-
-Apply grayscaling to some selected color ranges in each image.
-
-This augmenter is similar to
-:class:`imgaug.augmenters.color.Grayscale`. Instead of removing color
-from the whole image uniformly, it instead removes color from some ranges
-of color, while leaving other color ranges unaffected. E.g. red may become
-gray, while tones of blue are not changed.
-
-API link: :class:`~imgaug.augmenters.color.GrayscaleColorwise`
-
-**Example.**
-Create a colorwise grayscaling augmenter::
-
-    import imgaug.augmenters as iaa
-    aug = iaa.GrayscaleColorwise()
-
-.. figure:: ../../images/overview_of_augmenters/color/grayscalecolorwise.jpg
-    :alt: GrayscaleColorwise
-
-**Example.**
-Create a colorwise grayscaling augmenter with a large number of bins
-and stronger smoothing between them. The binning allows to have more
-color-specific desaturation effects, while the smoothing ensures that
-neighbouring colors are desaturated in similar ways. ::
-
-    aug = iaa.GrayscaleColorwise(nb_bins=200, smoothness=0.5)
-
-.. figure:: ../../images/overview_of_augmenters/color/grayscalecolorwise_many_bins.jpg
-    :alt: GrayscaleColorwise with many bins
-
-**Example.**
-Create a colorwise grayscale augmenter that -- on average -- grayscales
-half of all colors in each image. Note that colors will be either
-completely grayscale or completely unaffected due to the default setting
-of `alpha`. ::
-
-    aug = iaa.GrayscaleColorwise(nb_bins=2, smoothness=0.0)
-
-.. figure:: ../../images/overview_of_augmenters/color/grayscalecolorwise_two_bins.jpg
-    :alt: GrayscaleColorwise with two bins
-
-**Example.**
-Same as in the previous example, but the colors are not 100% removed or
-100% unchanged, but instead there can be partial removal of colors. In
-most cases though, it will be close to 100% removal/unchanged. ::
-
-    import imgaug.parameters as iap
-    aug = iaa.GrayscaleColorwise(nb_bins=2, smoothness=0.0,
-                                 alpha=iap.Beta(0.5, 0.5))
-
-.. figure:: ../../images/overview_of_augmenters/color/grayscalecolorwise_beta.jpg
-    :alt: GrayscaleColorwise with Beta distribution for alpha
-
-
-RemoveSaturationColorwise
--------------------------
-
-Apply saturation removal to some selected color ranges in each image.
-
-This is mostly identical to
-:class:`imgaug.augmenters.color.GrayscaleColorwise`. It executes the
-same steps, except that the mask from color (hue) to alpha is not
-used to blend the HSV image with a grayscale one, but instead is used
-as an inverted multiplier for the saturation channel, i.e. saturation
-values of colors with high alpha will be lowered significantly, leading
-to these colors appearing more grayish.
-
-API link: :class:`~imgaug.augmenters.color.RemoveSaturationColorwise`
-
-**Example.**
-Create an augmenter that decreases the saturation on a
-per-color basis.
-
-    import imgaug.augmenters as iaa
-    aug = iaa.RemoveSaturationColorwise()
-
-.. figure:: ../../images/overview_of_augmenters/color/removesaturationcolorwise.jpg
-    :alt: RemoveSaturationColorwise
 
 
 ChangeColorTemperature
@@ -714,7 +631,7 @@ This augmenter behaves for ``B`` similarly to
 ``UniformColorQuantization(2**B)``, but quantizes each bin with interval
 ``(a, b)`` to ``a`` instead of to ``a + (b-a)/2``.
 
-This augmenter is comparable to :func:`PIL.ImageOps.posterize`.
+This augmenter is comparable to :func:`~PIL.ImageOps.posterize`.
 
 .. note::
 

@@ -23,6 +23,7 @@ def main():
     chapter_augmenters_coarsepepper()
     chapter_augmenters_multiply()
     chapter_augmenters_multiplyelementwise()
+    chapter_augmenters_cutout()
     chapter_augmenters_dropout()
     chapter_augmenters_coarsedropout()
     chapter_augmenters_dropout2d()
@@ -304,6 +305,34 @@ def chapter_augmenters_multiplyelementwise():
         [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1,
         quality=90
     )
+
+
+def chapter_augmenters_cutout():
+    aug = iaa.Cutout(nb_iterations=2)
+    run_and_save_augseq(
+        "arithmetic/cutout_nb_iterations_2.jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1)
+
+    aug = iaa.Cutout(nb_iterations=(1, 5), size=0.2, squared=False)
+    run_and_save_augseq(
+        "arithmetic/cutout_non_square.jpg", aug,
+        [ia.quokka(size=(64, 90)) for _ in range(5)], cols=5, rows=1)
+
+    aug = iaa.Cutout(fill_mode="constant", cval=255)
+    run_and_save_augseq(
+        "arithmetic/cutout_cval_255.jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1)
+
+    aug = iaa.Cutout(fill_mode="constant", cval=(0, 255),
+                     fill_per_channel=0.5)
+    run_and_save_augseq(
+        "arithmetic/cutout_rgb.jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1)
+
+    aug = iaa.Cutout(fill_mode="gaussian", fill_per_channel=True)
+    run_and_save_augseq(
+        "arithmetic/cutout_gaussian.jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1)
 
 
 def chapter_augmenters_dropout():

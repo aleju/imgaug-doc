@@ -75,12 +75,12 @@ class IdentityOnFirstCall(meta.Augmenter):
         self.after_first_call = after_first_call
         self.call_idx = 0
 
-    def _augment_batch(self, batch, random_state, parents, hooks):
+    def _augment_batch_(self, batch, random_state, parents, hooks):
         self.call_idx += 1
         if self.call_idx == 1:
             return batch
-        return self.after_first_call._augment_batch(batch, random_state,
-                                                    parents, hooks)
+        return self.after_first_call._augment_batch_(batch, random_state,
+                                                     parents, hooks)
 
     def get_parameters(self):
         return []

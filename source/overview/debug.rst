@@ -16,14 +16,14 @@ in order to save to that filepath instead of the temporary folder. ::
 
     import imgaug.augmenters as iaa
     import tempfile
-    folder_path = tempfile.mkdtemp()
-    seq = iaa.Sequential([
-        iaa.Sequential([
-            iaa.Fliplr(0.5),
-            iaa.Crop(px=(0, 16))
-        ], random_order=True),
-        iaa.SaveDebugImageEveryNBatches(folder_path, 100)
-    ])
+    with tempfile.TemporaryDirectory() as folder_path:
+        seq = iaa.Sequential([
+            iaa.Sequential([
+                iaa.Fliplr(0.5),
+                iaa.Crop(px=(0, 16))
+            ], random_order=True),
+            iaa.SaveDebugImageEveryNBatches(folder_path, 100)
+        ])
 
 .. figure:: ../../images/overview_of_augmenters/debug/savedebugimageeverynbatches.jpg
     :alt: SaveDebugImageEveryNBatches

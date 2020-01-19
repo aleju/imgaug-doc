@@ -197,6 +197,46 @@ and ``45`` degress::
     :alt: Rotate
 
 
+ShearX
+------
+
+Apply affine shear on the x-axis to input data.
+
+This is a wrapper around :class:`Affine`.
+
+API link: :class:`~imgaug.augmenters.geometric.ShearX`
+
+**Example.**
+Create an augmenter that shears images along the x-axis by random amounts
+between ``-20`` and ``20`` degrees::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.ShearX((-20, 20))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/shearx.jpg
+    :alt: ShearX
+
+
+ShearY
+------
+
+Apply affine shear on the y-axis to input data.
+
+This is a wrapper around :class:`Affine`.
+
+API link: :class:`~imgaug.augmenters.geometric.ShearY`
+
+**Example.**
+Create an augmenter that shears images along the y-axis by random amounts
+between ``-20`` and ``20`` degrees::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.ShearY((-20, 20))
+
+.. figure:: ../../images/overview_of_augmenters/geometric/sheary.jpg
+    :alt: ShearY
+
+
 PiecewiseAffine
 ---------------
 

@@ -35,8 +35,6 @@ def main():
     chapter_augmenters_uniformcolorquantizationtonbits()
     chapter_augmenters_changecolorspace()
     chapter_augmenters_grayscale()
-    chapter_augmenters_grayscalecolorwise()
-    chapter_augmenters_removesaturationcolorwise()
     chapter_augmenters_changecolortemperature()
 
 
@@ -340,56 +338,6 @@ def chapter_augmenters_grayscale():
         "color/grayscale_vary_alpha.jpg",
         [iaa.Grayscale(alpha=alpha) for alpha in alphas],
         [ia.quokka(size=(64, 64)) for _ in range(8)], cols=8, rows=1
-    )
-
-
-def chapter_augmenters_grayscalecolorwise():
-    fn_start = "color/grayscalecolorwise"
-
-    image = imageio.imread(
-        os.path.join(INPUT_IMAGES_DIR,
-                     "1280px-Vincent_Van_Gogh_-_Wheatfield_with_Crows.jpg"))
-    image = ia.imresize_single_image(image, 0.125)
-
-    aug = iaa.GrayscaleColorwise()
-    run_and_save_augseq(
-        fn_start + ".jpg", aug,
-        [image] * (3*5), cols=3, rows=5
-    )
-
-    aug = iaa.GrayscaleColorwise(nb_bins=200, smoothness=0.5)
-    run_and_save_augseq(
-        fn_start + "_many_bins.jpg", aug,
-        [image] * (3*5), cols=3, rows=5
-    )
-
-    aug = iaa.GrayscaleColorwise(nb_bins=2, smoothness=0.0)
-    run_and_save_augseq(
-        fn_start + "_two_bins.jpg", aug,
-        [image] * (3*5), cols=3, rows=5,
-    )
-
-    import imgaug.parameters as iap
-    aug = iaa.GrayscaleColorwise(nb_bins=2, smoothness=0.0,
-                                 alpha=iap.Beta(0.5, 0.5))
-    run_and_save_augseq(
-        fn_start + "_beta.jpg", aug,
-        [image] * (3*5), cols=3, rows=5,
-    )
-
-
-def chapter_augmenters_removesaturationcolorwise():
-    fn_start = "color/removesaturationcolorwise"
-
-    image = imageio.imread(
-        os.path.join(INPUT_IMAGES_DIR,
-                     "1280px-Vincent_Van_Gogh_-_Wheatfield_with_Crows.jpg"))
-    image = ia.imresize_single_image(image, 0.125)
-
-    aug = iaa.RemoveSaturationColorwise()
-    run_and_save_augseq(
-        fn_start + ".jpg", aug,
-        [image] * (3*5), cols=3, rows=5
     )
 
 
