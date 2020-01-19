@@ -13,11 +13,11 @@ from .utils import run_and_save_augseq, DOCS_IMAGES_BASE_PATH
 
 
 def main():
-    chapter_augmenters_alpha()
+    chapter_augmenters_blendalpha()
     chapter_augmenters_blendalphamask()
-    chapter_augmenters_alphaelementwise()
-    chapter_augmenters_simplexnoisealpha()
-    chapter_augmenters_frequencynoisealpha()
+    chapter_augmenters_blendalphaelementwise()
+    chapter_augmenters_blendalphasimplexnoise()
+    chapter_augmenters_blendalphafrequencynoise()
     chapter_augmenters_blendalphasomecolors()
     chapter_augmenters_blendalphahorizontallineargradient()
     chapter_augmenters_blendalphaverticallineargradient()
@@ -27,8 +27,8 @@ def main():
     chapter_augmenters_blendalphaboundingboxes()
 
 
-def chapter_augmenters_alpha():
-    fn_start = "blend/alpha"
+def chapter_augmenters_blendalpha():
+    fn_start = "blend/blendalpha"
     aug_cls = iaa.Alpha
 
     aug = aug_cls(0.5, iaa.Grayscale(1.0))
@@ -78,8 +78,8 @@ def chapter_augmenters_blendalphamask():
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
 
-def chapter_augmenters_alphaelementwise():
-    fn_start = "blend/alphaelementwise"
+def chapter_augmenters_blendalphaelementwise():
+    fn_start = "blend/blendalphaelementwise"
     aug_cls = iaa.AlphaElementwise
 
     aug = aug_cls(0.5, iaa.Grayscale(1.0))
@@ -114,8 +114,8 @@ def chapter_augmenters_alphaelementwise():
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
 
-def chapter_augmenters_simplexnoisealpha():
-    fn_start = "blend/simplexnoisealpha"
+def chapter_augmenters_blendalphasimplexnoise():
+    fn_start = "blend/blendalphasimplexnoise"
 
     aug = iaa.SimplexNoiseAlpha(iaa.EdgeDetect(1.0))
     run_and_save_augseq(
@@ -144,8 +144,8 @@ def chapter_augmenters_simplexnoisealpha():
         [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
 
 
-def chapter_augmenters_frequencynoisealpha():
-    fn_start = "blend/frequencynoisealpha"
+def chapter_augmenters_blendalphafrequencynoise():
+    fn_start = "blend/blendalphafrequencynoise"
 
     aug = iaa.FrequencyNoiseAlpha(first=iaa.EdgeDetect(1.0))
     run_and_save_augseq(

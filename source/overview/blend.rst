@@ -35,7 +35,7 @@ all color. This is equivalent to ``iaa.Grayscale(0.5)``. ::
     import imgaug.augmenters as iaa
     aug = iaa.BlendAlpha(0.5, iaa.Grayscale(1.0))
 
-.. figure:: ../../images/overview_of_augmenters/blend/alpha_050_grayscale.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalpha_050_grayscale.jpg
     :alt: Alpha-blend images with grayscale images
 
 **Example.**
@@ -46,7 +46,7 @@ fraction of all colors. This is equivalent to
 
     aug = iaa.BlendAlpha((0.0, 1.0), iaa.Grayscale(1.0))
 
-.. figure:: ../../images/overview_of_augmenters/blend/alpha_uniform_factor.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalpha_uniform_factor.jpg
     :alt: Alpha-blend images with grayscale images using a random factor
 
 **Example.**
@@ -64,7 +64,7 @@ look rotated (factors near ``0.0``). ::
         iaa.Affine(rotate=(-20, 20)),
         per_channel=0.5)
 
-.. figure:: ../../images/overview_of_augmenters/blend/alpha_affine_per_channel.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalpha_affine_per_channel.jpg
     :alt: Alpha-blend images channelwise with rotated ones
 
 **Example.**
@@ -80,7 +80,7 @@ contain a bit of ``A`` and a bit of ``B``. ::
         foreground=iaa.Add(100),
         background=iaa.Multiply(0.2))
 
-.. figure:: ../../images/overview_of_augmenters/blend/alpha_two_branches.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalpha_two_branches.jpg
     :alt: Alpha with two branches
 
 **Example.**
@@ -90,7 +90,7 @@ image using an alpha factor of either exactly ``0.25`` or exactly ``0.75``
 
     aug = iaa.BlendAlpha([0.25, 0.75], iaa.MedianBlur(13))
 
-.. figure:: ../../images/overview_of_augmenters/blend/alpha_with_choice.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalpha_with_choice.jpg
     :alt: Alpha with a list of factors to use
 
 
@@ -151,7 +151,7 @@ pixels. ::
     import imgaug.augmenters as iaa
     aug = iaa.BlendAlphaElementwise(0.5, iaa.Grayscale(1.0))
 
-.. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_050_grayscale.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphaelementwise_050_grayscale.jpg
     :alt: Alpha-blend images pixelwise with grayscale images
 
 **Example.**
@@ -162,7 +162,7 @@ hue by a random fraction for each pixel. ::
 
     aug = iaa.BlendAlphaElementwise((0, 1.0), iaa.AddToHue(100))
 
-.. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_uniform_factor.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphaelementwise_uniform_factor.jpg
     :alt: Alpha-blend images pixelwise with grayscale images using a random factor
 
 **Example.**
@@ -180,7 +180,7 @@ may not look rotated (factors near ``0.0``). ::
         iaa.Affine(rotate=(-20, 20)),
         per_channel=0.5)
 
-.. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_affine_per_channel.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphaelementwise_affine_per_channel.jpg
     :alt: Alpha-blend images pixelwise and channelwise with rotated ones
 
 **Example.**
@@ -196,7 +196,7 @@ contain a bit of ``A`` and a bit of ``B``. ::
         foreground=iaa.Add(100),
         background=iaa.Multiply(0.2))
 
-.. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_two_branches.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphaelementwise_two_branches.jpg
     :alt: BlendAlphaElementwise with two branches
 
 **Example.**
@@ -206,7 +206,7 @@ exactly ``0.75`` (sampled once per pixel). ::
 
     aug = iaa.BlendAlphaElementwise([0.25, 0.75], iaa.MedianBlur(13))
 
-.. figure:: ../../images/overview_of_augmenters/blend/alphaelementwise_with_choice.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphaelementwise_with_choice.jpg
     :alt: BlendAlphaElementwise with a list of factors to use
 
 
@@ -229,7 +229,7 @@ masks. ::
     import imgaug.augmenters as iaa
     aug = iaa.BlendAlphaSimplexNoise(iaa.EdgeDetect(1.0))
 
-.. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphasimplexnoise.jpg
     :alt: BlendAlphaSimplexNoise with EdgeDetect
 
 **Example.**
@@ -242,7 +242,7 @@ edges. ::
         iaa.EdgeDetect(1.0),
         upscale_method="nearest")
 
-.. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_nearest.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphasimplexnoise_nearest.jpg
     :alt: BlendAlphaSimplexNoise with EdgeDetect and nearest neighbour upscaling
 
 **Example.**
@@ -254,7 +254,7 @@ neighbour upsampling is used. This leads to rectangles with smooth edges. ::
         iaa.EdgeDetect(1.0),
         upscale_method="linear")
 
-.. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_linear.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphasimplexnoise_linear.jpg
     :alt: BlendAlphaSimplexNoise with EdgeDetect and linear upscaling
 
 **Example.**
@@ -270,7 +270,7 @@ will be kept, rather than using the results of the augmentation
         iaa.EdgeDetect(1.0),
         sigmoid_thresh=iap.Normal(10.0, 5.0))
 
-.. figure:: ../../images/overview_of_augmenters/blend/simplexnoisealpha_sigmoid_thresh_normal.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphasimplexnoise_sigmoid_thresh_normal.jpg
     :alt: BlendAlphaSimplexNoise with EdgeDetect and gaussian-distributed sigmoid threshold
 
 
@@ -295,7 +295,7 @@ masks. ::
     import imgaug.augmenters as iaa
     aug = iaa.BlendAlphaFrequencyNoise(first=iaa.EdgeDetect(1.0))
 
-.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphafrequencynoise.jpg
     :alt: BlendAlphaFrequencyNoise with EdgeDetect
 
 **Example.**
@@ -307,7 +307,7 @@ neighbour upsampling is used. This results in smooth edges. ::
         first=iaa.EdgeDetect(1.0),
         upscale_method="nearest")
 
-.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_nearest.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphafrequencynoise_nearest.jpg
     :alt: BlendAlphaFrequencyNoise with EdgeDetect and nearest neighbour upscaling
 
 **Example.**
@@ -319,7 +319,7 @@ neighbour upsampling is used. This results in smooth edges. ::
         first=iaa.EdgeDetect(1.0),
         upscale_method="linear")
 
-.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_linear.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphafrequencynoise_linear.jpg
     :alt: BlendAlphaFrequencyNoise with EdgeDetect and linear upscaling
 
 **Example.**
@@ -333,7 +333,7 @@ without sharp edges. ::
         exponent=-2,
         sigmoid=False)
 
-.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_clouds.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphafrequencynoise_clouds.jpg
     :alt: BlendAlphaFrequencyNoise with EdgeDetect and a cloudy pattern
 
 **Example.**
@@ -349,7 +349,7 @@ rather than using the results of the augmentation (parameter/branch
         first=iaa.EdgeDetect(1.0),
         sigmoid_thresh=iap.Normal(10.0, 5.0))
 
-.. figure:: ../../images/overview_of_augmenters/blend/frequencynoisealpha_sigmoid_thresh_normal.jpg
+.. figure:: ../../images/overview_of_augmenters/blend/blendalphafrequencynoise_sigmoid_thresh_normal.jpg
     :alt: BlendAlphaFrequencyNoise with EdgeDetect and gaussian-distributed sigmoid threshold
 
 
