@@ -7,13 +7,14 @@ import matplotlib
 
 CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
 BLACKLIST = {
-    "/external/opensimplex.py"
+    "/external/opensimplex.py",
+    "/external/poly_point_isect_py2py3.py"
 }
 WRITE_TO = os.path.join(CURRENT_DIR, "images", "dtype_support", "%s.png")
 
 EMPTY_LINE_PATTERN = re.compile(r"^[\s\t]*$")
 CLASS_START_PATTERN = re.compile(r"^\s*class [a-zA-Z0-9_.(),\s]+:?[\s]*$")
-FUNCTION_START_PATTERN = re.compile(r"^\s*def [a-zA-Z0-9_(),=\.\[\]{}:\-\"'\s]+:?[\s]*$")
+FUNCTION_START_PATTERN = re.compile(r"^\s*def [a-zA-Z0-9_(),=\.\[\]{}:\-\"'\s\*]+:?[\s]*$")
 HEADLINE_PATTERN = re.compile(r"^[\s\t]*-+[\s]*$")
 
 DEFAULT_SCENARIO_NAME = "standard"
@@ -248,6 +249,9 @@ class DtypeSupportForOperation(object):
 
     @classmethod
     def from_docstring(cls, op_type, group, name, docstring):
+        # remove '"""' and whitespace-likes at the end
+        docstring = docstring.rstrip('"').rstrip()
+
         docstring = docstring.split("\n")
 
         # read out only part below "dtype support::"
@@ -256,7 +260,7 @@ class DtypeSupportForOperation(object):
         for line in docstring:
             if in_dtype_block:
                 dtype_block.append(line)
-            if "dtype support::" in line:
+            if "**Supported dtypes**:" in line:
                 in_dtype_block = True
 
         if len(dtype_block) == 0:
@@ -281,17 +285,24 @@ class DtypeSupportForOperation(object):
 
         # remove everything starting with the next headline
         next_headline = -1
-        for i, (inset_level, block) in enumerate(subblocks):
-            for line in block[1:]:
+        for block_idx, (inset_level, block) in enumerate(subblocks):
+            for line_idx, line in enumerate(block[1:]):
                 if HEADLINE_PATTERN.match(line):
-                    next_headline = i
+                    block[:] = block[:line_idx-1]
+                    next_headline = block_idx
                     break
 
             if next_headline > -1:
                 break
 
         if next_headline > -1:
-            subblocks = subblocks[:next_headline]
+            # remove until (and including) block that contains headline
+            subblocks = subblocks[:next_headline+1]
+            # is block containing headline now empty? then delete that block
+            if next_headline > 0:
+                inset_level, block = subblocks[next_headline]
+                if len(block) == 0:
+                    subblocks = subblocks[:next_headline]
 
         # convert subblocks of (inset, content) to (scenario name, content)
         scenario_to_support = []
@@ -305,7 +316,11 @@ class DtypeSupportForOperation(object):
             is_starting_with_else = subblock_content.strip().lower().startswith("else")
             is_ending_with_colon = subblock_content.strip().endswith(":")
             is_grid_content = "* ``uint8``" in subblock_content.strip()
-            is_see = ("See ``" in subblock_content.strip()) or ("See :func:`" in subblock_content.strip())
+            is_see = (
+                ("See ``" in subblock_content.strip())
+                or ("See :func:`" in subblock_content.strip())
+                or ("See :class:`" in subblock_content.strip())
+            )
             is_minimum_of = "minimum of (" in subblock_content.strip()
 
             child_blocks = []
@@ -358,6 +373,7 @@ class DtypeSupportForOperation(object):
         docstring_no_comments = docstring_no_comments.split("\n\n")[0]
 
         if ("See :func:`" in docstring_no_comments
+                or "See :class:`" in docstring_no_comments
                 or "See ``" in docstring_no_comments):
             return cls._parse_scenario_to_grid_see(docstring)
         elif "minimum of (" in docstring:
@@ -370,14 +386,17 @@ class DtypeSupportForOperation(object):
         docstring = docstring.strip()
         if ":func:" in docstring:
             op_type = "function"
-            match = re.match(r"^[\s\t]*See :func:`(?P<name>[^`]+)`.*$", docstring.strip())
+            match = re.match(r"^[\s\t]*See :func:`~?(?P<name>[^`]+)`.*$", docstring.strip())
+        elif ":class:" in docstring:
+            op_type = "class"
+            match = re.match(r"^[\s\t]*See :class:`~?(?P<name>[^`]+)`.*$", docstring.strip())
         else:
             op_type = "class"
-            match = re.match(r"^[\s\t]*See ``(?P<name>[^`]+)``.*$", docstring.strip())
+            match = re.match(r"^[\s\t]*See ``~?(?P<name>[^`]+)``.*$", docstring.strip())
 
         if match is None:
             msg = (
-                "Tried to parse a 'See XYZ' string, but found neither a "
+                "Tried to parse a 'See <pointer>' string, but found neither a "
                 "function indicator, nor a class indicator. Docstring: %s" % (
                     docstring))
             raise ValueError(msg)
@@ -399,7 +418,10 @@ class DtypeSupportForOperation(object):
             line = line.rstrip(",")
             if ":func:" in line:
                 op_type = "function"
-                match = re.match(r"^[\s\t]*:func:`(?P<name>[^`]+)`.*$", line)
+                match = re.match(r"^[\s\t]*:func:`~?(?P<name>[^`]+)`.*$", line)
+            elif ":class:" in line:
+                op_type = "class"
+                match = re.match(r"^[\s\t]*:class:`~?(?P<name>[^`]+)`.*$", line)
             else:
                 op_type = "class"
                 match = re.match(r"^[\s\t]*``(?P<name>[^`]+)``.*$", line)
@@ -516,7 +538,6 @@ class DtypeSupportGridSee(object):
 
     def resolve(self, other_dtype_supports):
         for dtsup in other_dtype_supports:
-            # same_op_type = (dtsup.op_type == self.other_op_type)
             same_name = ((dtsup.group + "." + dtsup.name) == self.other_pointer)
             if same_name:  # ignore op type here, because some functions hide as classes
                 if self.other_scenario is None:
