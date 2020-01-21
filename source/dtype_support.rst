@@ -82,6 +82,15 @@ imgaug.augmenters.blur
     Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
     helper functions in ``imgaug.augmenters.blur``.
 
+imgaug.augmenters.collections
+-----------------------------
+
+.. figure:: ../images/dtype_support/imgaug_augmenters_collections.png
+    :alt: dtype support for augmenters in imgaug.augmenters.collections
+
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.collections``.
+
 imgaug.augmenters.color
 -----------------------
 
@@ -109,6 +118,15 @@ imgaug.augmenters.convolutional
     Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
     helper functions in ``imgaug.augmenters.convolutional``.
 
+imgaug.augmenters.debug
+-----------------------
+
+.. figure:: ../images/dtype_support/imgaug_augmenters_debug.png
+    :alt: dtype support for augmenters in imgaug.augmenters.debug
+
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.debug``.
+
 imgaug.augmenters.edges
 -----------------------
 
@@ -135,6 +153,24 @@ imgaug.augmenters.geometric
 
     Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
     helper functions in ``imgaug.augmenters.geometric``.
+
+imgaug.augmenters.imgcorruptlike
+--------------------------------
+
+.. figure:: ../images/dtype_support/imgaug_augmenters_imgcorruptlike.png
+    :alt: dtype support for augmenters in imgaug.augmenters.imgcorruptlike
+
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.imgcorruptlike``.
+
+imgaug.augmenters.pillike
+-------------------------
+
+.. figure:: ../images/dtype_support/imgaug_augmenters_pillike.png
+    :alt: dtype support for augmenters in imgaug.augmenters.pillike
+
+    Dtype support for ``augment_images(arrays)``, ``augment_image(arr)`` and
+    helper functions in ``imgaug.augmenters.pillike``.
 
 imgaug.augmenters.segmentation
 ------------------------------
