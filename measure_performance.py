@@ -15,14 +15,28 @@ import imgaug as ia
 from imgaug import augmenters as iaa
 
 
-SLOW_AUGMENTERS = (iaa.CLAHE,
+SLOW_AUGMENTERS = (iaa.Cartoon,
+                   iaa.CLAHE,
                    iaa.PiecewiseAffine, iaa.ElasticTransformation,
                    iaa.Superpixels, iaa.UniformVoronoi,
                    iaa.RegularGridVoronoi, iaa.RelativeRegularGridVoronoi,
                    iaa.Clouds, iaa.Fog, iaa.CloudLayer, iaa.Snowflakes,
-                   iaa.SnowflakesLayer,
-                   iaa.SimplexNoiseAlpha, iaa.FrequencyNoiseAlpha,
-                   iaa.KMeansColorQuantization)
+                   iaa.Rain,
+                   iaa.CloudLayer, iaa.SnowflakesLayer, iaa.RainLayer,
+                   iaa.BlendAlphaSimplexNoise,
+                   iaa.BlendAlphaFrequencyNoise,
+                   iaa.KMeansColorQuantization,
+                   iaa.MeanShiftBlur,
+                   iaa.RandAugment,
+                   iaa.imgcorruptlike.GlassBlur,
+                   iaa.imgcorruptlike.MotionBlur,
+                   iaa.imgcorruptlike.ZoomBlur,
+                   iaa.imgcorruptlike.Fog,
+                   iaa.imgcorruptlike.Frost,
+                   iaa.imgcorruptlike.Snow,
+                   iaa.imgcorruptlike.Brightness,
+                   iaa.imgcorruptlike.Saturate,
+                   iaa.imgcorruptlike.ElasticTransform)
 
 
 def main():
@@ -68,49 +82,52 @@ def main():
                     iterations_aug = compute_iterations(
                         augmenter, iterations_slow, iterations_fast)
 
-                    ia.seed(1)
-                    times = []
-                    gc.disable()  # as done in timeit
-                    if not background:
-                        for _ in sm.xrange(iterations_aug):
-                            time_start = time.time()
-                            _img_aug = augmenter.augment_images(images_batch)
-                            time_end = time.time()
-                            times.append(time_end - time_start)
-                    else:
-                        batches = [ia.Batch(images=images_batch) for _ in sm.xrange(iterations_aug)]
-                        for _ in sm.xrange(iterations_aug):
-                            time_start = time.time()
-                            gen = augmenter.augment_batches(batches, background=True)
-                            for _batch_aug in gen:
-                                pass
-                            time_end = time.time()
-                            times.append(time_end - time_start)
-                    gc.enable()
+                    try:
+                        ia.seed(1)
+                        times = []
+                        gc.disable()  # as done in timeit
+                        if not background:
+                            for _ in sm.xrange(iterations_aug):
+                                time_start = time.time()
+                                _img_aug = augmenter.augment_images(images_batch)
+                                time_end = time.time()
+                                times.append(time_end - time_start)
+                        else:
+                            batches = [ia.Batch(images=images_batch) for _ in sm.xrange(iterations_aug)]
+                            for _ in sm.xrange(iterations_aug):
+                                time_start = time.time()
+                                gen = augmenter.augment_batches(batches, background=True)
+                                for _batch_aug in gen:
+                                    pass
+                                time_end = time.time()
+                                times.append(time_end - time_start)
+                        gc.enable()
 
-                    results_images.append({
-                        "augmentable": "images",
-                        "background": background,
-                        "image.shape": image.shape,
-                        "batch_size": batch_size,
-                        "augmenter.name": augmenter.name,
-                        "times": times
-                    })
+                        results_images.append({
+                            "augmentable": "images",
+                            "background": background,
+                            "image.shape": image.shape,
+                            "batch_size": batch_size,
+                            "augmenter.name": augmenter.name,
+                            "times": times
+                        })
 
-                    items_per_sec = (1/np.average(times)) * batch_size
-                    mbit_per_img = (image.size * image.dtype.itemsize * 8) / 1024 / 1024
-                    mbit_per_sec = items_per_sec * mbit_per_img
-                    print("IMG | HxW=%s B=%d %s "
-                          "| SUM %10.5fs "
-                          "| ITER avg %10.5fs, min %10.5fs, max %10.5fs "
-                          "| img/s %11.3f "
-                          "| mbit/s %9.3f, mbyte/s %9.3f "
-                          "| %s" % (
-                              image.shape[0:2], batch_size, "BG" if background else "FG",
-                              float(np.sum(times)), np.average(times), np.min(times), np.max(times),
-                              items_per_sec,
-                              mbit_per_sec, mbit_per_sec / 8,
-                              augmenter.name))
+                        items_per_sec = (1/np.average(times)) * batch_size
+                        mbit_per_img = (image.size * image.dtype.itemsize * 8) / 1024 / 1024
+                        mbit_per_sec = items_per_sec * mbit_per_img
+                        print("IMG | HxW=%s B=%d %s "
+                              "| SUM %10.5fs "
+                              "| ITER avg %10.5fs, min %10.5fs, max %10.5fs "
+                              "| img/s %11.3f "
+                              "| mbit/s %9.3f, mbyte/s %9.3f "
+                              "| %s" % (
+                                  image.shape[0:2], batch_size, "BG" if background else "FG",
+                                  float(np.sum(times)), np.average(times), np.min(times), np.max(times),
+                                  items_per_sec,
+                                  mbit_per_sec, mbit_per_sec / 8,
+                                  augmenter.name))
+                    except Exception as e:
+                        print("ERROR at %s: %s" % (augmenter.name, str(e).replace("\n", " ")))
 
     if args.save:
         current_dir = os.path.dirname(__file__)
@@ -148,59 +165,62 @@ def main():
                 print("batch_size: %d" % (batch_size,))
                 for background in backgrounds:
                     for augmenter in augmenters:
-                        heatmaps_oi_batch = [heatmaps_oi] * batch_size
-                        iterations_aug = compute_iterations(
-                            augmenter, iterations_slow, iterations_fast)
+                        try:
+                            heatmaps_oi_batch = [heatmaps_oi] * batch_size
+                            iterations_aug = compute_iterations(
+                                augmenter, iterations_slow, iterations_fast)
 
-                        ia.seed(1)
-                        times = []
-                        gc.disable()  # as done in timeit
-                        if not background:
-                            for _ in sm.xrange(iterations_aug):
-                                time_start = time.time()
-                                _hms_aug = augmenter.augment_heatmaps(heatmaps_oi_batch)
-                                time_end = time.time()
-                                times.append(time_end - time_start)
-                                gc.collect()
-                        else:
-                            batches = [ia.Batch(heatmaps=heatmaps_oi_batch) for _ in sm.xrange(iterations_aug)]
-                            for _ in sm.xrange(iterations_aug):
-                                time_start = time.time()
-                                gen = augmenter.augment_batches(batches, background=True)
-                                for _batch_aug in gen:
-                                    pass
-                                time_end = time.time()
-                                times.append(time_end - time_start)
-                                gc.collect()
-                        gc.disable()
+                            ia.seed(1)
+                            times = []
+                            gc.disable()  # as done in timeit
+                            if not background:
+                                for _ in sm.xrange(iterations_aug):
+                                    time_start = time.time()
+                                    _hms_aug = augmenter.augment_heatmaps(heatmaps_oi_batch)
+                                    time_end = time.time()
+                                    times.append(time_end - time_start)
+                                    gc.collect()
+                            else:
+                                batches = [ia.Batch(heatmaps=heatmaps_oi_batch) for _ in sm.xrange(iterations_aug)]
+                                for _ in sm.xrange(iterations_aug):
+                                    time_start = time.time()
+                                    gen = augmenter.augment_batches(batches, background=True)
+                                    for _batch_aug in gen:
+                                        pass
+                                    time_end = time.time()
+                                    times.append(time_end - time_start)
+                                    gc.collect()
+                            gc.disable()
 
-                        results_heatmaps.append({
-                            "augmentable": "heatmaps",
-                            "background": background,
-                            "nb_heatmaps": nb_heatmaps,
-                            "heatmaps_oi.arr_0to1.shape": heatmaps_oi.arr_0to1.shape,
-                            "heatmaps_oi.shape": heatmaps_oi.shape,
-                            "batch_size": batch_size,
-                            "augmenter.name": augmenter.name,
-                            "times": times
-                        })
+                            results_heatmaps.append({
+                                "augmentable": "heatmaps",
+                                "background": background,
+                                "nb_heatmaps": nb_heatmaps,
+                                "heatmaps_oi.arr_0to1.shape": heatmaps_oi.arr_0to1.shape,
+                                "heatmaps_oi.shape": heatmaps_oi.shape,
+                                "batch_size": batch_size,
+                                "augmenter.name": augmenter.name,
+                                "times": times
+                            })
 
-                        h, w, c = heatmaps_oi.arr_0to1.shape
-                        items_per_sec = (1/np.average(times)) * batch_size * c
-                        mbit_per_img = (h * w * heatmaps_oi.arr_0to1.dtype.itemsize * 8) / 1024 / 1024
-                        mbit_per_sec = items_per_sec * mbit_per_img
-                        print("HMs | HxWxN=%s (on %s) B=%d %s "
-                              "| SUM %10.5fs "
-                              "| ITER avg %10.5fs, min %10.5fs, max %10.5fs "
-                              "| hms/s %11.3f "
-                              "| mbit/s %9.3f, mbyte/s %9.3f "
-                              "| %s" % (
-                                  heatmaps_oi.arr_0to1.shape[0:3], heatmaps_oi.shape[0:2], batch_size,
-                                  "BG" if background else "FG",
-                                  float(np.sum(times)), np.average(times), np.min(times), np.max(times),
-                                  items_per_sec,
-                                  mbit_per_sec, mbit_per_sec / 8,
-                                  augmenter.name))
+                            h, w, c = heatmaps_oi.arr_0to1.shape
+                            items_per_sec = (1/np.average(times)) * batch_size * c
+                            mbit_per_img = (h * w * heatmaps_oi.arr_0to1.dtype.itemsize * 8) / 1024 / 1024
+                            mbit_per_sec = items_per_sec * mbit_per_img
+                            print("HMs | HxWxN=%s (on %s) B=%d %s "
+                                  "| SUM %10.5fs "
+                                  "| ITER avg %10.5fs, min %10.5fs, max %10.5fs "
+                                  "| hms/s %11.3f "
+                                  "| mbit/s %9.3f, mbyte/s %9.3f "
+                                  "| %s" % (
+                                      heatmaps_oi.arr_0to1.shape[0:3], heatmaps_oi.shape[0:2], batch_size,
+                                      "BG" if background else "FG",
+                                      float(np.sum(times)), np.average(times), np.min(times), np.max(times),
+                                      items_per_sec,
+                                      mbit_per_sec, mbit_per_sec / 8,
+                                      augmenter.name))
+                        except Exception as e:
+                            print("ERROR at %s: %s" % (augmenter.name, str(e).replace("\n", " ")))
 
     if args.save:
         current_dir = os.path.dirname(__file__)
@@ -247,56 +267,59 @@ def main():
                 print("batch_size: %d" % (batch_size,))
                 for background in backgrounds:
                     for augmenter in augmenters:
-                        keypoints_on_image_batch = [keypoints_on_image] * batch_size
-                        iterations_aug = compute_iterations(
-                            augmenter, iterations_slow, iterations_fast)
+                        try:
+                            keypoints_on_image_batch = [keypoints_on_image] * batch_size
+                            iterations_aug = compute_iterations(
+                                augmenter, iterations_slow, iterations_fast)
 
-                        ia.seed(1)
-                        times = []
-                        gc.disable()  # as done in timeit
-                        if not background:
-                            for _ in sm.xrange(iterations_aug):
-                                time_start = time.time()
-                                _kps_aug = augmenter.augment_keypoints(keypoints_on_image_batch)
-                                time_end = time.time()
-                                times.append(time_end - time_start)
-                                gc.collect()
-                        else:
-                            batches = [ia.Batch(keypoints=keypoints_on_image_batch) for _ in sm.xrange(iterations_aug)]
-                            for _ in sm.xrange(iterations_aug):
-                                time_start = time.time()
-                                gen = augmenter.augment_batches(batches, background=True)
-                                for _batch_aug in gen:
-                                    pass
-                                time_end = time.time()
-                                times.append(time_end - time_start)
-                        gc.enable()
+                            ia.seed(1)
+                            times = []
+                            gc.disable()  # as done in timeit
+                            if not background:
+                                for _ in sm.xrange(iterations_aug):
+                                    time_start = time.time()
+                                    _kps_aug = augmenter.augment_keypoints(keypoints_on_image_batch)
+                                    time_end = time.time()
+                                    times.append(time_end - time_start)
+                                    gc.collect()
+                            else:
+                                batches = [ia.Batch(keypoints=keypoints_on_image_batch) for _ in sm.xrange(iterations_aug)]
+                                for _ in sm.xrange(iterations_aug):
+                                    time_start = time.time()
+                                    gen = augmenter.augment_batches(batches, background=True)
+                                    for _batch_aug in gen:
+                                        pass
+                                    time_end = time.time()
+                                    times.append(time_end - time_start)
+                            gc.enable()
 
-                        results_keypoints.append({
-                            "augmentable": "keypoints",
-                            "background": background,
-                            "nb_points": len(keypoints_on_image.keypoints),
-                            "keypoints_on_image.shape": keypoints_on_image.shape,
-                            "batch_size": batch_size,
-                            "augmenter.name": augmenter.name,
-                            "times": times
-                        })
+                            results_keypoints.append({
+                                "augmentable": "keypoints",
+                                "background": background,
+                                "nb_points": len(keypoints_on_image.keypoints),
+                                "keypoints_on_image.shape": keypoints_on_image.shape,
+                                "batch_size": batch_size,
+                                "augmenter.name": augmenter.name,
+                                "times": times
+                            })
 
-                        items_per_sec = (1/np.average(times)) * batch_size * len(keypoints_on_image.keypoints)
-                        mbit_per_img = (len(keypoints_on_image.keypoints) * 2 * 32) / 1024 / 1024
-                        mbit_per_sec = items_per_sec * mbit_per_img
-                        print("KPs | #points=%d (on %s) B=%d %s "
-                              "| SUM %10.5fs "
-                              "| ITER avg %10.5fs, min %10.5fs, max %10.5fs "
-                              "| kps/s %11.3f "
-                              "| mbit/s %9.3f, mbyte/s %9.3f "
-                              "| %s" % (
-                                  len(keypoints_on_image.keypoints), keypoints_on_image.shape[0:2], batch_size,
-                                  "BG" if background else "FG",
-                                  float(np.sum(times)), np.average(times), np.min(times), np.max(times),
-                                  items_per_sec,
-                                  mbit_per_sec, mbit_per_sec / 8,
-                                  augmenter.name))
+                            items_per_sec = (1/np.average(times)) * batch_size * len(keypoints_on_image.keypoints)
+                            mbit_per_img = (len(keypoints_on_image.keypoints) * 2 * 32) / 1024 / 1024
+                            mbit_per_sec = items_per_sec * mbit_per_img
+                            print("KPs | #points=%d (on %s) B=%d %s "
+                                  "| SUM %10.5fs "
+                                  "| ITER avg %10.5fs, min %10.5fs, max %10.5fs "
+                                  "| kps/s %11.3f "
+                                  "| mbit/s %9.3f, mbyte/s %9.3f "
+                                  "| %s" % (
+                                      len(keypoints_on_image.keypoints), keypoints_on_image.shape[0:2], batch_size,
+                                      "BG" if background else "FG",
+                                      float(np.sum(times)), np.average(times), np.min(times), np.max(times),
+                                      items_per_sec,
+                                      mbit_per_sec, mbit_per_sec / 8,
+                                      augmenter.name))
+                        except Exception as e:
+                            print("ERROR at %s: %s" % (augmenter.name, str(e).replace("\n", " ")))
 
     if args.save:
         current_dir = os.path.dirname(__file__)
@@ -334,6 +357,7 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
         iaa.OneOf([iaa.Noop(), iaa.Noop(), iaa.Noop()], name="OneOf_3xNoop"),
         iaa.Sometimes(0.5, iaa.Noop(), name="Sometimes_Noop"),
         iaa.WithChannels([1, 2], iaa.Noop(), name="WithChannels_1_and_2_Noop"),
+        iaa.Identity(name="Identity"),
         iaa.Noop(name="Noop"),
         iaa.Lambda(func_images=lambda_func_images, func_heatmaps=lambda_func_heatmaps, func_keypoints=lambda_func_keypoints,
                    name="Lambda"),
@@ -351,8 +375,11 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
         iaa.AdditivePoissonNoise(lam=(1, 5), name="AdditivePoissonNoise"),
         iaa.Multiply((0.5, 1.5), name="Multiply"),
         iaa.MultiplyElementwise((0.5, 1.5), name="MultiplyElementwise"),
+        iaa.Cutout(nb_iterations=1, name="Cutout-fill_constant"),
         iaa.Dropout((0.01, 0.05), name="Dropout"),
         iaa.CoarseDropout((0.01, 0.05), size_percent=(0.01, 0.1), name="CoarseDropout"),
+        iaa.Dropout2d(0.1, name="Dropout2d"),
+        iaa.TotalDropout(0.1, name="TotalDropout"),
         iaa.ReplaceElementwise((0.01, 0.05), (0, 255), name="ReplaceElementwise"),
         #iaa.ReplaceElementwise((0.95, 0.99), (0, 255), name="ReplaceElementwise"),
         iaa.SaltAndPepper((0.01, 0.05), name="SaltAndPepper"),
@@ -366,33 +393,55 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
         # ContrastNormalization
         iaa.JpegCompression((50, 99), name="JpegCompression")
     ]
+    augmenters_artistic = [
+        iaa.Cartoon(name="Cartoon")
+    ]
     augmenters_blend = [
-        iaa.Alpha((0.01, 0.99), iaa.Noop(), name="Alpha"),
-        iaa.AlphaElementwise((0.01, 0.99), iaa.Noop(), name="AlphaElementwise"),
-        iaa.SimplexNoiseAlpha(iaa.Noop(), name="SimplexNoiseAlpha"),
-        iaa.FrequencyNoiseAlpha((-2.0, 2.0), iaa.Noop(), name="FrequencyNoiseAlpha")
+        iaa.BlendAlpha((0.01, 0.99), iaa.Identity(), name="Alpha"),
+        iaa.BlendAlphaElementwise((0.01, 0.99), iaa.Identity(), name="AlphaElementwise"),
+        iaa.BlendAlphaSimplexNoise(iaa.Identity(), name="SimplexNoiseAlpha"),
+        iaa.BlendAlphaFrequencyNoise((-2.0, 2.0), iaa.Identity(), name="FrequencyNoiseAlpha"),
+        iaa.BlendAlphaSomeColors(iaa.Identity(), name="BlendAlphaSomeColors"),
+        iaa.BlendAlphaHorizontalLinearGradient(iaa.Identity(), name="BlendAlphaHorizontalLinearGradient"),
+        iaa.BlendAlphaVerticalLinearGradient(iaa.Identity(), name="BlendAlphaVerticalLinearGradient"),
+        iaa.BlendAlphaRegularGrid(nb_rows=(2, 8), nb_cols=(2, 8), foreground=iaa.Identity(), name="BlendAlphaRegularGrid"),
+        iaa.BlendAlphaCheckerboard(nb_rows=(2, 8), nb_cols=(2, 8), foreground=iaa.Identity(), name="BlendAlphaCheckerboard"),
+        # TODO BlendAlphaSegMapClassId
+        # TODO BlendAlphaBoundingBoxes
     ]
     augmenters_blur = [
         iaa.GaussianBlur(sigma=(1.0, 5.0), name="GaussianBlur"),
         iaa.AverageBlur(k=(3, 11), name="AverageBlur"),
         iaa.MedianBlur(k=(3, 11), name="MedianBlur"),
         iaa.BilateralBlur(d=(3, 11), name="BilateralBlur"),
-        iaa.MotionBlur(k=(3, 11), name="MotionBlur")
+        iaa.MotionBlur(k=(3, 11), name="MotionBlur"),
+        iaa.MeanShiftBlur(spatial_radius=(5.0, 40.0), color_radius=(5.0, 40.0),
+                          name="MeanShiftBlur")
+    ]
+    augmenters_collections = [
+        iaa.RandAugment(n=2, m=(6, 12), name="RandAugment")
     ]
     augmenters_color = [
         # InColorspace (deprecated)
         iaa.WithColorspace(to_colorspace="HSV", children=iaa.Noop(), name="WithColorspace"),
+        iaa.WithBrightnessChannels(iaa.Identity(), name="WithBrightnessChannels"),
+        iaa.MultiplyAndAddToBrightness(mul=(0.7, 1.3), add=(-30, 30), name="MultiplyAndAddToBrightness"),
+        iaa.MultiplyBrightness((0.7, 1.3), name="MultiplyBrightness"),
+        iaa.AddToBrightness((-30, 30), name="AddToBrightness"),
         iaa.WithHueAndSaturation(children=iaa.Noop(), name="WithHueAndSaturation"),
         iaa.MultiplyHueAndSaturation((0.8, 1.2), name="MultiplyHueAndSaturation"),
         iaa.MultiplyHue((-1.0, 1.0), name="MultiplyHue"),
         iaa.MultiplySaturation((0.8, 1.2), name="MultiplySaturation"),
+        iaa.RemoveSaturation((0.01, 0.99), name="RemoveSaturation"),
         iaa.AddToHueAndSaturation((-10, 10), name="AddToHueAndSaturation"),
         iaa.AddToHue((-10, 10), name="AddToHue"),
         iaa.AddToSaturation((-10, 10), name="AddToSaturation"),
         iaa.ChangeColorspace(to_colorspace="HSV", name="ChangeColorspace"),
         iaa.Grayscale((0.01, 0.99), name="Grayscale"),
         iaa.KMeansColorQuantization((2, 16), name="KMeansColorQuantization"),
-        iaa.UniformColorQuantization((2, 16), name="UniformColorQuantization")
+        iaa.UniformColorQuantization((2, 16), name="UniformColorQuantization"),
+        iaa.UniformColorQuantizationToNBits((1, 7), name="UniformQuantizationToNBits"),
+        iaa.Posterize((1, 7), name="Posterize")
     ]
     augmenters_contrast = [
         iaa.GammaContrast(gamma=(0.5, 2.0), name="GammaContrast"),
@@ -430,7 +479,6 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
         iaa.Affine(scale=(0.9, 1.1), translate_percent={"x": (-0.05, 0.05), "y": (-0.05, 0.05)}, rotate=(-10, 10),
                    shear=(-10, 10), order=1, mode="constant", cval=(0, 255), backend="skimage",
                    name="Affine_order_1_constant_skimage"),
-        # TODO AffineCv2
         iaa.PiecewiseAffine(scale=(0.01, 0.05), nb_rows=4, nb_cols=4, order=1, mode="constant",
                             name="PiecewiseAffine_4x4_order_1_constant"),
         iaa.PiecewiseAffine(scale=(0.01, 0.05), nb_rows=4, nb_cols=4, order=0, mode="constant",
@@ -450,7 +498,9 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
         iaa.ElasticTransformation(alpha=(1, 10), sigma=(0.5, 1.5), order=1, mode="reflect", cval=0,
                                   name="ElasticTransformation_order_1_reflect"),
         iaa.Rot90((1, 3), keep_size=False, name="Rot90"),
-        iaa.Rot90((1, 3), keep_size=True, name="Rot90_keep_size")
+        iaa.Rot90((1, 3), keep_size=True, name="Rot90_keep_size"),
+        iaa.WithPolarWarping(iaa.Identity(), name="WithPolarWarping"),
+        iaa.Jigsaw(nb_rows=(3, 8), nb_cols=(3, 8), max_steps=1, name="Jigsaw")
     ]
     augmenters_pooling = [
         iaa.AveragePooling(kernel_size=(1, 16), keep_size=False, name="AveragePooling"),
@@ -461,6 +511,53 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
         iaa.MinPooling(kernel_size=(1, 16), keep_size=True, name="MinPooling_keep_size"),
         iaa.MedianPooling(kernel_size=(1, 16), keep_size=False, name="MedianPooling"),
         iaa.MedianPooling(kernel_size=(1, 16), keep_size=True, name="MedianPooling_keep_size")
+    ]
+    augmenters_imgcorruptlike = [
+        iaa.imgcorruptlike.GaussianNoise(severity=(1, 5), name="imgcorruptlike.GaussianNoise"),
+        iaa.imgcorruptlike.ShotNoise(severity=(1, 5), name="imgcorruptlike.ShotNoise"),
+        iaa.imgcorruptlike.ImpulseNoise(severity=(1, 5), name="imgcorruptlike.ImpulseNoise"),
+        iaa.imgcorruptlike.SpeckleNoise(severity=(1, 5), name="imgcorruptlike.SpeckleNoise"),
+        iaa.imgcorruptlike.GaussianBlur(severity=(1, 5), name="imgcorruptlike.GaussianBlur"),
+        iaa.imgcorruptlike.GlassBlur(severity=(1, 5), name="imgcorruptlike.GlassBlur"),
+        iaa.imgcorruptlike.DefocusBlur(severity=(1, 5), name="imgcorruptlike.DefocusBlur"),
+        iaa.imgcorruptlike.MotionBlur(severity=(1, 5), name="imgcorruptlike.MotionBlur"),
+        iaa.imgcorruptlike.ZoomBlur(severity=(1, 5), name="imgcorruptlike.ZoomBlur"),
+        iaa.imgcorruptlike.Fog(severity=(1, 5), name="imgcorruptlike.Fog"),
+        iaa.imgcorruptlike.Frost(severity=(1, 5), name="imgcorruptlike.Frost"),
+        iaa.imgcorruptlike.Snow(severity=(1, 5), name="imgcorruptlike.Snow"),
+        iaa.imgcorruptlike.Spatter(severity=(1, 5), name="imgcorruptlike.Spatter"),
+        iaa.imgcorruptlike.Contrast(severity=(1, 5), name="imgcorruptlike.Contrast"),
+        iaa.imgcorruptlike.Brightness(severity=(1, 5), name="imgcorruptlike.Brightness"),
+        iaa.imgcorruptlike.Saturate(severity=(1, 5), name="imgcorruptlike.Saturate"),
+        iaa.imgcorruptlike.JpegCompression(severity=(1, 5), name="imgcorruptlike.JpegCompression"),
+        iaa.imgcorruptlike.Pixelate(severity=(1, 5), name="imgcorruptlike.Pixelate"),
+        iaa.imgcorruptlike.ElasticTransform(severity=(1, 5), name="imgcorruptlike.ElasticTransform")
+    ]
+    augmenters_pillike = [
+        iaa.pillike.Solarize(p=1.0, threshold=(32, 128), name="pillike.Solarize"),
+        iaa.pillike.Posterize((1, 7), name="pillike.Posterize"),
+        iaa.pillike.Equalize(name="pillike.Equalize"),
+        iaa.pillike.Autocontrast(name="pillike.Autocontrast"),
+        iaa.pillike.EnhanceColor((0.0, 3.0), name="pillike.EnhanceColor"),
+        iaa.pillike.EnhanceContrast((0.0, 3.0), name="pillike.EnhanceContrast"),
+        iaa.pillike.EnhanceBrightness((0.0, 3.0), name="pillike.EnhanceBrightness"),
+        iaa.pillike.EnhanceSharpness((0.0, 3.0), name="pillike.EnhanceSharpness"),
+        iaa.pillike.FilterBlur(name="pillike.FilterBlur"),
+        iaa.pillike.FilterSmooth(name="pillike.FilterSmooth"),
+        iaa.pillike.FilterSmoothMore(name="pillike.FilterSmoothMore"),
+        iaa.pillike.FilterEdgeEnhance(name="pillike.FilterEdgeEnhance"),
+        iaa.pillike.FilterEdgeEnhanceMore(name="pillike.FilterEdgeEnhanceMore"),
+        iaa.pillike.FilterFindEdges(name="pillike.FilterFindEdges"),
+        iaa.pillike.FilterContour(name="pillike.FilterContour"),
+        iaa.pillike.FilterEmboss(name="pillike.FilterEmboss"),
+        iaa.pillike.FilterSharpen(name="pillike.FilterSharpen"),
+        iaa.pillike.FilterDetail(name="pillike.FilterDetail"),
+        iaa.pillike.Affine(scale=(0.9, 1.1),
+                           translate_percent={"x": (-0.05, 0.05), "y": (-0.05, 0.05)},
+                           rotate=(-10, 10),
+                           shear=(-10, 10),
+                           fillcolor=(0, 255),
+                           name="pillike.Affine"),
     ]
     augmenters_segmentation = [
         iaa.Superpixels(p_replace=(0.05, 1.0), n_segments=(10, 100), max_size=64, interpolation="cubic",
@@ -512,14 +609,25 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
         iaa.SnowflakesLayer(density=(0.005, 0.075), density_uniformity=(0.3, 0.9),
                             flake_size=(0.2, 0.7), flake_size_uniformity=(0.4, 0.8),
                             angle=(-30, 30), speed=(0.007, 0.03),
-                            blur_sigma_fraction=(0.0001, 0.001), name="SnowflakesLayer")
+                            blur_sigma_fraction=(0.0001, 0.001), name="SnowflakesLayer"),
+        iaa.Rain(name="Rain"),
+        iaa.RainLayer(density=(0.03, 0.14),
+                      density_uniformity=(0.8, 1.0),
+                      drop_size=(0.01, 0.02),
+                      drop_size_uniformity=(0.2, 0.5),
+                      angle=(-15, 15),
+                      speed=(0.04, 0.20),
+                      blur_sigma_fraction=(0.001, 0.001),
+                      name="RainLayer")
     ]
 
     augmenters = (
         augmenters_meta
         + augmenters_arithmetic
+        + augmenters_artistic
         + augmenters_blend
         + augmenters_blur
+        + augmenters_collections
         + augmenters_color
         + augmenters_contrast
         + augmenters_convolutional
@@ -527,6 +635,8 @@ def create_augmenters(height, width, height_augmentable, width_augmentable, only
         + augmenters_flip
         + augmenters_geometric
         + augmenters_pooling
+        + augmenters_imgcorruptlike
+        + augmenters_pillike
         + augmenters_segmentation
         + augmenters_size
         + augmenters_weather
