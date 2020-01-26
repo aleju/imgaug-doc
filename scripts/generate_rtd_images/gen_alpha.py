@@ -62,7 +62,7 @@ def chapter_alpha_masks_introduction():
                 background=iaa.LinearContrast((0.5, 2.0)),
                 per_channel=True
             ),
-            second=iaa.BlendAlphaFrequencyNoise(
+            background=iaa.BlendAlphaFrequencyNoise(
                 exponent=(-2.5, -1.0),
                 foreground=iaa.Affine(
                     rotate=(-10, 10),
@@ -355,7 +355,7 @@ def chapter_alpha_masks_frequency():
     )
 
     seq = iaa.BlendAlphaFrequencyNoise(
-        first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
+        foreground=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
     )
 
     images_aug = seq(images=images)
@@ -409,7 +409,7 @@ def chapter_alpha_masks_frequency():
     ia.seed(seed)
 
     seq = iaa.BlendAlphaFrequencyNoise(
-        first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
+        foreground=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
     )
 
     masks = [
@@ -492,7 +492,7 @@ def chapter_alpha_masks_frequency():
     ia.seed(seed)
 
     seq = iaa.BlendAlphaFrequencyNoise(
-        first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
+        foreground=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
         upscale_method="nearest"
     )
 
@@ -522,7 +522,7 @@ def chapter_alpha_masks_frequency():
     ia.seed(seed)
 
     seq = iaa.BlendAlphaFrequencyNoise(
-        first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
+        foreground=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
         upscale_method="linear"
     )
 
