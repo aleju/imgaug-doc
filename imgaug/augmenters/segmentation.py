@@ -37,8 +37,7 @@ def _ensure_image_max_size(image, max_size, interpolation):
     This downscales to `max_size` if any side violates that maximum.
     The other side is downscaled too so that the aspect ratio is maintained.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.imgaug.imresize_single_image`.
 
@@ -77,8 +76,7 @@ class Superpixels(meta.Augmenter):
 
         This augmenter is fairly slow. See :ref:`performance`.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     if (image size <= max_size):
 
@@ -175,8 +173,16 @@ class Superpixels(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -199,11 +205,13 @@ class Superpixels(meta.Augmenter):
 
     """
 
-    def __init__(self, p_replace=0, n_segments=100, max_size=128,
-                 interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, p_replace=(0.5, 1.0), n_segments=(50, 120),
+                 max_size=128, interpolation="linear",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Superpixels, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.p_replace = iap.handle_probability_param(
             p_replace, "p_replace", tuple_to_uniform=True, list_to_choice=True)
@@ -213,6 +221,7 @@ class Superpixels(meta.Augmenter):
         self.max_size = max_size
         self.interpolation = interpolation
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -456,8 +465,7 @@ class Voronoi(meta.Augmenter):
     This code is very loosely based on
     https://codegolf.stackexchange.com/questions/50299/draw-an-image-as-a-voronoi-map/50345#50345
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     if (image size <= max_size):
 
@@ -537,8 +545,16 @@ class Voronoi(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -577,9 +593,11 @@ class Voronoi(meta.Augmenter):
 
     def __init__(self, points_sampler, p_replace=1.0, max_size=128,
                  interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Voronoi, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         assert isinstance(points_sampler, IPointsSampler), (
             "Expected 'points_sampler' to be an instance of IPointsSampler, "
@@ -592,6 +610,7 @@ class Voronoi(meta.Augmenter):
         self.max_size = max_size
         self.interpolation = interpolation
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -650,8 +669,7 @@ class UniformVoronoi(Voronoi):
     each image. The cell coordinates are sampled uniformly using the image
     height and width as maxima.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.segmentation.Voronoi`.
 
@@ -717,8 +735,16 @@ class UniformVoronoi(Voronoi):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -743,15 +769,17 @@ class UniformVoronoi(Voronoi):
 
     """
 
-    def __init__(self, n_points, p_replace=1.0, max_size=128,
+    def __init__(self, n_points=(50, 500), p_replace=(0.5, 1.0), max_size=128,
                  interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(UniformVoronoi, self).__init__(
             points_sampler=UniformPointsSampler(n_points),
             p_replace=p_replace,
             max_size=max_size,
             interpolation=interpolation,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class RegularGridVoronoi(Voronoi):
@@ -766,8 +794,7 @@ class RegularGridVoronoi(Voronoi):
     to randomize the grid. Each image pixel then belongs to the voronoi
     cell with the closest coordinate.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.segmentation.Voronoi`.
 
@@ -870,8 +897,16 @@ class RegularGridVoronoi(Voronoi):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -897,9 +932,11 @@ class RegularGridVoronoi(Voronoi):
 
     """
 
-    def __init__(self, n_rows, n_cols, p_drop_points=0.4, p_replace=1.0,
+    def __init__(self, n_rows=(10, 30), n_cols=(10, 30),
+                 p_drop_points=(0.0, 0.5), p_replace=(0.5, 1.0),
                  max_size=128, interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(RegularGridVoronoi, self).__init__(
             points_sampler=DropoutPointsSampler(
                 RegularGridPointsSampler(n_rows, n_cols),
@@ -908,7 +945,8 @@ class RegularGridVoronoi(Voronoi):
             p_replace=p_replace,
             max_size=max_size,
             interpolation=interpolation,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class RelativeRegularGridVoronoi(Voronoi):
@@ -928,11 +966,10 @@ class RelativeRegularGridVoronoi(Voronoi):
         In contrast to the other voronoi augmenters, this one uses
         ``None`` as the default value for `max_size`, i.e. the color averaging
         is always performed at full resolution. This enables the augmenter to
-        make most use of the added points for larger images. It does however
-        slow down the augmentation process.
+        make use of the additional points on larger images. It does
+        however slow down the augmentation process.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.segmentation.Voronoi`.
 
@@ -1037,8 +1074,16 @@ class RelativeRegularGridVoronoi(Voronoi):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1069,9 +1114,11 @@ class RelativeRegularGridVoronoi(Voronoi):
 
     """
 
-    def __init__(self, n_rows_frac, n_cols_frac, p_drop_points=0.4,
-                 p_replace=1.0, max_size=None, interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, n_rows_frac=(0.05, 0.15), n_cols_frac=(0.05, 0.15),
+                 p_drop_points=(0.0, 0.5), p_replace=(0.5, 1.0),
+                 max_size=None, interpolation="linear",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(RelativeRegularGridVoronoi, self).__init__(
             points_sampler=DropoutPointsSampler(
                 RelativeRegularGridPointsSampler(n_rows_frac, n_cols_frac),
@@ -1080,7 +1127,8 @@ class RelativeRegularGridVoronoi(Voronoi):
             p_replace=p_replace,
             max_size=max_size,
             interpolation=interpolation,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 @six.add_metaclass(ABCMeta)

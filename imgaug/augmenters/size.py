@@ -343,6 +343,7 @@ def _handle_position_parameter(position):
 
 
 # TODO this is the same as in imgaug.py, make DRY
+# Added in 0.4.0.
 def _assert_two_or_three_dims(shape):
     if hasattr(shape, "shape"):
         shape = shape.shape
@@ -356,8 +357,9 @@ def pad(arr, top=0, right=0, bottom=0, left=0, mode="constant", cval=0):
 
     This function is a wrapper around :func:`numpy.pad`.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0. (Previously named ``imgaug.imgaug.pad()``.)
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested (1)
         * ``uint16``: yes; fully tested (1)
@@ -559,8 +561,9 @@ def pad_to_aspect_ratio(arr, aspect_ratio, mode="constant", cval=0,
     explanation of how the required padding amounts are distributed per
     image axis.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0. (Previously named ``imgaug.imgaug.pad_to_aspect_ratio()``.)
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.size.pad`.
 
@@ -626,8 +629,9 @@ def pad_to_multiples_of(arr, height_multiple, width_multiple, mode="constant",
     explanation of how the required padding amounts are distributed per
     image axis.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0. (Previously named ``imgaug.imgaug.pad_to_multiples_of()``.)
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.size.pad`.
 
@@ -708,6 +712,9 @@ def compute_paddings_to_reach_aspect_ratio(arr, aspect_ratio):
     will always add such a left over pixel to the bottom (y-axis) or
     right (x-axis) side.
 
+    Added in 0.4.0. (Previously named
+    ``imgaug.imgaug.compute_paddings_to_reach_aspect_ratio()``.)
+
     Parameters
     ----------
     arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
@@ -779,6 +786,8 @@ def compute_croppings_to_reach_aspect_ratio(arr, aspect_ratio):
     If an aspect ratio cannot be reached exactly, this function will return
     rather one pixel too few than one pixel too many.
 
+    Added in 0.4.0.
+
     Parameters
     ----------
     arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
@@ -836,6 +845,9 @@ def compute_paddings_to_reach_multiples_of(arr, height_multiple,
     See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
     explanation of how the required padding amounts are distributed per
     image axis.
+
+    Added in 0.4.0. (Previously named
+    ``imgaug.imgaug.compute_paddings_to_reach_multiples_of()``.)
 
     Parameters
     ----------
@@ -897,6 +909,8 @@ def compute_croppings_to_reach_multiples_of(arr, height_multiple,
     See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
     explanation of how the required cropping amounts are distributed per
     image axis.
+
+    Added in 0.4.0.
 
     Parameters
     ----------
@@ -962,6 +976,9 @@ def compute_paddings_to_reach_powers_of(arr, height_base, width_base,
     See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
     explanation of how the required padding amounts are distributed per
     image axis.
+
+    Added in 0.4.0. (Previously named
+    ``imgaug.imgaug.compute_paddings_to_reach_exponents_of()``.)
 
     Parameters
     ----------
@@ -1039,6 +1056,8 @@ def compute_croppings_to_reach_powers_of(arr, height_base, width_base,
 
         For axes where ``1 <= S < B`` see parameter `allow_zero_exponent`.
 
+    Added in 0.4.0.
+
     Parameters
     ----------
     arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
@@ -1107,8 +1126,7 @@ def Scale(*args, **kwargs):
 class Resize(meta.Augmenter):
     """Augmenter that resizes images to specified heights and widths.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.imgaug.imresize_many_images`.
 
@@ -1171,8 +1189,16 @@ class Resize(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1236,9 +1262,11 @@ class Resize(meta.Augmenter):
     """
 
     def __init__(self, size, interpolation="cubic",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Resize, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.size, self.size_order = self._handle_size_arg(size, False)
         self.interpolation = self._handle_interpolation_arg(interpolation)
@@ -1349,6 +1377,7 @@ class Resize(meta.Augmenter):
                 "got %s." % (type(interpolation),))
         return interpolation
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         nb_rows = batch.nb_rows
         samples = self._draw_samples(nb_rows, random_state)
@@ -1380,6 +1409,7 @@ class Resize(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _augment_images_by_samples(self, images, samples):
         input_was_array = False
         input_dtype = None
@@ -1403,6 +1433,7 @@ class Resize(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     def _augment_maps_by_samples(self, augmentables, arr_attr_name, samples):
         result = []
         samples_h, samples_w, samples_ip = samples
@@ -1429,6 +1460,7 @@ class Resize(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     def _augment_keypoints_by_samples(self, kpsois, samples):
         result = []
         samples_a, samples_b, _samples_ip = samples
@@ -1540,8 +1572,7 @@ class CropAndPad(meta.Augmenter):
         after it has augmented them. To deactivate this, add the
         parameter ``keep_size=False``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     if (keep_size=False):
 
@@ -1679,8 +1710,16 @@ class CropAndPad(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1759,10 +1798,15 @@ class CropAndPad(meta.Augmenter):
 
     def __init__(self, px=None, percent=None, pad_mode="constant", pad_cval=0,
                  keep_size=True, sample_independently=True,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=invalid-name
         super(CropAndPad, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+        if px is None and percent is None:
+            percent = (-0.1, 0.1)
 
         self.mode, self.all_sides, self.top, self.right, self.bottom, \
             self.left = self._handle_px_and_percent_args(px, percent)
@@ -1919,6 +1963,7 @@ class CropAndPad(meta.Augmenter):
                 "StochasticParameter, got type %s." % (type(percent),))
         return all_sides, top, right, bottom, left
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         shapes = batch.get_rowwise_shapes()
         samples = self._draw_samples(random_state, shapes)
@@ -1951,6 +1996,7 @@ class CropAndPad(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _augment_images_by_samples(self, images, samples):
         result = []
         for i, image in enumerate(images):
@@ -1972,6 +2018,7 @@ class CropAndPad(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     def _augment_maps_by_samples(self, augmentables, pad_mode, pad_cval,
                                  samples):
         result = []
@@ -1995,6 +2042,7 @@ class CropAndPad(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     def _augment_keypoints_by_samples(self, keypoints_on_images, samples):
         result = []
         for i, keypoints_on_image in enumerate(keypoints_on_images):
@@ -2129,8 +2177,7 @@ class CropAndPad(meta.Augmenter):
 class Pad(CropAndPad):
     """Pad images, i.e. adds columns/rows of pixels to them.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropAndPad`.
 
@@ -2248,8 +2295,16 @@ class Pad(CropAndPad):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2317,7 +2372,8 @@ class Pad(CropAndPad):
 
     def __init__(self, px=None, percent=None, pad_mode="constant", pad_cval=0,
                  keep_size=True, sample_independently=True,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         def recursive_validate(value):
             if value is None:
                 return value
@@ -2334,6 +2390,9 @@ class Pad(CropAndPad):
                 "Expected None or int or float or StochasticParameter or "
                 "list or tuple, got %s." % (type(value),))
 
+        if px is None and percent is None:
+            percent = (0.0, 0.1)
+
         px = recursive_validate(px)
         percent = recursive_validate(percent)
 
@@ -2344,7 +2403,8 @@ class Pad(CropAndPad):
             pad_cval=pad_cval,
             keep_size=keep_size,
             sample_independently=sample_independently,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Crop(CropAndPad):
@@ -2356,8 +2416,7 @@ class Crop(CropAndPad):
 
     This augmenter will never crop images below a height or width of ``1``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropAndPad`.
 
@@ -2443,8 +2502,16 @@ class Crop(CropAndPad):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2491,7 +2558,8 @@ class Crop(CropAndPad):
 
     def __init__(self, px=None, percent=None, keep_size=True,
                  sample_independently=True,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         def recursive_negate(value):
             if value is None:
                 return value
@@ -2508,6 +2576,9 @@ class Crop(CropAndPad):
                 "Expected None or int or float or StochasticParameter or "
                 "list or tuple, got %s." % (type(value),))
 
+        if px is None and percent is None:
+            percent = (0.0, 0.1)
+
         px = recursive_negate(px)
         percent = recursive_negate(percent)
 
@@ -2516,7 +2587,8 @@ class Crop(CropAndPad):
             percent=percent,
             keep_size=keep_size,
             sample_independently=sample_independently,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 # TODO maybe rename this to PadToMinimumSize?
@@ -2538,8 +2610,7 @@ class PadToFixedSize(meta.Augmenter):
     and 0px to the left and sometimes add 1px to both sides. Set `position`
     to ``center`` to prevent that.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.size.pad`.
 
@@ -2607,8 +2678,16 @@ class PadToFixedSize(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2647,9 +2726,11 @@ class PadToFixedSize(meta.Augmenter):
 
     def __init__(self, width, height, pad_mode="constant", pad_cval=0,
                  position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(PadToFixedSize, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.size = (width, height)
 
         # Position of where to pad. The further to the top left this is, the
@@ -2674,6 +2755,7 @@ class PadToFixedSize(meta.Augmenter):
         self._pad_cval_heatmaps = 0.0
         self._pad_cval_segmentation_maps = 0
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         # Providing the whole batch to _draw_samples() would not be necessary
         # for this augmenter. The number of rows would be sufficient. This
@@ -2707,6 +2789,7 @@ class PadToFixedSize(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _augment_images_by_samples(self, images, samples):
         result = []
         sizes, pad_xs, pad_ys, pad_modes, pad_cvals = samples
@@ -2728,6 +2811,7 @@ class PadToFixedSize(meta.Augmenter):
         #      some might have been larger than desired height/width)
         return result
 
+    # Added in 0.4.0.
     def _augment_keypoints_by_samples(self, keypoints_on_images, samples):
         result = []
         sizes, pad_xs, pad_ys, _, _ = samples
@@ -2746,6 +2830,7 @@ class PadToFixedSize(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     def _augment_maps_by_samples(self, augmentables, samples, pad_mode,
                                  pad_cval):
         sizes, pad_xs, pad_ys, pad_modes, pad_cvals = samples
@@ -2832,8 +2917,9 @@ class CenterPadToFixedSize(PadToFixedSize):
     all image sides, while :class:`~imgaug.augmenters.size.PadToFixedSize`
     by defaults spreads them randomly.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -2857,8 +2943,16 @@ class CenterPadToFixedSize(PadToFixedSize):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2871,12 +2965,15 @@ class CenterPadToFixedSize(PadToFixedSize):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width, height, pad_mode="constant", pad_cval=0,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterPadToFixedSize, self).__init__(
             width=width, height=height, pad_mode=pad_mode, pad_cval=pad_cval,
             position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 # TODO maybe rename this to CropToMaximumSize ?
@@ -2897,8 +2994,7 @@ class CropToFixedSize(meta.Augmenter):
     remove 2px from the right and 0px from the left and sometimes remove 1px
     from both sides. Set `position` to ``center`` to prevent that.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -2970,8 +3066,16 @@ class CropToFixedSize(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3000,9 +3104,11 @@ class CropToFixedSize(meta.Augmenter):
     """
 
     def __init__(self, width, height, position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CropToFixedSize, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.size = (width, height)
 
         # Position of where to crop. The further to the top left this is,
@@ -3014,6 +3120,7 @@ class CropToFixedSize(meta.Augmenter):
         # (0.0, 1.0) crops left and bottom, (1.0, 0.0) crops right and top.
         self.position = _handle_position_parameter(position)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         # Providing the whole batch to _draw_samples() would not be necessary
         # for this augmenter. The number of rows would be sufficient. This
@@ -3045,6 +3152,7 @@ class CropToFixedSize(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _augment_images_by_samples(self, images, samples):
         result = []
         sizes, offset_xs, offset_ys = samples
@@ -3062,6 +3170,7 @@ class CropToFixedSize(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     def _augment_keypoints_by_samples(self, kpsois, samples):
         result = []
         sizes, offset_xs, offset_ys = samples
@@ -3079,6 +3188,7 @@ class CropToFixedSize(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     def _augment_maps_by_samples(self, augmentables, samples):
         sizes, offset_xs, offset_ys = samples
         for i, (augmentable, size) in enumerate(zip(augmentables, sizes)):
@@ -3152,8 +3262,9 @@ class CenterCropToFixedSize(CropToFixedSize):
         respective axis. Hence, resulting images can be smaller than the
         provided axis sizes.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -3171,8 +3282,16 @@ class CenterCropToFixedSize(CropToFixedSize):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3184,11 +3303,14 @@ class CenterCropToFixedSize(CropToFixedSize):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width, height,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterCropToFixedSize, self).__init__(
             width=width, height=height, position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CropToMultiplesOf(CropToFixedSize):
@@ -3201,8 +3323,9 @@ class CropToMultiplesOf(CropToFixedSize):
         As a result, this augmenter can still produce axis sizes that are
         not multiples of the given values.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -3227,8 +3350,16 @@ class CropToMultiplesOf(CropToFixedSize):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3243,14 +3374,18 @@ class CropToMultiplesOf(CropToFixedSize):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width_multiple, height_multiple, position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CropToMultiplesOf, self).__init__(
             width=None, height=None, position=position,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.width_multiple = width_multiple
         self.height_multiple = height_multiple
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         _sizes, offset_xs, offset_ys = super(
             CropToMultiplesOf, self
@@ -3276,6 +3411,7 @@ class CropToMultiplesOf(CropToFixedSize):
 
         return sizes, offset_xs, offset_ys
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.width_multiple, self.height_multiple, self.position]
@@ -3290,8 +3426,9 @@ class CenterCropToMultiplesOf(CropToMultiplesOf):
     :class:`~imgaug.augmenters.size.CropToMultiplesOf` by default spreads
     them randomly.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -3309,8 +3446,16 @@ class CenterCropToMultiplesOf(CropToMultiplesOf):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3325,20 +3470,24 @@ class CenterCropToMultiplesOf(CropToMultiplesOf):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width_multiple, height_multiple,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterCropToMultiplesOf, self).__init__(
             width_multiple=width_multiple,
             height_multiple=height_multiple,
             position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class PadToMultiplesOf(PadToFixedSize):
     """Pad images until their height/width is a multiple of a value.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -3369,8 +3518,16 @@ class PadToMultiplesOf(PadToFixedSize):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3385,17 +3542,21 @@ class PadToMultiplesOf(PadToFixedSize):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width_multiple, height_multiple,
                  pad_mode="constant", pad_cval=0,
                  position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(PadToMultiplesOf, self).__init__(
             width=None, height=None, pad_mode=pad_mode, pad_cval=pad_cval,
             position=position,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.width_multiple = width_multiple
         self.height_multiple = height_multiple
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         _sizes, pad_xs, pad_ys, pad_modes, pad_cvals = super(
             PadToMultiplesOf, self
@@ -3421,6 +3582,7 @@ class PadToMultiplesOf(PadToFixedSize):
 
         return sizes, pad_xs, pad_ys, pad_modes, pad_cvals
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.width_multiple, self.height_multiple,
@@ -3437,8 +3599,9 @@ class CenterPadToMultiplesOf(PadToMultiplesOf):
     :class:`~imgaug.augmenters.size.PadToMultiplesOf` by default spreads them
     randomly.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -3462,8 +3625,16 @@ class CenterPadToMultiplesOf(PadToMultiplesOf):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3478,16 +3649,19 @@ class CenterPadToMultiplesOf(PadToMultiplesOf):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width_multiple, height_multiple,
                  pad_mode="constant", pad_cval=0,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterPadToMultiplesOf, self).__init__(
             width_multiple=width_multiple,
             height_multiple=height_multiple,
             pad_mode=pad_mode,
             pad_cval=pad_cval,
             position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CropToPowersOf(CropToFixedSize):
@@ -3505,8 +3679,9 @@ class CropToPowersOf(CropToFixedSize):
         to combine this augmenter with a padding augmenter that pads each
         axis up to ``B``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -3533,8 +3708,16 @@ class CropToPowersOf(CropToFixedSize):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3549,14 +3732,18 @@ class CropToPowersOf(CropToFixedSize):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width_base, height_base, position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CropToPowersOf, self).__init__(
             width=None, height=None, position=position,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.width_base = width_base
         self.height_base = height_base
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         _sizes, offset_xs, offset_ys = super(
             CropToPowersOf, self
@@ -3582,6 +3769,7 @@ class CropToPowersOf(CropToFixedSize):
 
         return sizes, offset_xs, offset_ys
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.width_base, self.height_base, self.position]
@@ -3596,8 +3784,9 @@ class CenterCropToPowersOf(CropToPowersOf):
     :class:`~imgaug.augmenters.size.CropToPowersOf` by default spreads them
     randomly.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -3615,8 +3804,16 @@ class CenterCropToPowersOf(CropToPowersOf):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3631,11 +3828,14 @@ class CenterCropToPowersOf(CropToPowersOf):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width_base, height_base,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterCropToPowersOf, self).__init__(
             width_base=width_base, height_base=height_base, position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class PadToPowersOf(PadToFixedSize):
@@ -3646,8 +3846,9 @@ class PadToPowersOf(PadToFixedSize):
     provided base (e.g. ``2``) and ``E`` is an exponent from the discrete
     interval ``[1 .. inf)``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -3680,8 +3881,16 @@ class PadToPowersOf(PadToFixedSize):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3696,17 +3905,21 @@ class PadToPowersOf(PadToFixedSize):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width_base, height_base,
                  pad_mode="constant", pad_cval=0,
                  position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(PadToPowersOf, self).__init__(
             width=None, height=None, pad_mode=pad_mode, pad_cval=pad_cval,
             position=position,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.width_base = width_base
         self.height_base = height_base
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         _sizes, pad_xs, pad_ys, pad_modes, pad_cvals = super(
             PadToPowersOf, self
@@ -3732,6 +3945,7 @@ class PadToPowersOf(PadToFixedSize):
 
         return sizes, pad_xs, pad_ys, pad_modes, pad_cvals
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.width_base, self.height_base,
@@ -3747,8 +3961,9 @@ class CenterPadToPowersOf(PadToPowersOf):
     over all image sides, while :class:`~imgaug.augmenters.size.PadToPowersOf`
     by default spreads them randomly.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -3772,8 +3987,16 @@ class CenterPadToPowersOf(PadToPowersOf):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3788,14 +4011,17 @@ class CenterPadToPowersOf(PadToPowersOf):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, width_base, height_base,
                  pad_mode="constant", pad_cval=0,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterPadToPowersOf, self).__init__(
             width_base=width_base, height_base=height_base,
             pad_mode=pad_mode, pad_cval=pad_cval,
             position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CropToAspectRatio(CropToFixedSize):
@@ -3807,8 +4033,9 @@ class CropToAspectRatio(CropToFixedSize):
     side to crop reaches a size of ``1``. If any side of the image starts
     with a size of ``0``, the image will not be changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -3827,8 +4054,16 @@ class CropToAspectRatio(CropToFixedSize):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3843,13 +4078,17 @@ class CropToAspectRatio(CropToFixedSize):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, aspect_ratio, position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CropToAspectRatio, self).__init__(
             width=None, height=None, position=position,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.aspect_ratio = aspect_ratio
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         _sizes, offset_xs, offset_ys = super(
             CropToAspectRatio, self
@@ -3878,6 +4117,7 @@ class CropToAspectRatio(CropToFixedSize):
 
         return sizes, offset_xs, offset_ys
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.aspect_ratio, self.position]
@@ -3892,8 +4132,9 @@ class CenterCropToAspectRatio(CropToAspectRatio):
     :class:`~imgaug.augmenters.size.CropToAspectRatio` by default spreads
     them randomly.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -3908,8 +4149,16 @@ class CenterCropToAspectRatio(CropToAspectRatio):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3924,11 +4173,14 @@ class CenterCropToAspectRatio(CropToAspectRatio):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, aspect_ratio,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterCropToAspectRatio, self).__init__(
             aspect_ratio=aspect_ratio, position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class PadToAspectRatio(PadToFixedSize):
@@ -3937,8 +4189,9 @@ class PadToAspectRatio(PadToFixedSize):
     This augmenter adds either rows or columns until the image reaches
     the desired aspect ratio given in ``width / height``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -3963,8 +4216,16 @@ class PadToAspectRatio(PadToFixedSize):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3979,15 +4240,19 @@ class PadToAspectRatio(PadToFixedSize):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, aspect_ratio, pad_mode="constant", pad_cval=0,
                  position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(PadToAspectRatio, self).__init__(
             width=None, height=None, pad_mode=pad_mode, pad_cval=pad_cval,
             position=position,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.aspect_ratio = aspect_ratio
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         _sizes, pad_xs, pad_ys, pad_modes, pad_cvals = super(
             PadToAspectRatio, self
@@ -4013,6 +4278,7 @@ class PadToAspectRatio(PadToFixedSize):
 
         return sizes, pad_xs, pad_ys, pad_modes, pad_cvals
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.aspect_ratio, self.pad_mode, self.pad_cval,
@@ -4028,8 +4294,9 @@ class CenterPadToAspectRatio(PadToAspectRatio):
     :class:`~imgaug.augmenters.size.PadToAspectRatio` by default spreads them
     randomly.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -4066,12 +4333,15 @@ class CenterPadToAspectRatio(PadToAspectRatio):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, aspect_ratio, pad_mode="constant", pad_cval=0,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterPadToAspectRatio, self).__init__(
             aspect_ratio=aspect_ratio, position="center",
             pad_mode=pad_mode, pad_cval=pad_cval,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CropToSquare(CropToAspectRatio):
@@ -4082,8 +4352,9 @@ class CropToSquare(CropToAspectRatio):
 
     Images with axis sizes of ``0`` will not be altered.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -4098,8 +4369,16 @@ class CropToSquare(CropToAspectRatio):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4113,11 +4392,14 @@ class CropToSquare(CropToAspectRatio):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CropToSquare, self).__init__(
             aspect_ratio=1.0, position=position,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CenterCropToSquare(CropToSquare):
@@ -4136,8 +4418,9 @@ class CenterCropToSquare(CropToSquare):
 
     Images with axis sizes of ``0`` will not be altered.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.CropToFixedSize`.
 
@@ -4149,8 +4432,16 @@ class CenterCropToSquare(CropToSquare):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4164,10 +4455,13 @@ class CenterCropToSquare(CropToSquare):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterCropToSquare, self).__init__(
             position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class PadToSquare(PadToAspectRatio):
@@ -4176,8 +4470,9 @@ class PadToSquare(PadToAspectRatio):
     This augmenter is identical to
     :class:`~imgaug.augmenters.size.PadToAspectRatio` with ``aspect_ratio=1.0``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -4198,8 +4493,16 @@ class PadToSquare(PadToAspectRatio):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4213,12 +4516,15 @@ class PadToSquare(PadToAspectRatio):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, pad_mode="constant", pad_cval=0, position="uniform",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(PadToSquare, self).__init__(
             aspect_ratio=1.0, pad_mode=pad_mode, pad_cval=pad_cval,
             position=position,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CenterPadToSquare(PadToSquare):
@@ -4231,8 +4537,9 @@ class CenterPadToSquare(PadToSquare):
     :class:`~imgaug.augmenters.size.PadToAspectRatio` with
     ``aspect_ratio=1.0, position="center"``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.size.PadToFixedSize`.
 
@@ -4265,11 +4572,14 @@ class CenterPadToSquare(PadToSquare):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, pad_mode="constant", pad_cval=0,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CenterPadToSquare, self).__init__(
             pad_mode=pad_mode, pad_cval=pad_cval, position="center",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class KeepSizeByResize(meta.Augmenter):
@@ -4282,8 +4592,7 @@ class KeepSizeByResize(meta.Augmenter):
     the interpolation mode and which augmentables to resize (images, heatmaps,
     segmentation maps).
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.imgaug.imresize_many_images`.
 
@@ -4335,8 +4644,16 @@ class KeepSizeByResize(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4379,9 +4696,11 @@ class KeepSizeByResize(meta.Augmenter):
                  interpolation="cubic",
                  interpolation_heatmaps=SAME_AS_IMAGES,
                  interpolation_segmaps="nearest",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(KeepSizeByResize, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.children = children
 
         def _validate_param(val, allow_same_as_images):
@@ -4418,6 +4737,7 @@ class KeepSizeByResize(meta.Augmenter):
         self.interpolation_segmaps = _validate_param(interpolation_segmaps,
                                                      True)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             images_were_array = None
@@ -4460,6 +4780,7 @@ class KeepSizeByResize(meta.Augmenter):
                     setattr(batch, augm_name, cbaois)
         return batch
 
+    # Added in 0.4.0.
     @classmethod
     def _keep_size_images(cls, images, shapes_orig, images_were_array,
                           samples):
@@ -4479,10 +4800,13 @@ class KeepSizeByResize(meta.Augmenter):
             # note here that NO_RESIZE can have led to different shapes
             nb_shapes = len({image.shape for image in result})
             if nb_shapes == 1:
-                result = np.array(result, dtype=images.dtype)
+                # images.dtype does not necessarily work anymore, children
+                # might have turned 'images' into list
+                result = np.array(result, dtype=result[0].dtype)
 
         return result
 
+    # Added in 0.4.0.
     @classmethod
     def _keep_size_maps(cls, augmentables, shapes_orig_images,
                         shapes_orig_arrs, interpolations):
@@ -4500,6 +4824,7 @@ class KeepSizeByResize(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     @classmethod
     def _keep_size_keypoints(cls, kpsois_aug, shapes_orig, interpolations):
         result = []
@@ -4512,6 +4837,7 @@ class KeepSizeByResize(meta.Augmenter):
 
         return result
 
+    # Added in 0.4.0.
     @classmethod
     def _get_shapes(cls, batch):
         result = dict()

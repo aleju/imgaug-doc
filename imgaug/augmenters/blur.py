@@ -32,8 +32,7 @@ def blur_gaussian_(image, sigma, ksize=None, backend="auto", eps=1e-3):
 
     This operation *may* change the input image in-place.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     if (backend="auto"):
 
@@ -287,8 +286,9 @@ def blur_mean_shift_(image, spatial_window_radius, color_window_radius):
 
         This function is quite slow.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no (1)
@@ -388,8 +388,7 @@ def _compute_gaussian_blur_ksize(sigma):
 class GaussianBlur(meta.Augmenter):
     """Augmenter to blur images using gaussian kernels.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See ``~imgaug.augmenters.blur.blur_gaussian_(backend="auto")``.
 
@@ -415,8 +414,16 @@ class GaussianBlur(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -433,10 +440,12 @@ class GaussianBlur(meta.Augmenter):
 
     """
 
-    def __init__(self, sigma=0,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, sigma=(0.0, 3.0),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(GaussianBlur, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.sigma = iap.handle_continuous_param(
             sigma, "sigma", value_range=(0, None), tuple_to_uniform=True,
@@ -446,6 +455,7 @@ class GaussianBlur(meta.Augmenter):
         # apply the blur
         self.eps = 1e-3
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -469,8 +479,7 @@ class AverageBlur(meta.Augmenter):
     The padding behaviour around the image borders is cv2's
     ``BORDER_REFLECT_101``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -524,8 +533,16 @@ class AverageBlur(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -547,9 +564,12 @@ class AverageBlur(meta.Augmenter):
 
     """
 
-    def __init__(self, k=1, seed=None, name=None, **old_kwargs):
+    def __init__(self, k=(1, 7),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(AverageBlur, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         # TODO replace this by iap.handle_discrete_kernel_size()
         self.mode = "single"
@@ -597,6 +617,7 @@ class AverageBlur(meta.Augmenter):
                 "Expected int, tuple/list with 2 entries or "
                 "StochasticParameter. Got %s." % (type(k),))
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -675,8 +696,7 @@ class MedianBlur(meta.Augmenter):
     Median blurring can be used to remove small dirt from images.
     At larger kernel sizes, its effects have some similarity with Superpixels.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: ?
@@ -716,8 +736,16 @@ class MedianBlur(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -734,9 +762,12 @@ class MedianBlur(meta.Augmenter):
 
     """
 
-    def __init__(self, k=1, seed=None, name=None, **old_kwargs):
+    def __init__(self, k=(1, 7),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MedianBlur, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         # TODO replace this by iap.handle_discrete_kernel_size()
         self.k = iap.handle_discrete_param(
@@ -751,6 +782,7 @@ class MedianBlur(meta.Augmenter):
                 "Expected all values in iterable k to be odd, but at least "
                 "one was not. Add or subtract 1 to/from that value.")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -798,8 +830,7 @@ class BilateralBlur(meta.Augmenter):
     http://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html#bilateralfilter
     for more information regarding the parameters.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; not tested
         * ``uint16``: ?
@@ -871,8 +902,16 @@ class BilateralBlur(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -886,11 +925,13 @@ class BilateralBlur(meta.Augmenter):
 
     """
 
-    def __init__(self, d=1, sigma_color=(10, 250), sigma_space=(10, 250),
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, d=(1, 9), sigma_color=(10, 250), sigma_space=(10, 250),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=invalid-name
         super(BilateralBlur, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.d = iap.handle_discrete_param(
             d, "d", value_range=(1, None), tuple_to_uniform=True,
@@ -902,6 +943,7 @@ class BilateralBlur(meta.Augmenter):
             sigma_space, "sigma_space", value_range=(1, None),
             tuple_to_uniform=True, list_to_choice=True)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         # pylint: disable=invalid-name
         if batch.images is None:
@@ -941,8 +983,7 @@ class BilateralBlur(meta.Augmenter):
 class MotionBlur(iaa_convolutional.Convolve):
     """Blur images in a way that fakes camera or object movements.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.convolutional.Convolve`.
 
@@ -1002,8 +1043,16 @@ class MotionBlur(iaa_convolutional.Convolve):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1019,8 +1068,9 @@ class MotionBlur(iaa_convolutional.Convolve):
 
     """
 
-    def __init__(self, k=5, angle=(0, 360), direction=(-1.0, 1.0), order=1,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, k=(3, 7), angle=(0, 360), direction=(-1.0, 1.0), order=1,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # TODO allow (1, None) and set to identity matrix if k == 1
         k_param = iap.handle_discrete_param(
             k, "k", value_range=(3, None), tuple_to_uniform=True,
@@ -1037,16 +1087,20 @@ class MotionBlur(iaa_convolutional.Convolve):
 
         super(MotionBlur, self).__init__(
             matrix_gen,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
+# Added in 0.4.0.
 class _MotionBlurMatrixGenerator(object):
+    # Added in 0.4.0.
     def __init__(self, k, angle, direction, order):
         self.k = k
         self.angle = angle
         self.direction = direction
         self.order = order
 
+    # Added in 0.4.0.
     def __call__(self, _image, nb_channels, random_state):
         # avoid cyclic import between blur and geometric
         from . import geometric as iaa_geometric
@@ -1094,8 +1148,9 @@ class MeanShiftBlur(meta.Augmenter):
 
         This augmenter is quite slow.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.blur.blur_mean_shift_`.
 
@@ -1131,8 +1186,16 @@ class MeanShiftBlur(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1142,10 +1205,14 @@ class MeanShiftBlur(meta.Augmenter):
     Create a mean shift blur augmenter.
 
     """
+
+    # Added in 0.4.0.
     def __init__(self, spatial_radius=(5.0, 40.0), color_radius=(5.0, 40.0),
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MeanShiftBlur, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.spatial_window_radius = iap.handle_continuous_param(
             spatial_radius, "spatial_radius",
             value_range=(0.01, None), tuple_to_uniform=True,
@@ -1155,6 +1222,7 @@ class MeanShiftBlur(meta.Augmenter):
             value_range=(0.01, None), tuple_to_uniform=True,
             list_to_choice=True)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is not None:
             samples = self._draw_samples(batch, random_state)
@@ -1167,6 +1235,7 @@ class MeanShiftBlur(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         nb_rows = batch.nb_rows
         return (
@@ -1176,6 +1245,7 @@ class MeanShiftBlur(meta.Augmenter):
                                                   random_state=random_state)
         )
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.spatial_window_radius, self.color_window_radius]

@@ -44,9 +44,11 @@ class _AbstractPoolingBase(meta.Augmenter):
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
     def __init__(self, kernel_size, keep_size=True,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(_AbstractPoolingBase, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.kernel_size = iap.handle_discrete_kernel_size_param(
             kernel_size,
             "kernel_size",
@@ -76,6 +78,7 @@ class _AbstractPoolingBase(meta.Augmenter):
             np.clip(kernel_sizes_w, 1, None)
         )
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None and self.keep_size:
             return batch
@@ -88,6 +91,7 @@ class _AbstractPoolingBase(meta.Augmenter):
             setattr(batch, column.attr_name, value_aug)
         return batch
 
+    # Added in 0.4.0.
     def _augment_images_by_samples(self, images, samples):
         if not self.keep_size:
             images = list(images)
@@ -106,14 +110,17 @@ class _AbstractPoolingBase(meta.Augmenter):
 
         return images
 
+    # Added in 0.4.0.
     def _augment_heatmaps_by_samples(self, heatmaps, samples):
         return self._augment_hms_and_segmaps_by_samples(heatmaps, samples,
                                                         "arr_0to1")
 
+    # Added in 0.4.0.
     def _augment_segmentation_maps_by_samples(self, segmaps, samples):
         return self._augment_hms_and_segmaps_by_samples(segmaps, samples,
                                                         "arr")
 
+    # Added in 0.4.0.
     def _augment_hms_and_segmaps_by_samples(self, augmentables, samples,
                                             arr_attr_name):
         if self.keep_size:
@@ -142,6 +149,7 @@ class _AbstractPoolingBase(meta.Augmenter):
 
         return augmentables
 
+    # Added in 0.4.0.
     def _augment_keypoints_by_samples(self, keypoints_on_images, samples):
         if self.keep_size:
             return keypoints_on_images
@@ -159,17 +167,20 @@ class _AbstractPoolingBase(meta.Augmenter):
 
         return keypoints_on_images
 
+    # Added in 0.4.0.
     def _augment_polygons_by_samples(self, polygons_on_images, samples):
         func = functools.partial(self._augment_keypoints_by_samples,
                                  samples=samples)
         return self._apply_to_polygons_as_keypoints(polygons_on_images, func,
                                                     recoverer=None)
 
+    # Added in 0.4.0.
     def _augment_line_strings_by_samples(self, line_strings_on_images, samples):
         func = functools.partial(self._augment_keypoints_by_samples,
                                  samples=samples)
         return self._apply_to_cbaois_as_keypoints(line_strings_on_images, func)
 
+    # Added in 0.4.0.
     def _augment_bounding_boxes_by_samples(self, bounding_boxes_on_images,
                                            samples):
         func = functools.partial(self._augment_keypoints_by_samples,
@@ -207,8 +218,7 @@ class AveragePooling(_AbstractPoolingBase):
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.imgaug.avg_pool`.
 
@@ -250,8 +260,16 @@ class AveragePooling(_AbstractPoolingBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -288,11 +306,13 @@ class AveragePooling(_AbstractPoolingBase):
 
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
-    def __init__(self, kernel_size, keep_size=True,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, kernel_size=(1, 5), keep_size=True,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(AveragePooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         return ia.avg_pool(
@@ -319,8 +339,7 @@ class MaxPooling(_AbstractPoolingBase):
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.imgaug.max_pool`.
 
@@ -362,8 +381,16 @@ class MaxPooling(_AbstractPoolingBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -400,11 +427,13 @@ class MaxPooling(_AbstractPoolingBase):
 
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
-    def __init__(self, kernel_size, keep_size=True,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, kernel_size=(1, 5), keep_size=True,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MaxPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend max_pool to support pad_mode and set it here
@@ -433,8 +462,7 @@ class MinPooling(_AbstractPoolingBase):
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.imgaug.min_pool`.
 
@@ -476,8 +504,16 @@ class MinPooling(_AbstractPoolingBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -514,11 +550,13 @@ class MinPooling(_AbstractPoolingBase):
 
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
-    def __init__(self, kernel_size, keep_size=True,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, kernel_size=(1, 5), keep_size=True,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MinPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend pool to support pad_mode and set it here
@@ -547,8 +585,7 @@ class MedianPooling(_AbstractPoolingBase):
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.imgaug.median_pool`.
 
@@ -590,8 +627,16 @@ class MedianPooling(_AbstractPoolingBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -628,11 +673,13 @@ class MedianPooling(_AbstractPoolingBase):
 
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
-    def __init__(self, kernel_size, keep_size=True,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, kernel_size=(1, 5), keep_size=True,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MedianPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend pool to support pad_mode and set it here

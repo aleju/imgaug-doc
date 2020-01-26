@@ -5,6 +5,8 @@ List of augmenters:
 
     * :class:`Cartoon`
 
+Added in 0.4.0.
+
 """
 
 from __future__ import print_function, division, absolute_import
@@ -35,6 +37,24 @@ def stylize_cartoon(image, blur_ksize=3, segmentation_size=1.0,
 
     This method is loosely based on the one proposed in
     https://stackoverflow.com/a/11614479/3760780
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+        * ``uint8``: yes; fully tested
+        * ``uint16``: no
+        * ``uint32``: no
+        * ``uint64``: no
+        * ``int8``: no
+        * ``int16``: no
+        * ``int32``: no
+        * ``int64``: no
+        * ``float16``: no
+        * ``float32``: no
+        * ``float64``: no
+        * ``float128``: no
+        * ``bool``: no
 
     Parameters
     ----------
@@ -139,6 +159,7 @@ def stylize_cartoon(image, blur_ksize=3, segmentation_size=1.0,
                      from_colorspace)
 
 
+# Added in 0.4.0.
 def _find_edges_canny(image, edge_multiplier, from_colorspace):
     image_gray = colorlib.change_colorspace_(np.copy(image),
                                              to_colorspace=colorlib.CSPACE_GRAY,
@@ -149,6 +170,7 @@ def _find_edges_canny(image, edge_multiplier, from_colorspace):
     return edges
 
 
+# Added in 0.4.0.
 def _find_edges_laplacian(image, edge_multiplier, from_colorspace):
     image_gray = colorlib.change_colorspace_(np.copy(image),
                                              to_colorspace=colorlib.CSPACE_GRAY,
@@ -167,6 +189,7 @@ def _find_edges_laplacian(image, edge_multiplier, from_colorspace):
     return edges_uint8
 
 
+# Added in 0.4.0.
 def _blur_median(image, ksize):
     if ksize % 2 == 0:
         ksize += 1
@@ -175,6 +198,7 @@ def _blur_median(image, ksize):
     return cv2.medianBlur(_normalize_cv2_input_arr_(image), ksize)
 
 
+# Added in 0.4.0.
 def _threshold(image, thresh):
     mask = (image < thresh)
     result = np.copy(image)
@@ -182,6 +206,7 @@ def _threshold(image, thresh):
     return result
 
 
+# Added in 0.4.0.
 def _suppress_edge_blobs(edges, size, thresh, inverse):
     kernel = np.ones((size, size), dtype=np.float32)
     counts = cv2.filter2D(_normalize_cv2_input_arr_(edges / 255.0), -1, kernel)
@@ -196,6 +221,7 @@ def _suppress_edge_blobs(edges, size, thresh, inverse):
     return edges
 
 
+# Added in 0.4.0.
 def _saturate(image, factor, from_colorspace):
     image = np.copy(image)
     if np.isclose(factor, 1.0, atol=1e-2):
@@ -213,6 +239,7 @@ def _saturate(image, factor, from_colorspace):
     return image_sat
 
 
+# Added in 0.4.0.
 def _blend_edges(image, image_edges):
     image_edges = 1.0 - (image_edges / 255.0)
     image_edges = np.tile(image_edges[..., np.newaxis], (1, 1, 3))
@@ -233,8 +260,9 @@ class Cartoon(meta.Augmenter):
     edges or also too many detected edges are probably the most significant
     drawbacks.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.artistic.stylize_cartoon`.
 
@@ -302,8 +330,16 @@ class Cartoon(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -319,12 +355,16 @@ class Cartoon(meta.Augmenter):
     images.
 
     """
+
+    # Added in 0.4.0.
     def __init__(self, blur_ksize=(1, 5), segmentation_size=(0.8, 1.2),
                  saturation=(1.5, 2.5), edge_prevalence=(0.9, 1.1),
                  from_colorspace=colorlib.CSPACE_RGB,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Cartoon, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.blur_ksize = iap.handle_continuous_param(
             blur_ksize, "blur_ksize", value_range=(0, None),
@@ -340,6 +380,7 @@ class Cartoon(meta.Augmenter):
             tuple_to_uniform=True, list_to_choice=True)
         self.from_colorspace = from_colorspace
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is not None:
             samples = self._draw_samples(batch, random_state)
@@ -354,6 +395,7 @@ class Cartoon(meta.Augmenter):
                 )
         return batch
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         nb_rows = batch.nb_rows
         return (
@@ -365,6 +407,7 @@ class Cartoon(meta.Augmenter):
                                               random_state=random_state)
         )
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.blur_ksize, self.segmentation_size, self.saturation,

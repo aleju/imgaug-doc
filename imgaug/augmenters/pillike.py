@@ -44,6 +44,8 @@ Standard usage of these augmenters follows roughly the schema::
 
     images_aug = aug(images=[image, image, image])
 
+Added in 0.4.0.
+
 """
 from __future__ import print_function, division, absolute_import
 
@@ -66,9 +68,14 @@ from . import size as sizelib
 from .. import parameters as iap
 
 
+# TODO some of the augmenters in this module broke on numpy arrays as
+#      image inputs (as opposed to lists of arrays) without any test failing
+#      add appropriate tests for that
+
 _EQUALIZE_USE_PIL_BELOW = 64*64  # H*W
 
 
+# Added in 0.4.0.
 def _ensure_valid_shape(image, func_name):
     is_hw1 = image.ndim == 3 and image.shape[-1] == 1
     if is_hw1:
@@ -86,11 +93,12 @@ def _ensure_valid_shape(image, func_name):
 def solarize_(image, threshold=128):
     """Invert all array components above a threshold in-place.
 
-    This function has identical outputs to :func:`~PIL.ImageOps.solarize`.
+    This function has identical outputs to ``PIL.ImageOps.solarize``.
     It does however work in-place.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See ``~imgaug.augmenters.arithmetic.invert_(min_value=None and max_value=None)``.
 
@@ -117,10 +125,11 @@ def solarize_(image, threshold=128):
 def solarize(image, threshold=128):
     """Invert all array components above a threshold.
 
-    This function has identical outputs to :func:`~PIL.ImageOps.solarize`.
+    This function has identical outputs to ``PIL.ImageOps.solarize``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See ``~imgaug.augmenters.arithmetic.invert_(min_value=None and max_value=None)``.
 
@@ -145,11 +154,12 @@ def solarize(image, threshold=128):
 def posterize_(image, bits):
     """Reduce the number of bits for each color channel in-place.
 
-    This function has identical outputs to :func:`~PIL.ImageOps.posterize`.
+    This function has identical outputs to ``PIL.ImageOps.posterize``.
     It does however work in-place.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.quantize_uniform_to_n_bits_`.
 
@@ -175,10 +185,11 @@ def posterize_(image, bits):
 def posterize(image, bits):
     """Reduce the number of bits for each color channel.
 
-    This function has identical outputs to :func:`~PIL.ImageOps.posterize`.
+    This function has identical outputs to ``PIL.ImageOps.posterize``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.quantize_uniform_to_n_bits`.
 
@@ -206,12 +217,13 @@ def equalize(image, mask=None):
     See :func:`~imgaug.augmenters.pillike.equalize_` for details.
 
     This function is identical in inputs and outputs to
-    :func:`~PIL.ImageOps.equalize`.
+    ``PIL.ImageOps.equalize``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
 
-    See :func:`~imgaug.augmenters.pillike.pil_equalize_`.
+    **Supported dtypes**:
+
+    See :func:`~imgaug.augmenters.pillike.equalize_`.
 
     Parameters
     ----------
@@ -243,11 +255,12 @@ def equalize_(image, mask=None):
     This function applies a non-linear mapping to the input image, in order
     to create a uniform distribution of grayscale values in the output image.
 
-    This function has identical outputs to :func:`~PIL.ImageOps.equalize`.
+    This function has identical outputs to ``PIL.ImageOps.equalize``.
     It does however work in-place.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -302,6 +315,7 @@ def equalize_(image, mask=None):
 
 # note that this is supposed to be a non-PIL reimplementation of PIL's
 # equalize, which produces slightly different results from cv2.equalizeHist()
+# Added in 0.4.0.
 def _equalize_no_pil_(image, mask=None):
     nb_channels = 1 if image.ndim == 2 else image.shape[-1]
     # TODO remove the first axis, no longer needed
@@ -333,6 +347,7 @@ def _equalize_no_pil_(image, mask=None):
     return image
 
 
+# Added in 0.4.0.
 def _equalize_pil_(image, mask=None):
     if mask is not None:
         mask = PIL.Image.fromarray(mask).convert("L")
@@ -355,11 +370,12 @@ def autocontrast(image, cutoff=0, ignore=None):
     and remaps the image so that the darkest pixel becomes black (``0``), and
     the lightest becomes white (``255``).
 
-    This function has identical outputs to :func:`~PIL.ImageOps.autocontrast`.
+    This function has identical outputs to ``PIL.ImageOps.autocontrast``.
     The speed is almost identical.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -410,6 +426,7 @@ def autocontrast(image, cutoff=0, ignore=None):
     return _autocontrast_no_pil(image, cutoff, ignore)
 
 
+# Added in 0.4.0.
 def _autocontrast_pil(image, cutoff, ignore):
     # don't return np.asarray(...) as its results are read-only
     return np.array(
@@ -423,6 +440,7 @@ def _autocontrast_pil(image, cutoff, ignore):
 # This function is only faster than the corresponding PIL function if no
 # cutoff is used.
 # C901 is "<functionname> is too complex"
+# Added in 0.4.0.
 def _autocontrast_no_pil(image, cutoff, ignore):  # noqa: C901
     # pylint: disable=invalid-name
     if ignore is not None and not ia.is_iterable(ignore):
@@ -513,6 +531,7 @@ def _autocontrast_no_pil(image, cutoff, ignore):  # noqa: C901
     return result
 
 
+# Added in 0.4.0.
 def _apply_enhance_func(image, cls, factor):
     assert image.dtype.name == "uint8", (
         "Can apply PIL image enhancement only to uint8 images, "
@@ -539,10 +558,11 @@ def enhance_color(image, factor):
     """Change the strength of colors in an image.
 
     This function has identical outputs to
-    :class:`~PIL.ImageEnhance.Color`.
+    ``PIL.ImageEnhance.Color``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -581,10 +601,11 @@ def enhance_contrast(image, factor):
     """Change the contrast of an image.
 
     This function has identical outputs to
-    :class:`~PIL.ImageEnhance.Contrast`.
+    ``PIL.ImageEnhance.Contrast``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -624,10 +645,11 @@ def enhance_brightness(image, factor):
     """Change the brightness of images.
 
     This function has identical outputs to
-    :class:`~PIL.ImageEnhance.Brightness`.
+    ``PIL.ImageEnhance.Brightness``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -666,10 +688,11 @@ def enhance_sharpness(image, factor):
     """Change the sharpness of an image.
 
     This function has identical outputs to
-    :class:`~PIL.ImageEnhance.Sharpness`.
+    ``PIL.ImageEnhance.Sharpness``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -704,6 +727,7 @@ def enhance_sharpness(image, factor):
     return _apply_enhance_func(image, PIL.ImageEnhance.Sharpness, factor)
 
 
+# Added in 0.4.0.
 def _filter_by_kernel(image, kernel):
     assert image.dtype.name == "uint8", (
         "Can apply PIL filters only to uint8 images, "
@@ -731,8 +755,9 @@ def filter_blur(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.BLUR`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -767,8 +792,9 @@ def filter_smooth(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.SMOOTH`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -803,8 +829,9 @@ def filter_smooth_more(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.SMOOTH_MORE`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -839,8 +866,9 @@ def filter_edge_enhance(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.EDGE_ENHANCE`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -876,8 +904,9 @@ def filter_edge_enhance_more(image):
     This is the same as using PIL's ``PIL.ImageFilter.EDGE_ENHANCE_MORE``
     kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -912,8 +941,9 @@ def filter_find_edges(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.FIND_EDGES`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -948,8 +978,9 @@ def filter_contour(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.CONTOUR`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -984,8 +1015,9 @@ def filter_emboss(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.EMBOSS`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -1020,8 +1052,9 @@ def filter_sharpen(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.SHARPEN`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -1056,8 +1089,9 @@ def filter_detail(image):
 
     This is the same as using PIL's ``PIL.ImageFilter.DETAIL`` kernel.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -1089,6 +1123,7 @@ def filter_detail(image):
 
 # TODO unify this with the matrix generation for Affine,
 #      there is probably no need to keep these separate
+# Added in 0.4.0.
 def _create_affine_matrix(scale_x=1.0, scale_y=1.0,
                           translate_x_px=0, translate_y_px=0,
                           rotate_deg=0,
@@ -1164,10 +1199,11 @@ def warp_affine(image,
     """Apply an affine transformation to an image.
 
     This function has identical outputs to
-    :func:`~PIL.Image.transform` with ``method=PIL.Image.AFFINE``.
+    ``PIL.Image.transform`` with ``method=PIL.Image.AFFINE``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -1283,10 +1319,11 @@ class Solarize(arithmetic.Invert):
 
     The outputs are identical to PIL's ``solarize()``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
 
-    See :class:`~imgaug.augmenters.arithmetic.Invert`.
+    **Supported dtypes**:
+
+    See ``~imgaug.augmenters.arithmetic.invert_(min_value=None and max_value=None)``.
 
     Parameters
     ----------
@@ -1302,8 +1339,16 @@ class Solarize(arithmetic.Invert):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1317,12 +1362,14 @@ class Solarize(arithmetic.Invert):
     """
 
     def __init__(self, p=1.0, threshold=128,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Solarize, self).__init__(
             p=p, per_channel=False,
             min_value=None, max_value=None,
             threshold=threshold, invert_above_threshold=True,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Posterize(colorlib.Posterize):
@@ -1336,8 +1383,9 @@ class Posterize(colorlib.Posterize):
     i.e. all three classes are right now guarantueed to have the same
     outputs as PIL's function.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.Posterize`.
 
@@ -1347,10 +1395,11 @@ class Posterize(colorlib.Posterize):
 class Equalize(meta.Augmenter):
     """Equalize the image histogram.
 
-    This augmenter has identical outputs to :func:`~PIL.ImageOps.equalize`.
+    This augmenter has identical outputs to ``PIL.ImageOps.equalize``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.equalize_`.
 
@@ -1362,8 +1411,16 @@ class Equalize(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1374,17 +1431,23 @@ class Equalize(meta.Augmenter):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Equalize, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         # pylint: disable=no-self-use
-        if batch.images:
+        if batch.images is not None:
             for image in batch.images:
                 image[...] = equalize_(image)
         return batch
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []
@@ -1393,12 +1456,13 @@ class Equalize(meta.Augmenter):
 class Autocontrast(contrastlib._ContrastFuncWrapper):
     """Adjust contrast by cutting off ``p%`` of lowest/highest histogram values.
 
-    This augmenter has identical outputs to :func:`~PIL.ImageOps.autocontrast`.
+    This augmenter has identical outputs to ``PIL.ImageOps.autocontrast``.
 
     See :func:`~imgaug.augmenters.pillike.autocontrast` for more details.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.autocontrast`.
 
@@ -1428,8 +1492,16 @@ class Autocontrast(contrastlib._ContrastFuncWrapper):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1448,8 +1520,10 @@ class Autocontrast(contrastlib._ContrastFuncWrapper):
     """
     # pylint: disable=protected-access
 
+    # Added in 0.4.0.
     def __init__(self, cutoff=(0, 20), per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         params1d = [
             iap.handle_discrete_param(
                 cutoff, "cutoff", value_range=(0, 49), tuple_to_uniform=True,
@@ -1465,32 +1539,39 @@ class Autocontrast(contrastlib._ContrastFuncWrapper):
                                "float16", "float32", "float64",
                                "float16", "float32", "float64", "float96",
                                "float128", "float256", "bool"],
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
+# Added in 0.4.0.
 class _EnhanceBase(meta.Augmenter):
+    # Added in 0.4.0.
     def __init__(self, func, factor, factor_value_range,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(_EnhanceBase, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.func = func
         self.factor = iap.handle_continuous_param(
             factor, "factor", value_range=factor_value_range,
             tuple_to_uniform=True, list_to_choice=True)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
 
         factors = self._draw_samples(len(batch.images), random_state)
-        if batch.images:
-            for image, factor in zip(batch.images, factors):
-                image[...] = self.func(image, factor)
+        for image, factor in zip(batch.images, factors):
+            image[...] = self.func(image, factor)
         return batch
 
+    # Added in 0.4.0.
     def _draw_samples(self, nb_rows, random_state):
         return self.factor.draw_samples((nb_rows,), random_state=random_state)
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.factor]
@@ -1499,10 +1580,11 @@ class _EnhanceBase(meta.Augmenter):
 class EnhanceColor(_EnhanceBase):
     """Convert images to grayscale.
 
-    This augmenter has identical outputs to :class:`~PIL.ImageEnhance.Color`.
+    This augmenter has identical outputs to ``PIL.ImageEnhance.Color``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.enhance_color`.
 
@@ -1527,8 +1609,16 @@ class EnhanceColor(_EnhanceBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1540,22 +1630,26 @@ class EnhanceColor(_EnhanceBase):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, factor=(0.0, 3.0),
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(EnhanceColor, self).__init__(
             func=enhance_color,
             factor=factor,
             factor_value_range=(0.0, None),
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class EnhanceContrast(_EnhanceBase):
     """Change the contrast of images.
 
-    This augmenter has identical outputs to :class:`~PIL.ImageEnhance.Contrast`.
+    This augmenter has identical outputs to ``PIL.ImageEnhance.Contrast``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.enhance_contrast`.
 
@@ -1581,8 +1675,16 @@ class EnhanceContrast(_EnhanceBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1594,23 +1696,27 @@ class EnhanceContrast(_EnhanceBase):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, factor=(0.5, 1.5),
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(EnhanceContrast, self).__init__(
             func=enhance_contrast,
             factor=factor,
             factor_value_range=(0.0, None),
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class EnhanceBrightness(_EnhanceBase):
     """Change the brightness of images.
 
     This augmenter has identical outputs to
-    :class:`~PIL.ImageEnhance.Brightness`.
+    ``PIL.ImageEnhance.Brightness``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.enhance_brightness`.
 
@@ -1635,8 +1741,16 @@ class EnhanceBrightness(_EnhanceBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1648,23 +1762,27 @@ class EnhanceBrightness(_EnhanceBase):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, factor=(0.5, 1.5),
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(EnhanceBrightness, self).__init__(
             func=enhance_brightness,
             factor=factor,
             factor_value_range=(0.0, None),
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class EnhanceSharpness(_EnhanceBase):
     """Change the sharpness of images.
 
     This augmenter has identical outputs to
-    :class:`~PIL.ImageEnhance.Sharpness`.
+    ``PIL.ImageEnhance.Sharpness``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.enhance_sharpness`.
 
@@ -1689,8 +1807,16 @@ class EnhanceSharpness(_EnhanceBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1702,31 +1828,37 @@ class EnhanceSharpness(_EnhanceBase):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, factor=(0.0, 2.0),
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(EnhanceSharpness, self).__init__(
             func=enhance_sharpness,
             factor=factor,
             factor_value_range=(0.0, None),
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
+# Added in 0.4.0.
 class _FilterBase(meta.Augmenter):
+    # Added in 0.4.0.
     def __init__(self, func,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(_FilterBase, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.func = func
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
-        if batch.images is None:
-            return batch
-
-        if batch.images:
+        if batch.images is not None:
             for image in batch.images:
                 image[...] = self.func(image)
         return batch
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []
@@ -1736,10 +1868,11 @@ class FilterBlur(_FilterBase):
     """Apply a blur filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel ``PIL.ImageFilter.BLUR``.
+    calling ``PIL.Image.filter`` with kernel ``PIL.ImageFilter.BLUR``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_blur`.
 
@@ -1751,8 +1884,16 @@ class FilterBlur(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1763,20 +1904,25 @@ class FilterBlur(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterBlur, self).__init__(
             func=filter_blur,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterSmooth(_FilterBase):
     """Apply a smoothening filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel ``PIL.ImageFilter.SMOOTH``.
+    calling ``PIL.Image.filter`` with kernel ``PIL.ImageFilter.SMOOTH``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_smooth`.
 
@@ -1788,8 +1934,16 @@ class FilterSmooth(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1800,20 +1954,25 @@ class FilterSmooth(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterSmooth, self).__init__(
             func=filter_smooth,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterSmoothMore(_FilterBase):
     """Apply a strong smoothening filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel ``PIL.ImageFilter.BLUR``.
+    calling ``PIL.Image.filter`` with kernel ``PIL.ImageFilter.BLUR``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_smooth_more`.
 
@@ -1825,8 +1984,16 @@ class FilterSmoothMore(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1838,21 +2005,26 @@ class FilterSmoothMore(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterSmoothMore, self).__init__(
             func=filter_smooth_more,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterEdgeEnhance(_FilterBase):
     """Apply an edge enhance filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel
+    calling ``PIL.Image.filter`` with kernel
     ``PIL.ImageFilter.EDGE_ENHANCE``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_edge_enhance`.
 
@@ -1864,8 +2036,16 @@ class FilterEdgeEnhance(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1877,21 +2057,26 @@ class FilterEdgeEnhance(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterEdgeEnhance, self).__init__(
             func=filter_edge_enhance,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterEdgeEnhanceMore(_FilterBase):
     """Apply a strong edge enhancement filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel
+    calling ``PIL.Image.filter`` with kernel
     ``PIL.ImageFilter.EDGE_ENHANCE_MORE``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_edge_enhance_more`.
 
@@ -1903,8 +2088,16 @@ class FilterEdgeEnhanceMore(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1916,21 +2109,26 @@ class FilterEdgeEnhanceMore(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterEdgeEnhanceMore, self).__init__(
             func=filter_edge_enhance_more,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterFindEdges(_FilterBase):
     """Apply a edge detection kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel
+    calling ``PIL.Image.filter`` with kernel
     ``PIL.ImageFilter.FIND_EDGES``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_find_edges`.
 
@@ -1942,8 +2140,16 @@ class FilterFindEdges(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1954,20 +2160,25 @@ class FilterFindEdges(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterFindEdges, self).__init__(
             func=filter_find_edges,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterContour(_FilterBase):
     """Apply a contour detection filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel ``PIL.ImageFilter.CONTOUR``.
+    calling ``PIL.Image.filter`` with kernel ``PIL.ImageFilter.CONTOUR``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_contour`.
 
@@ -1979,8 +2190,16 @@ class FilterContour(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1992,20 +2211,25 @@ class FilterContour(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterContour, self).__init__(
             func=filter_contour,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterEmboss(_FilterBase):
     """Apply an emboss filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel ``PIL.ImageFilter.EMBOSS``.
+    calling ``PIL.Image.filter`` with kernel ``PIL.ImageFilter.EMBOSS``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_emboss`.
 
@@ -2017,8 +2241,16 @@ class FilterEmboss(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2029,20 +2261,25 @@ class FilterEmboss(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterEmboss, self).__init__(
             func=filter_emboss,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterSharpen(_FilterBase):
     """Apply a sharpening filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel ``PIL.ImageFilter.SHARPEN``.
+    calling ``PIL.Image.filter`` with kernel ``PIL.ImageFilter.SHARPEN``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_sharpen`.
 
@@ -2054,8 +2291,16 @@ class FilterSharpen(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2066,20 +2311,25 @@ class FilterSharpen(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterSharpen, self).__init__(
             func=filter_sharpen,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class FilterDetail(_FilterBase):
     """Apply a detail enhancement filter kernel to images.
 
     This augmenter has identical outputs to
-    calling :func:`~PIL.Image.filter` with kernel ``PIL.ImageFilter.DETAIL``.
+    calling ``PIL.Image.filter`` with kernel ``PIL.ImageFilter.DETAIL``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.filter_detail`.
 
@@ -2091,8 +2341,16 @@ class FilterDetail(_FilterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2104,19 +2362,23 @@ class FilterDetail(_FilterBase):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(FilterDetail, self).__init__(
             func=filter_detail,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Affine(geometric.Affine):
     """Apply PIL-like affine transformations to images.
 
     This augmenter has identical outputs to
-    :func:`~PIL.Image.transform` with parameter ``method=PIL.Image.AFFINE``.
+    ``PIL.Image.transform`` with parameter ``method=PIL.Image.AFFINE``.
 
-    .. note::
+    .. warning::
 
         This augmenter can currently only transform image-data.
         Batches containing heatmaps, segmentation maps and
@@ -2132,8 +2394,9 @@ class Affine(geometric.Affine):
         top left corner as the transformation center. To mirror that
         behaviour, use ``center=(0.0, 0.0)``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.pillike.warp_affine`.
 
@@ -2174,8 +2437,16 @@ class Affine(geometric.Affine):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2204,9 +2475,11 @@ class Affine(geometric.Affine):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, scale=1.0, translate_percent=None, translate_px=None,
                  rotate=0.0, shear=0.0, fillcolor=0, center=(0.5, 0.5),
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Affine, self).__init__(
             scale=scale,
             translate_percent=translate_percent,
@@ -2218,20 +2491,23 @@ class Affine(geometric.Affine):
             mode="constant",
             fit_output=False,
             backend="auto",
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         # TODO move that func to iap
         self.center = sizelib._handle_position_parameter(center)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         cols = batch.get_column_names()
         assert len(cols) == 0 or (len(cols) == 1 and "images" in cols), (
-            "PILAffine can currently only process image data. Got a batch "
-            "containing: %s. Use imgaug.augmenters.geometric.Affine for "
+            "pillike.Affine can currently only process image data. Got a "
+            "batch containing: %s. Use imgaug.augmenters.geometric.Affine for "
             "batches containing non-image data." % (", ".join(cols),))
 
         return super(Affine, self)._augment_batch_(
             batch, random_state, parents, hooks)
 
+    # Added in 0.4.0.
     def _augment_images_by_samples(self, images, samples,
                                    image_shapes=None,
                                    return_matrices=False):
@@ -2261,6 +2537,7 @@ class Affine(geometric.Affine):
 
         return images
 
+    # Added in 0.4.0.
     def _draw_samples(self, nb_samples, random_state):
         # standard affine samples
         samples = super(Affine, self)._draw_samples(nb_samples,
@@ -2283,6 +2560,7 @@ class Affine(geometric.Affine):
         samples.center_y = yy
         return samples
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [

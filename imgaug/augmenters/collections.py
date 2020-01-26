@@ -4,6 +4,8 @@ List of augmenters:
 
     * :class:`RandAugment`
 
+Added in 0.4.0.
+
 """
 from __future__ import print_function, division, absolute_import
 
@@ -65,8 +67,9 @@ class RandAugment(meta.Sequential):
         transformations to ensure that outputs are as similar as possible
         to the paper's implementation.)
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     minimum of (
         :class:`~imgaug.augmenters.flip.Fliplr`,
@@ -138,8 +141,16 @@ class RandAugment(meta.Sequential):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -173,10 +184,13 @@ class RandAugment(meta.Sequential):
     # N=2, M=9 is optimal for ImageNet with ResNet-50
     # N=2, M=28 is optimal for ImageNet with EfficientNet-B7
     # for cval they use [125, 122, 113]
+    # Added in 0.4.0.
     def __init__(self, n=2, m=(6, 12), cval=128,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=invalid-name
-        random_state = iarandom.RNG(seed)
+        seed = seed if random_state == "deprecated" else random_state
+        rng = iarandom.RNG(seed)
 
         # we don't limit the value range to 10 here, because the paper
         # gives several examples of using more than 10 for M
@@ -199,18 +213,20 @@ class RandAugment(meta.Sequential):
         # assign random state to all child augmenters
         for lst in [initial_augs, main_augs]:
             for augmenter in lst:
-                augmenter.random_state = random_state
+                augmenter.random_state = rng
 
         super(RandAugment, self).__init__(
             [
                 meta.Sequential(initial_augs,
-                                seed=random_state.derive_rng_()),
+                                seed=rng.derive_rng_()),
                 meta.SomeOf(n, main_augs, random_order=True,
-                            seed=random_state.derive_rng_())
+                            seed=rng.derive_rng_())
             ],
-            seed=random_state, name=name, **old_kwargs
+            seed=rng, name=name,
+            random_state=random_state, deterministic=deterministic
         )
 
+    # Added in 0.4.0.
     @classmethod
     def _create_initial_augmenters_list(cls, m):
         # pylint: disable=invalid-name
@@ -231,6 +247,7 @@ class RandAugment(meta.Sequential):
             )
         ]
 
+    # Added in 0.4.0.
     @classmethod
     def _create_main_augmenters_list(cls, m, cval):
         # pylint: disable=invalid-name
@@ -317,6 +334,7 @@ class RandAugment(meta.Sequential):
             pillike.FilterSmooth()
         ]
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         someof = self[1]

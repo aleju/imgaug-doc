@@ -1,7 +1,20 @@
 """
 Augmenters that wrap methods from ``imagecorruptions`` package.
 
-See https://github.com/bethgelab/imagecorruptions for the package.
+See `https://github.com/bethgelab/imagecorruptions`_ for the package.
+
+The package is derived from `https://github.com/hendrycks/robustness`_.
+The corresponding `paper <https://arxiv.org/abs/1807.01697>`_ is::
+
+    Hendrycks, Dan and Dietterich, Thomas G.
+    Benchmarking Neural Network Robustness to Common Corruptions and
+    Surface Variations
+
+with the `newer version <https://arxiv.org/abs/1903.12261>`_ being::
+
+    Hendrycks, Dan and Dietterich, Thomas G.
+    Benchmarking Neural Network Robustness to Common Corruptions and
+    Perturbations
 
 List of augmenters:
 
@@ -51,6 +64,8 @@ Example usage::
     Use e.g. ``iaa.imgcorruptlike.GaussianNoise(severity=2)(images=...)`` to
     create and apply a specific augmenter.
 
+Added in 0.4.0.
+
 """
 from __future__ import print_function, division, absolute_import
 
@@ -76,6 +91,7 @@ _MISSING_PACKAGE_ERROR_MSG = (
 )
 
 
+# Added in 0.4.0.
 def _clipped_zoom_no_scipy_warning(img, zoom_factor):
     from scipy.ndimage import zoom as scizoom
 
@@ -102,8 +118,9 @@ def _call_imgcorrupt_func(fname, seed, convert_to_pil, *args, **kwargs):
     The dtype support below is basically a placeholder to which the
     augmentation functions can point to decrease the amount of documentation.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; indirectly tested (1)
         * ``uint16``: no
@@ -204,6 +221,8 @@ def get_corruption_names(subset="common"):
         corresponding augmentation functions, while ``get_corruption_names()``
         in ``imagecorruptions`` only returns the augmentation names.
 
+    Added in 0.4.0.
+
     Parameters
     ----------
     subset : {'common', 'validation', 'all'}, optional.
@@ -249,8 +268,9 @@ def get_corruption_names(subset="common"):
 def apply_gaussian_noise(x, severity=1, seed=None):
     """Apply ``gaussian_noise`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -280,8 +300,9 @@ def apply_gaussian_noise(x, severity=1, seed=None):
 def apply_shot_noise(x, severity=1, seed=None):
     """Apply ``shot_noise`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -311,8 +332,9 @@ def apply_shot_noise(x, severity=1, seed=None):
 def apply_impulse_noise(x, severity=1, seed=None):
     """Apply ``impulse_noise`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -342,8 +364,9 @@ def apply_impulse_noise(x, severity=1, seed=None):
 def apply_speckle_noise(x, severity=1, seed=None):
     """Apply ``speckle_noise`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -373,8 +396,9 @@ def apply_speckle_noise(x, severity=1, seed=None):
 def apply_gaussian_blur(x, severity=1, seed=None):
     """Apply ``gaussian_blur`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -404,8 +428,9 @@ def apply_gaussian_blur(x, severity=1, seed=None):
 def apply_glass_blur(x, severity=1, seed=None):
     """Apply ``glass_blur`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -433,6 +458,7 @@ def apply_glass_blur(x, severity=1, seed=None):
                                  severity)
 
 
+# Added in 0.4.0.
 def _apply_glass_blur_imgaug(x, severity=1):
     # false positive on x_shape[0]
     # invalid name for dx, dy
@@ -495,8 +521,9 @@ def _apply_glass_blur_imgaug(x, severity=1):
 def apply_defocus_blur(x, severity=1, seed=None):
     """Apply ``defocus_blur`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -526,8 +553,9 @@ def apply_defocus_blur(x, severity=1, seed=None):
 def apply_motion_blur(x, severity=1, seed=None):
     """Apply ``motion_blur`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -557,8 +585,9 @@ def apply_motion_blur(x, severity=1, seed=None):
 def apply_zoom_blur(x, severity=1, seed=None):
     """Apply ``zoom_blur`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -588,8 +617,9 @@ def apply_zoom_blur(x, severity=1, seed=None):
 def apply_fog(x, severity=1, seed=None):
     """Apply ``fog`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -619,8 +649,9 @@ def apply_fog(x, severity=1, seed=None):
 def apply_frost(x, severity=1, seed=None):
     """Apply ``frost`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -650,8 +681,9 @@ def apply_frost(x, severity=1, seed=None):
 def apply_snow(x, severity=1, seed=None):
     """Apply ``snow`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -681,8 +713,9 @@ def apply_snow(x, severity=1, seed=None):
 def apply_spatter(x, severity=1, seed=None):
     """Apply ``spatter`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -712,8 +745,9 @@ def apply_spatter(x, severity=1, seed=None):
 def apply_contrast(x, severity=1, seed=None):
     """Apply ``contrast`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -743,8 +777,9 @@ def apply_contrast(x, severity=1, seed=None):
 def apply_brightness(x, severity=1, seed=None):
     """Apply ``brightness`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -774,8 +809,9 @@ def apply_brightness(x, severity=1, seed=None):
 def apply_saturate(x, severity=1, seed=None):
     """Apply ``saturate`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -805,8 +841,9 @@ def apply_saturate(x, severity=1, seed=None):
 def apply_jpeg_compression(x, severity=1, seed=None):
     """Apply ``jpeg_compression`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -836,8 +873,9 @@ def apply_jpeg_compression(x, severity=1, seed=None):
 def apply_pixelate(x, severity=1, seed=None):
     """Apply ``pixelate`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -867,8 +905,9 @@ def apply_pixelate(x, severity=1, seed=None):
 def apply_elastic_transform(image, severity=1, seed=None):
     """Apply ``elastic_transform`` from ``imagecorruptions``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike._call_imgcorrupt_func`.
 
@@ -928,10 +967,9 @@ def apply_elastic_transform(image, severity=1, seed=None):
 #                            {"__init__": __init__})
 #
 #     augmenter_class.__doc__ = """
-#     Wrapper around function :func:`imagecorruption.%s`.
+#     Wrapper around ``imagecorruptions.corruptions.%s``.
 #
-#     Supported dtypes
-#     ----------------
+#     **Supported dtypes**:
 #
 #     See :func:`~imgaug.augmenters.imgcorruptlike.apply_%s`.
 #
@@ -955,7 +993,7 @@ def apply_elastic_transform(image, severity=1, seed=None):
 #     >>> import imgaug.augmenters as iaa
 #     >>> aug = iaa.%s(severity=2)
 #
-#     Create an augmenter around :func:`imagecorruption.%s`. Apply it to
+#     Create an augmenter around ``imagecorruptions.corruptions.%s``. Apply it to
 #     images using e.g. ``aug(images=[image1, image2, ...])``.
 #
 #     """ % (func_name, func_name, class_name, func_name)
@@ -963,17 +1001,21 @@ def apply_elastic_transform(image, severity=1, seed=None):
 #     return augmenter_class
 
 
+# Added in 0.4.0.
 class _ImgcorruptAugmenterBase(meta.Augmenter):
     def __init__(self, func, severity=1,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(_ImgcorruptAugmenterBase, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.func = func
         self.severity = iap.handle_discrete_param(
             severity, "severity", value_range=(1, 5), tuple_to_uniform=True,
             list_to_choice=True, allow_floats=False)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -986,6 +1028,7 @@ class _ImgcorruptAugmenterBase(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _draw_samples(self, nb_rows, random_state):
         severities = self.severity.draw_samples((nb_rows,),
                                                 random_state=random_state)
@@ -993,6 +1036,7 @@ class _ImgcorruptAugmenterBase(meta.Augmenter):
 
         return severities, seeds
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.severity]
@@ -1000,14 +1044,15 @@ class _ImgcorruptAugmenterBase(meta.Augmenter):
 
 class GaussianNoise(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.gaussian_noise`.
+    Wrapper around ``imagecorruptions.corruptions.gaussian_noise``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_gaussian_noise`.
 
@@ -1023,8 +1068,16 @@ class GaussianNoise(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1032,28 +1085,33 @@ class GaussianNoise(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.GaussianNoise(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.gaussian_noise`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.gaussian_noise``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(GaussianNoise, self).__init__(
             apply_gaussian_noise, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class ShotNoise(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.shot_noise`.
+    Wrapper around ``imagecorruptions.shot_noise``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_shot_noise`.
 
@@ -1069,8 +1127,16 @@ class ShotNoise(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1078,28 +1144,33 @@ class ShotNoise(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.ShotNoise(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.shot_noise`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.shot_noise``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ShotNoise, self).__init__(
             apply_shot_noise, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class ImpulseNoise(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.impulse_noise`.
+    Wrapper around ``imagecorruptions.corruptions.impulse_noise``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_impulse_noise`.
 
@@ -1115,8 +1186,16 @@ class ImpulseNoise(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1124,28 +1203,33 @@ class ImpulseNoise(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.ImpulseNoise(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.impulse_noise`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.impulse_noise``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ImpulseNoise, self).__init__(
             apply_impulse_noise, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class SpeckleNoise(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.speckle_noise`.
+    Wrapper around ``imagecorruptions.corruptions.speckle_noise``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_speckle_noise`.
 
@@ -1161,8 +1245,16 @@ class SpeckleNoise(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1170,28 +1262,33 @@ class SpeckleNoise(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.SpeckleNoise(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.speckle_noise`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.speckle_noise``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(SpeckleNoise, self).__init__(
             apply_speckle_noise, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class GaussianBlur(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.gaussian_blur`.
+    Wrapper around ``imagecorruptions.corruptions.gaussian_blur``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_gaussian_blur`.
 
@@ -1207,8 +1304,16 @@ class GaussianBlur(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1216,28 +1321,33 @@ class GaussianBlur(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.GaussianBlur(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.gaussian_blur`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.gaussian_blur``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(GaussianBlur, self).__init__(
             apply_gaussian_blur, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class GlassBlur(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.glass_blur`.
+    Wrapper around ``imagecorruptions.corruptions.glass_blur``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_glass_blur`.
 
@@ -1253,8 +1363,16 @@ class GlassBlur(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1262,28 +1380,33 @@ class GlassBlur(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.GlassBlur(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.glass_blur`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.glass_blur``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(GlassBlur, self).__init__(
             apply_glass_blur, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class DefocusBlur(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.defocus_blur`.
+    Wrapper around ``imagecorruptions.corruptions.defocus_blur``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_defocus_blur`.
 
@@ -1299,8 +1422,16 @@ class DefocusBlur(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1308,28 +1439,33 @@ class DefocusBlur(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.DefocusBlur(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.defocus_blur`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.defocus_blur``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(DefocusBlur, self).__init__(
             apply_defocus_blur, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class MotionBlur(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.motion_blur`.
+    Wrapper around ``imagecorruptions.corruptions.motion_blur``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_motion_blur`.
 
@@ -1345,8 +1481,16 @@ class MotionBlur(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1354,28 +1498,33 @@ class MotionBlur(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.MotionBlur(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.motion_blur`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.motion_blur``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MotionBlur, self).__init__(
             apply_motion_blur, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class ZoomBlur(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.zoom_blur`.
+    Wrapper around ``imagecorruptions.corruptions.zoom_blur``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_zoom_blur`.
 
@@ -1391,8 +1540,16 @@ class ZoomBlur(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1400,28 +1557,33 @@ class ZoomBlur(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.ZoomBlur(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.zoom_blur`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.zoom_blur``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ZoomBlur, self).__init__(
             apply_zoom_blur, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Fog(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.fog`.
+    Wrapper around ``imagecorruptions.corruptions.fog``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_fog`.
 
@@ -1437,8 +1599,16 @@ class Fog(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1446,28 +1616,33 @@ class Fog(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.Fog(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.fog`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.fog``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Fog, self).__init__(
             apply_fog, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Frost(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.frost`.
+    Wrapper around ``imagecorruptions.corruptions.frost``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_frost`.
 
@@ -1483,8 +1658,16 @@ class Frost(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1492,28 +1675,33 @@ class Frost(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.Frost(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.frost`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.frost``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Frost, self).__init__(
             apply_frost, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Snow(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.snow`.
+    Wrapper around ``imagecorruptions.corruptions.snow``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_snow`.
 
@@ -1529,8 +1717,16 @@ class Snow(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1538,28 +1734,33 @@ class Snow(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.Snow(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.snow`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.snow``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Snow, self).__init__(
             apply_snow, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Spatter(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.spatter`.
+    Wrapper around ``imagecorruptions.corruptions.spatter``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_spatter`.
 
@@ -1575,8 +1776,16 @@ class Spatter(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1584,28 +1793,33 @@ class Spatter(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.Spatter(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.spatter`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.spatter``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Spatter, self).__init__(
             apply_spatter, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Contrast(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.contrast`.
+    Wrapper around ``imagecorruptions.corruptions.contrast``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_contrast`.
 
@@ -1621,8 +1835,16 @@ class Contrast(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1630,28 +1852,33 @@ class Contrast(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.Contrast(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.contrast`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.contrast``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Contrast, self).__init__(
             apply_contrast, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Brightness(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.brightness`.
+    Wrapper around ``imagecorruptions.corruptions.brightness``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_brightness`.
 
@@ -1667,8 +1894,16 @@ class Brightness(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1676,28 +1911,33 @@ class Brightness(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.Brightness(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.brightness`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.brightness``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Brightness, self).__init__(
             apply_brightness, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Saturate(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.saturate`.
+    Wrapper around ``imagecorruptions.corruptions.saturate``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_saturate`.
 
@@ -1713,8 +1953,16 @@ class Saturate(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1722,28 +1970,33 @@ class Saturate(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.Saturate(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.saturate`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.saturate``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Saturate, self).__init__(
             apply_saturate, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class JpegCompression(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.jpeg_compression`.
+    Wrapper around ``imagecorruptions.corruptions.jpeg_compression``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_jpeg_compression`.
 
@@ -1759,8 +2012,16 @@ class JpegCompression(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1768,28 +2029,33 @@ class JpegCompression(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.JpegCompression(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.jpeg_compression`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.jpeg_compression``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(JpegCompression, self).__init__(
             apply_jpeg_compression, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Pixelate(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.pixelate`.
+    Wrapper around ``imagecorruptions.corruptions.pixelate``.
 
     .. note::
 
         This augmenter only affects images. Other data is not changed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_pixelate`.
 
@@ -1805,8 +2071,16 @@ class Pixelate(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1814,28 +2088,37 @@ class Pixelate(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.Pixelate(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.pixelate`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.pixelate``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Pixelate, self).__init__(
             apply_pixelate, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class ElasticTransform(_ImgcorruptAugmenterBase):
     """
-    Wrapper around function :func:`imagecorruption.elastic_transform`.
+    Wrapper around ``imagecorruptions.corruptions.elastic_transform``.
 
-    .. note::
+    .. warning::
 
-        This augmenter only affects images. Other data is not changed.
+        This augmenter can currently only transform image-data.
+        Batches containing heatmaps, segmentation maps and
+        coordinate-based augmentables will be rejected with an error.
+        Use :class:`~imgaug.augmenters.geometric.ElasticTransformation` if
+        you have to transform such inputs.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.imgcorruptlike.apply_elastic_transform`.
 
@@ -1851,8 +2134,16 @@ class ElasticTransform(_ImgcorruptAugmenterBase):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1860,13 +2151,28 @@ class ElasticTransform(_ImgcorruptAugmenterBase):
     >>> import imgaug.augmenters as iaa
     >>> aug = iaa.imgcorruptlike.ElasticTransform(severity=2)
 
-    Create an augmenter around :func:`imagecorruption.elastic_transform`.
+    Create an augmenter around
+    ``imagecorruptions.corruptions.elastic_transform``.
     Apply it to images using e.g. ``aug(images=[image1, image2, ...])``.
 
     """
 
-    def __init__(self, severity=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, severity=(1, 5),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ElasticTransform, self).__init__(
             apply_elastic_transform, severity,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        cols = batch.get_column_names()
+        assert len(cols) == 0 or (len(cols) == 1 and "images" in cols), (
+            "imgcorruptlike.ElasticTransform can currently only process image "
+            "data. Got a batch containing: %s. Use "
+            "imgaug.augmenters.geometric.ElasticTransformation for "
+            "batches containing non-image data." % (", ".join(cols),))
+        return super(ElasticTransform, self)._augment_batch_(
+            batch, random_state, parents, hooks)

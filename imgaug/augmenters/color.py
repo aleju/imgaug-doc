@@ -19,6 +19,7 @@ List of augmenters:
     * :class:`AddToSaturation`
     * :class:`ChangeColorspace`
     * :class:`Grayscale`
+    * :class:`ChangeColorTemperature`
     * :class:`KMeansColorQuantization`
     * :class:`UniformColorQuantization`
     * :class:`Posterize`
@@ -185,8 +186,7 @@ def change_colorspace_(image, to_colorspace, from_colorspace=CSPACE_RGB):
 
         Output grayscale images will still have three channels.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -322,8 +322,7 @@ def change_colorspaces_(images, to_colorspaces, from_colorspaces=CSPACE_RGB):
 
         Output grayscale images will still have three channels.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.change_colorspace_`.
 
@@ -396,9 +395,11 @@ def change_colorspaces_(images, to_colorspaces, from_colorspaces=CSPACE_RGB):
     return images
 
 
+# Added in 0.4.0.
 class _KelvinToRGBTableSingleton(object):
     _INSTANCE = None
 
+    # Added in 0.4.0.
     @classmethod
     def get_instance(cls):
         if cls._INSTANCE is None:
@@ -406,7 +407,9 @@ class _KelvinToRGBTableSingleton(object):
         return cls._INSTANCE
 
 
+# Added in 0.4.0.
 class _KelvinToRGBTable(object):
+    # Added in 0.4.0.
     def __init__(self):
         self.table = self.create_table()
 
@@ -416,6 +419,8 @@ class _KelvinToRGBTable(object):
         A single returned multiplier denotes the channelwise multipliers
         in the range ``[0.0, 1.0]`` to apply to an image to change its kelvin
         value to the desired one.
+
+        Added in 0.4.0.
 
         Parameters
         ----------
@@ -448,6 +453,7 @@ class _KelvinToRGBTable(object):
 
         return multipliers
 
+    # Added in 0.4.0.
     @classmethod
     def create_table(cls):
         table = np.float32([
@@ -850,8 +856,9 @@ class _KelvinToRGBTable(object):
 def change_color_temperatures_(images, kelvins, from_colorspaces=CSPACE_RGB):
     """Change in-place the temperature of images to given values in Kelvin.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.change_colorspace_`.
 
@@ -946,8 +953,9 @@ def change_color_temperatures_(images, kelvins, from_colorspaces=CSPACE_RGB):
 def change_color_temperature(image, kelvin, from_colorspace=CSPACE_RGB):
     """Change the temperature of an image to a given value in Kelvin.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.change_color_temperatures_`.
 
@@ -979,11 +987,14 @@ def change_color_temperature(image, kelvin, from_colorspace=CSPACE_RGB):
 
 @ia.deprecated(alt_func="WithColorspace")
 def InColorspace(to_colorspace, from_colorspace="RGB", children=None,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
     """Convert images to another colorspace."""
     # pylint: disable=invalid-name
     return WithColorspace(to_colorspace, from_colorspace, children,
-                          seed=seed, name=name, **old_kwargs)
+                          seed=seed, name=name,
+                          random_state=random_state,
+                          deterministic=deterministic)
 
 
 # TODO add tests
@@ -996,8 +1007,7 @@ class WithColorspace(meta.Augmenter):
     child augmenters C and finally changes the colorspace back from B to A.
     See also ChangeColorspace() for more.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.change_colorspaces_`.
 
@@ -1018,8 +1028,16 @@ class WithColorspace(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1040,14 +1058,17 @@ class WithColorspace(meta.Augmenter):
     """
 
     def __init__(self, to_colorspace, from_colorspace=CSPACE_RGB, children=None,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(WithColorspace, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.to_colorspace = to_colorspace
         self.from_colorspace = from_colorspace
         self.children = meta.handle_children_list(children, self.name, "then")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             # TODO this did not fail in the tests when there was only one
@@ -1104,8 +1125,9 @@ class WithBrightnessChannels(meta.Augmenter):
     it reintegrates the augmented channel into the full image and converts
     back to the input colorspace.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.change_colorspaces_`.
 
@@ -1140,8 +1162,16 @@ class WithBrightnessChannels(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1180,6 +1210,7 @@ class WithBrightnessChannels(meta.Augmenter):
 
     _VALID_COLORSPACES = set(_CSPACE_TO_CHANNEL_ID.keys())
 
+    # Added in 0.4.0.
     def __init__(self, children=None,
                  to_colorspace=[
                      CSPACE_YCrCb,
@@ -1189,10 +1220,12 @@ class WithBrightnessChannels(meta.Augmenter):
                      CSPACE_Luv,
                      CSPACE_YUV],
                  from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=dangerous-default-value
         super(WithBrightnessChannels, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.children = meta.handle_children_list(children, self.name, "then")
         self.to_colorspace = iap.handle_categorical_string_param(
@@ -1200,6 +1233,7 @@ class WithBrightnessChannels(meta.Augmenter):
             valid_values=self._VALID_COLORSPACES)
         self.from_colorspace = from_colorspace
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             images_cvt = None
@@ -1231,6 +1265,7 @@ class WithBrightnessChannels(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _extract_brightness_channels(self, images, colorspaces):
         result = []
         for image, colorspace in zip(images, colorspaces):
@@ -1241,6 +1276,7 @@ class WithBrightnessChannels(meta.Augmenter):
             result.append(channel)
         return result
 
+    # Added in 0.4.0.
     def _invert_extract_brightness_channels(self, channels, images,
                                             colorspaces):
         for channel, image, colorspace in zip(channels, images, colorspaces):
@@ -1248,6 +1284,7 @@ class WithBrightnessChannels(meta.Augmenter):
             image[:, :, channel_id:channel_id+1] = channel
         return images
 
+    # Added in 0.4.0.
     def _to_deterministic(self):
         aug = self.copy()
         aug.children = aug.children.to_deterministic()
@@ -1255,14 +1292,17 @@ class WithBrightnessChannels(meta.Augmenter):
         aug.random_state = self.random_state.derive_rng_()
         return aug
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.to_colorspace, self.from_colorspace]
 
+    # Added in 0.4.0.
     def get_children_lists(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_children_lists`."""
         return [self.children]
 
+    # Added in 0.4.0.
     def __str__(self):
         return (
             "WithBrightnessChannels("
@@ -1285,8 +1325,9 @@ class MultiplyAndAddToBrightness(WithBrightnessChannels):
     This is a wrapper around :class:`WithBrightnessChannels` and hence
     performs internally the same projection to random colorspaces.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.WithBrightnessChannels`.
 
@@ -1315,8 +1356,16 @@ class MultiplyAndAddToBrightness(WithBrightnessChannels):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1330,6 +1379,7 @@ class MultiplyAndAddToBrightness(WithBrightnessChannels):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, mul=(0.7, 1.3), add=(-30, 30),
                  to_colorspace=[
                      CSPACE_YCrCb,
@@ -1340,7 +1390,8 @@ class MultiplyAndAddToBrightness(WithBrightnessChannels):
                      CSPACE_YUV],
                  from_colorspace="RGB",
                  random_order=True,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=dangerous-default-value
         mul = (
             meta.Identity()
@@ -1355,8 +1406,10 @@ class MultiplyAndAddToBrightness(WithBrightnessChannels):
             ),
             to_colorspace=to_colorspace,
             from_colorspace=from_colorspace,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
+    # Added in 0.4.0.
     def __str__(self):
         return (
             "MultiplyAndAddToBrightness("
@@ -1383,8 +1436,9 @@ class MultiplyBrightness(MultiplyAndAddToBrightness):
     This is a wrapper around :class:`WithBrightnessChannels` and hence
     performs internally the same projection to random colorspaces.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.MultiplyAndAddToBrightness`.
 
@@ -1405,8 +1459,16 @@ class MultiplyBrightness(MultiplyAndAddToBrightness):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1419,6 +1481,7 @@ class MultiplyBrightness(MultiplyAndAddToBrightness):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, mul=(0.7, 1.3),
                  to_colorspace=[
                      CSPACE_YCrCb,
@@ -1428,7 +1491,8 @@ class MultiplyBrightness(MultiplyAndAddToBrightness):
                      CSPACE_Luv,
                      CSPACE_YUV],
                  from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=dangerous-default-value
         super(MultiplyBrightness, self).__init__(
             mul=mul,
@@ -1436,7 +1500,8 @@ class MultiplyBrightness(MultiplyAndAddToBrightness):
             to_colorspace=to_colorspace,
             from_colorspace=from_colorspace,
             random_order=False,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class AddToBrightness(MultiplyAndAddToBrightness):
@@ -1445,8 +1510,9 @@ class AddToBrightness(MultiplyAndAddToBrightness):
     This is a wrapper around :class:`WithBrightnessChannels` and hence
     performs internally the same projection to random colorspaces.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.MultiplyAndAddToBrightness`.
 
@@ -1467,8 +1533,16 @@ class AddToBrightness(MultiplyAndAddToBrightness):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1481,6 +1555,7 @@ class AddToBrightness(MultiplyAndAddToBrightness):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, add=(-30, 30),
                  to_colorspace=[
                      CSPACE_YCrCb,
@@ -1490,7 +1565,8 @@ class AddToBrightness(MultiplyAndAddToBrightness):
                      CSPACE_Luv,
                      CSPACE_YUV],
                  from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=dangerous-default-value
         super(AddToBrightness, self).__init__(
             mul=1.0,
@@ -1498,7 +1574,8 @@ class AddToBrightness(MultiplyAndAddToBrightness):
             to_colorspace=to_colorspace,
             from_colorspace=from_colorspace,
             random_order=False,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 # TODO Merge this into WithColorspace? A bit problematic due to int16
@@ -1522,8 +1599,7 @@ class WithHueAndSaturation(meta.Augmenter):
     is applied to the hue channel's values, followed by a mapping from
     ``[0, 255]`` to ``[0, 180]`` (and finally the colorspace conversion).
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.change_colorspaces_`.
 
@@ -1543,8 +1619,16 @@ class WithHueAndSaturation(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1577,9 +1661,11 @@ class WithHueAndSaturation(meta.Augmenter):
     """
 
     def __init__(self, children=None, from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(WithHueAndSaturation, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.children = meta.handle_children_list(children, self.name, "then")
         self.from_colorspace = from_colorspace
@@ -1588,6 +1674,7 @@ class WithHueAndSaturation(meta.Augmenter):
         # for Add or Multiply
         self._internal_dtype = np.int16
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             images_hs, images_hsv = self._images_to_hsv_(batch.images)
@@ -1600,6 +1687,7 @@ class WithHueAndSaturation(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _images_to_hsv_(self, images):
         if images is None:
             return None, None
@@ -1623,6 +1711,7 @@ class WithHueAndSaturation(meta.Augmenter):
             images_hs = np.stack(images_hs, axis=0)
         return images_hs, images_hsv
 
+    # Added in 0.4.0.
     def _hs_to_images_(self, images_hs, images_hsv):
         if images_hs is None:
             return None
@@ -1688,8 +1777,7 @@ class MultiplyHueAndSaturation(WithHueAndSaturation):
 
     This augmenter is a wrapper around ``WithHueAndSaturation``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.WithHueAndSaturation`.
 
@@ -1763,8 +1851,16 @@ class MultiplyHueAndSaturation(WithHueAndSaturation):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1790,7 +1886,12 @@ class MultiplyHueAndSaturation(WithHueAndSaturation):
 
     def __init__(self, mul=None, mul_hue=None, mul_saturation=None,
                  per_channel=False, from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        if mul is None and mul_hue is None and mul_saturation is None:
+            mul_hue = (0.5, 1.5)
+            mul_saturation = (0.0, 1.7)
+
         if mul is not None:
             assert mul_hue is None, (
                 "`mul_hue` may not be set if `mul` is set. "
@@ -1813,9 +1914,9 @@ class MultiplyHueAndSaturation(WithHueAndSaturation):
                     mul_saturation, "mul_saturation", value_range=(0.0, 10.0),
                     tuple_to_uniform=True, list_to_choice=True)
 
-        if "random_state" in old_kwargs:
-            seed = old_kwargs["random_state"]
-            del old_kwargs["random_state"]
+        if random_state != "deprecated":
+            seed = random_state
+            random_state = "deprecated"
 
         if seed is None:
             rss = [None] * 5
@@ -1830,7 +1931,8 @@ class MultiplyHueAndSaturation(WithHueAndSaturation):
                     per_channel=per_channel,
                     seed=rss[0],
                     name="%s-Multiply" % (name,),
-                    **old_kwargs
+                    random_state=random_state,
+                    deterministic=deterministic
                 )
             )
         else:
@@ -1842,11 +1944,13 @@ class MultiplyHueAndSaturation(WithHueAndSaturation):
                             mul_hue,
                             seed=rss[0],
                             name="%s-MultiplyHue" % (name,),
-                            **old_kwargs
+                            random_state=random_state,
+                            deterministic=deterministic
                         ),
                         seed=rss[1],
                         name="%s-WithChannelsHue" % (name,),
-                        **old_kwargs
+                        random_state=random_state,
+                        deterministic=deterministic
                     )
                 )
             if mul_saturation is not None:
@@ -1857,11 +1961,13 @@ class MultiplyHueAndSaturation(WithHueAndSaturation):
                             mul_saturation,
                             seed=rss[2],
                             name="%s-MultiplySaturation" % (name,),
-                            **old_kwargs
+                            random_state=random_state,
+                            deterministic=deterministic
                         ),
                         seed=rss[3],
                         name="%s-WithChannelsSaturation" % (name,),
-                        **old_kwargs
+                        random_state=random_state,
+                        deterministic=deterministic
                     )
                 )
 
@@ -1870,7 +1976,7 @@ class MultiplyHueAndSaturation(WithHueAndSaturation):
             from_colorspace=from_colorspace,
             seed=rss[4],
             name=name,
-            **old_kwargs
+            random_state=random_state, deterministic=deterministic
         )
 
 
@@ -1884,8 +1990,7 @@ class MultiplyHue(MultiplyHueAndSaturation):
 
     This augmenter is a shortcut for ``MultiplyHueAndSaturation(mul_hue=...)``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.MultiplyHueAndSaturation`.
 
@@ -1916,8 +2021,16 @@ class MultiplyHue(MultiplyHueAndSaturation):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1929,12 +2042,14 @@ class MultiplyHue(MultiplyHueAndSaturation):
 
     """
 
-    def __init__(self, mul=(-1.0, 1.0), from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, mul=(-3.0, 3.0), from_colorspace="RGB",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MultiplyHue, self).__init__(
             mul_hue=mul,
             from_colorspace=from_colorspace,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class MultiplySaturation(MultiplyHueAndSaturation):
@@ -1948,8 +2063,7 @@ class MultiplySaturation(MultiplyHueAndSaturation):
     This augmenter is a shortcut for
     ``MultiplyHueAndSaturation(mul_saturation=...)``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.MultiplyHueAndSaturation`.
 
@@ -1976,8 +2090,16 @@ class MultiplySaturation(MultiplyHueAndSaturation):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1990,11 +2112,13 @@ class MultiplySaturation(MultiplyHueAndSaturation):
     """
 
     def __init__(self, mul=(0.0, 3.0), from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MultiplySaturation, self).__init__(
             mul_saturation=mul,
             from_colorspace=from_colorspace,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class RemoveSaturation(MultiplySaturation):
@@ -2004,8 +2128,9 @@ class RemoveSaturation(MultiplySaturation):
 
     This augmenter is the same as ``MultiplySaturation((0.0, 1.0))``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.MultiplySaturation`.
 
@@ -2034,13 +2159,21 @@ class RemoveSaturation(MultiplySaturation):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
     >>> import imgaug.augmenters as iaa
-    >>> aug = iaa.RemoveSaturation()
+    >>> aug = iaa.RemoveSaturation((0.0, 1.0))
 
     Create an augmenter that decreases saturation by varying degrees.
 
@@ -2056,8 +2189,10 @@ class RemoveSaturation(MultiplySaturation):
 
     """
 
-    def __init__(self, mul=(0.0, 1.0), from_colorspace=CSPACE_RGB,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, mul=1, from_colorspace=CSPACE_RGB,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         mul = iap.Subtract(
             1.0,
             iap.handle_continuous_param(mul, "mul",
@@ -2068,7 +2203,8 @@ class RemoveSaturation(MultiplySaturation):
         )
         super(RemoveSaturation, self).__init__(
             mul, from_colorspace=from_colorspace,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 # TODO removed deterministic and random_state here as parameters, because this
@@ -2141,8 +2277,7 @@ class AddToHueAndSaturation(meta.Augmenter):
 
     TODO add float support
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.change_colorspace_`.
 
@@ -2214,8 +2349,16 @@ class AddToHueAndSaturation(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2232,9 +2375,14 @@ class AddToHueAndSaturation(meta.Augmenter):
 
     def __init__(self, value=None, value_hue=None, value_saturation=None,
                  per_channel=False, from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(AddToHueAndSaturation, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        if value is None and value_hue is None and value_saturation is None:
+            value_hue = (-40, 40)
+            value_saturation = (-40, 40)
 
         self.value = self._handle_value_arg(value, value_hue, value_saturation)
         self.value_hue = self._handle_value_hue_arg(value_hue)
@@ -2289,6 +2437,7 @@ class AddToHueAndSaturation(meta.Augmenter):
 
         return samples_hue, samples_saturation
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -2446,8 +2595,7 @@ class AddToHue(AddToHueAndSaturation):
 
     This augmenter is a shortcut for ``AddToHueAndSaturation(value_hue=...)``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.AddToHueAndSaturation`.
 
@@ -2477,8 +2625,16 @@ class AddToHue(AddToHueAndSaturation):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2492,11 +2648,13 @@ class AddToHue(AddToHueAndSaturation):
     """
 
     def __init__(self, value=(-255, 255), from_colorspace=CSPACE_RGB,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(AddToHue, self).__init__(
             value_hue=value,
             from_colorspace=from_colorspace,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class AddToSaturation(AddToHueAndSaturation):
@@ -2513,8 +2671,7 @@ class AddToSaturation(AddToHueAndSaturation):
     This augmenter is a shortcut for
     ``AddToHueAndSaturation(value_saturation=...)``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.AddToHueAndSaturation`.
 
@@ -2541,8 +2698,16 @@ class AddToSaturation(AddToHueAndSaturation):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2556,11 +2721,13 @@ class AddToSaturation(AddToHueAndSaturation):
     """
 
     def __init__(self, value=(-75, 75), from_colorspace="RGB",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(AddToSaturation, self).__init__(
             value_saturation=value,
             from_colorspace=from_colorspace,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 # TODO tests
@@ -2580,8 +2747,7 @@ class ChangeColorspace(meta.Augmenter):
         This augmenter tries to project the colorspace value range on
         0-255. It outputs dtype=uint8 images.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.change_colorspace_`.
 
@@ -2626,8 +2792,16 @@ class ChangeColorspace(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     """
 
@@ -2679,9 +2853,11 @@ class ChangeColorspace(meta.Augmenter):
     }
 
     def __init__(self, to_colorspace, from_colorspace=CSPACE_RGB, alpha=1.0,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ChangeColorspace, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         # TODO somehow merge this with Alpha augmenter?
         self.alpha = iap.handle_continuous_param(
@@ -2736,6 +2912,7 @@ class ChangeColorspace(meta.Augmenter):
             (n_augmentables,), random_state=rss[1])
         return alphas, to_colorspaces
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -2780,8 +2957,7 @@ class Grayscale(ChangeColorspace):
 
     TODO check dtype support
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.change_colorspace_`.
 
@@ -2811,8 +2987,16 @@ class Grayscale(ChangeColorspace):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2831,13 +3015,15 @@ class Grayscale(ChangeColorspace):
 
     """
 
-    def __init__(self, alpha=0, from_colorspace=CSPACE_RGB,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, alpha=1, from_colorspace=CSPACE_RGB,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Grayscale, self).__init__(
             to_colorspace=CSPACE_GRAY,
             alpha=alpha,
             from_colorspace=from_colorspace,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class ChangeColorTemperature(meta.Augmenter):
@@ -2848,13 +3034,14 @@ class ChangeColorTemperature(meta.Augmenter):
     in progressively darker blue tones.
 
     Color temperatures taken from
-    http://www.vendian.org/mncharity/dir3/blackbody/UnstableURLs/bbr_color.html
+    `<http://www.vendian.org/mncharity/dir3/blackbody/UnstableURLs/bbr_color.html>`_
 
     Basic method to change color temperatures taken from
-    https://stackoverflow.com/a/11888449
+    `<https://stackoverflow.com/a/11888449>`_
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.change_color_temperatures_`.
 
@@ -2882,16 +3069,20 @@ class ChangeColorTemperature(meta.Augmenter):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, kelvin=(1000, 11000), from_colorspace=CSPACE_RGB,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ChangeColorTemperature, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.kelvin = iap.handle_continuous_param(
             kelvin, "kelvin", value_range=(1000, 40000), tuple_to_uniform=True,
             list_to_choice=True)
         self.from_colorspace = from_colorspace
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is not None:
             nb_rows = batch.nb_rows
@@ -2903,6 +3094,7 @@ class ChangeColorTemperature(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.kelvin, self.from_colorspace]
@@ -2917,10 +3109,12 @@ class _AbstractColorQuantization(meta.Augmenter):
                  to_colorspace=[CSPACE_RGB, CSPACE_Lab],
                  max_size=128,
                  interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=dangerous-default-value
         super(_AbstractColorQuantization, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.counts_value_range = counts_value_range
         self.counts = iap.handle_discrete_param(
@@ -2944,6 +3138,7 @@ class _AbstractColorQuantization(meta.Augmenter):
 
         return counts
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -3061,21 +3256,20 @@ class KMeansColorQuantization(_AbstractColorQuantization):
         images have 4 channels, it is assumed that the 4th channel is an alpha
         channel and it will not be quantized.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     if (image size <= max_size):
 
         minimum of (
             :class:`~imgaug.augmenters.color.ChangeColorspace`,
-            :func:`~imgaug.augmenters.color.quantize_colors_kmeans`
+            :func:`~imgaug.augmenters.color.quantize_kmeans`
         )
 
     if (image size > max_size):
 
         minimum of (
             :class:`~imgaug.augmenters.color.ChangeColorspace`,
-            :func:`~imgaug.augmenters.color.quantize_colors_kmeans`,
+            :func:`~imgaug.augmenters.color.quantize_kmeans`,
             :func:`~imgaug.imgaug.imresize_single_image`
         )
 
@@ -3130,8 +3324,16 @@ class KMeansColorQuantization(_AbstractColorQuantization):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3172,7 +3374,8 @@ class KMeansColorQuantization(_AbstractColorQuantization):
     def __init__(self, n_colors=(2, 16), from_colorspace=CSPACE_RGB,
                  to_colorspace=[CSPACE_RGB, CSPACE_Lab],
                  max_size=128, interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=dangerous-default-value
         super(KMeansColorQuantization, self).__init__(
             counts=n_colors,
@@ -3180,11 +3383,16 @@ class KMeansColorQuantization(_AbstractColorQuantization):
             to_colorspace=to_colorspace,
             max_size=max_size,
             interpolation=interpolation,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     @property
     def n_colors(self):
-        """Alias for property ``counts``."""
+        """Alias for property ``counts``.
+
+        Added in 0.4.0.
+
+        """
         return self.counts
 
     def _quantize(self, image, counts):
@@ -3193,7 +3401,11 @@ class KMeansColorQuantization(_AbstractColorQuantization):
 
 @ia.deprecated("imgaug.augmenters.colors.quantize_kmeans")
 def quantize_colors_kmeans(image, n_colors, n_max_iter=10, eps=1.0):
-    """Outdated name of :func:`quantize_kmeans`."""
+    """Outdated name of :func:`quantize_kmeans`.
+
+    Deprecated since 0.4.0.
+
+    """
     return quantize_kmeans(arr=image, nb_clusters=n_colors,
                            nb_max_iter=n_max_iter, eps=eps)
 
@@ -3214,8 +3426,9 @@ def quantize_kmeans(arr, nb_clusters, nb_max_iter=10, eps=1.0):
         internal RNG and imgaug's global RNG. This is necessary in order
         to ensure that the k-means clustering happens deterministically.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0. (Previously called ``quantize_colors_kmeans()``.)
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -3332,8 +3545,7 @@ class UniformColorQuantization(_AbstractColorQuantization):
         images have 4 channels, it is assumed that the 4th channel is an alpha
         channel and it will not be quantized.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     if (image size <= max_size):
 
@@ -3399,8 +3611,16 @@ class UniformColorQuantization(_AbstractColorQuantization):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3437,7 +3657,8 @@ class UniformColorQuantization(_AbstractColorQuantization):
                  to_colorspace=None,
                  max_size=None,
                  interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=dangerous-default-value
         super(UniformColorQuantization, self).__init__(
             counts=n_colors,
@@ -3445,11 +3666,16 @@ class UniformColorQuantization(_AbstractColorQuantization):
             to_colorspace=to_colorspace,
             max_size=max_size,
             interpolation=interpolation,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     @property
     def n_colors(self):
-        """Alias for property ``counts``."""
+        """Alias for property ``counts``.
+
+        Added in 0.4.0.
+
+        """
         return self.counts
 
     def _quantize(self, image, counts):
@@ -3478,21 +3704,22 @@ class UniformColorQuantizationToNBits(_AbstractColorQuantization):
         images have 4 channels, it is assumed that the 4th channel is an alpha
         channel and it will not be quantized.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     if (image size <= max_size):
 
         minimum of (
             :class:`~imgaug.augmenters.color.ChangeColorspace`,
-            :func:`~imgaug.augmenters.color.quantize_colors_uniform`
+            :func:`~imgaug.augmenters.color.quantize_uniform`
         )
 
     if (image size > max_size):
 
         minimum of (
             :class:`~imgaug.augmenters.color.ChangeColorspace`,
-            :func:`~imgaug.augmenters.color.quantize_colors_uniform`,
+            :func:`~imgaug.augmenters.color.quantize_uniform`,
             :func:`~imgaug.imgaug.imresize_single_image`
         )
 
@@ -3545,8 +3772,16 @@ class UniformColorQuantizationToNBits(_AbstractColorQuantization):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3573,13 +3808,15 @@ class UniformColorQuantizationToNBits(_AbstractColorQuantization):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self,
                  nb_bits=(1, 8),
                  from_colorspace=CSPACE_RGB,
                  to_colorspace=None,
                  max_size=None,
                  interpolation="linear",
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         # pylint: disable=dangerous-default-value
 
         # wrt value range: for discrete params, (1, 8) results in
@@ -3591,8 +3828,10 @@ class UniformColorQuantizationToNBits(_AbstractColorQuantization):
             to_colorspace=to_colorspace,
             max_size=max_size,
             interpolation=interpolation,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
+    # Added in 0.4.0.
     def _quantize(self, image, counts):
         return quantize_uniform_to_n_bits_(image, counts)
 
@@ -3600,8 +3839,9 @@ class UniformColorQuantizationToNBits(_AbstractColorQuantization):
 class Posterize(UniformColorQuantizationToNBits):
     """Alias for :class:`UniformColorQuantizationToNBits`.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.color.UniformColorQuantizationToNBits`.
 
@@ -3610,7 +3850,11 @@ class Posterize(UniformColorQuantizationToNBits):
 
 @ia.deprecated("imgaug.augmenters.colors.quantize_uniform")
 def quantize_colors_uniform(image, n_colors):
-    """Outdated name for :func:`quantize_uniform`."""
+    """Outdated name for :func:`quantize_uniform`.
+
+    Deprecated since 0.4.0.
+
+    """
     return quantize_uniform(arr=image, nb_bins=n_colors)
 
 
@@ -3619,8 +3863,9 @@ def quantize_uniform(arr, nb_bins, to_bin_centers=True):
 
     See :func:`quantize_uniform_` for details.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0. (Previously called ``quantize_colors_uniform()``.)
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.quantize_uniform_`.
 
@@ -3656,8 +3901,9 @@ def quantize_uniform_(arr, nb_bins, to_bin_centers=True):
     the target number of bins (roughly matches number of colors) after
     quantization.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no
@@ -3728,12 +3974,15 @@ def quantize_uniform_(arr, nb_bins, to_bin_centers=True):
     return arr
 
 
+# Added in 0.4.0.
 class _QuantizeUniformCenterizedLUTTableSingleton(object):
     _INSTANCE = None
 
     @classmethod
     def get_instance(cls):
         """Get singleton instance of :class:`_QuantizeUniformLUTTable`.
+
+        Added in 0.4.0.
 
         Returns
         -------
@@ -3746,6 +3995,7 @@ class _QuantizeUniformCenterizedLUTTableSingleton(object):
         return cls._INSTANCE
 
 
+# Added in 0.4.0.
 class _QuantizeUniformNotCenterizedLUTTableSingleton(object):
     """Table for :func:`quantize_uniform` with ``to_bin_centers=False``."""
     _INSTANCE = None
@@ -3753,6 +4003,8 @@ class _QuantizeUniformNotCenterizedLUTTableSingleton(object):
     @classmethod
     def get_instance(cls):
         """Get singleton instance of :class:`_QuantizeUniformLUTTable`.
+
+        Added in 0.4.0.
 
         Returns
         -------
@@ -3765,14 +4017,20 @@ class _QuantizeUniformNotCenterizedLUTTableSingleton(object):
         return cls._INSTANCE
 
 
+# Added in 0.4.0.
 class _QuantizeUniformLUTTable(object):
     def __init__(self, centerize):
         self.table = self._generate_quantize_uniform_table(centerize)
 
     def get_for_nb_bins(self, nb_bins):
-        """Get LUT ndarray for a provided number of bins."""
+        """Get LUT ndarray for a provided number of bins.
+
+        Added in 0.4.0.
+
+        """
         return self.table[nb_bins, :]
 
+    # Added in 0.4.0.
     @classmethod
     def _generate_quantize_uniform_table(cls, centerize):
         # For simplicity, we generate here the tables for nb_bins=0 (results
@@ -3800,8 +4058,9 @@ def quantize_uniform_to_n_bits(arr, nb_bits):
 
     See :func:`quantize_uniform_to_n_bits` for details.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.quantize_uniform_to_n_bits_`.
 
@@ -3836,8 +4095,9 @@ def quantize_uniform_to_n_bits_(arr, nb_bits):
     This function produces the same outputs as :func:`PIL.ImageOps.posterize`,
     but is significantly faster.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.quantize_uniform_`.
 
@@ -3882,8 +4142,9 @@ def posterize(arr, nb_bits):
     This function is an alias for :func:`quantize_uniform_to_n_bits` and was
     added for users familiar with the same function in PIL.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.color.quantize_uniform_to_n_bits`.
 

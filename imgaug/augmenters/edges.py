@@ -168,8 +168,7 @@ class Canny(meta.Augmenter):
     """
     Apply a canny edge detector to input images.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no; not tested
@@ -263,8 +262,16 @@ class Canny(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -315,8 +322,11 @@ class Canny(meta.Augmenter):
                  hysteresis_thresholds=((100-40, 100+40), (200-40, 200+40)),
                  sobel_kernel_size=(3, 7),
                  colorizer=None,
-                 seed=None, name=None, **old_kwargs):
-        super(Canny, self).__init__(seed=seed, name=name, **old_kwargs)
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(Canny, self).__init__(
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.alpha = iap.handle_continuous_param(
             alpha, "alpha", value_range=(0, 1.0), tuple_to_uniform=True,
@@ -404,6 +414,7 @@ class Canny(meta.Augmenter):
 
         return alpha_samples, hthresh_samples, sobel_samples
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch

@@ -35,9 +35,10 @@ import six.moves as sm
 
 import imgaug as ia
 from imgaug.augmentables.batches import (Batch, UnnormalizedBatch,
-                                         BatchInAugmentation)
+                                         _BatchInAugmentation)
 from .. import parameters as iap
 from .. import random as iarandom
+from . import base as iabase
 
 
 @ia.deprecated("imgaug.dtypes.clip_")
@@ -257,6 +258,8 @@ class Augmenter(object):
         If a new bit generator has to be created, it will be an instance
         of :class:`numpy.random.SFC64`.
 
+        Added in 0.4.0.
+
     name : None or str, optional
         Name given to the Augmenter instance. This name is used when
         converting the instance to a string, e.g. for ``print`` statements.
@@ -279,20 +282,24 @@ class Augmenter(object):
         Instead, instantiate the augmenter and then use
         :func:`~imgaug.augmenters.Augmenter.to_deterministic`.
 
-    **old_kwargs
-        Catch-all for deprecated parameters that should not be used anymore.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    def __init__(self, seed=None, name=None,
+                 random_state="deprecated",
+                 deterministic="deprecated"):
         """Create a new Augmenter instance."""
         super(Augmenter, self).__init__()
-
-        valid_old_kwargs = {"random_state", "deterministic"}
-        for key in old_kwargs:
-            assert key in valid_old_kwargs, (
-                "Got an unknown parameter `%s` in "
-                "`imgaug.augmenters.meta.Augmenter`." % (key,))
 
         assert name is None or ia.is_string(name), (
             "Expected name to be None or string-like, got %s." % (
@@ -302,23 +309,23 @@ class Augmenter(object):
         else:
             self.name = name
 
-        deterministic = False
-        if "deterministic" in old_kwargs:
+        if deterministic != "deprecated":
             ia.warn_deprecated(
                 "The parameter `deterministic` is deprecated "
                 "in `imgaug.augmenters.meta.Augmenter`. Use "
                 "`.to_deterministic()` to switch into deterministic mode.",
                 stacklevel=4)
-            deterministic = old_kwargs["deterministic"]
+            assert ia.is_single_bool(deterministic), (
+                "Expected deterministic to be a boolean, got %s." % (
+                    type(deterministic),))
+        else:
+            deterministic = False
 
-        assert ia.is_single_bool(deterministic), (
-            "Expected deterministic to be a boolean, got %s." % (
-                type(deterministic),))
         self.deterministic = deterministic
 
-        if "random_state" in old_kwargs:
+        if random_state != "deprecated":
             assert seed is None, "Cannot set both `seed` and `random_state`."
-            seed = old_kwargs["random_state"]
+            seed = random_state
 
         if deterministic and seed is None:
             # Usually if None is provided, the global RNG will be used.
@@ -546,7 +553,11 @@ class Augmenter(object):
                            "must be changed to "
                            "`augment_batch(batch, hooks=hooks)`.")
     def augment_batch(self, batch, hooks=None):
-        """Augment a single batch."""
+        """Augment a single batch.
+
+        Deprecated since 0.4.0.
+
+        """
         # We call augment_batch_() directly here without copy, because this
         # method never copies. Would make sense to add a copy here if the
         # method is un-deprecated at some point.
@@ -557,16 +568,18 @@ class Augmenter(object):
         """
         Augment a single batch in-place.
 
+        Added in 0.4.0.
+
         Parameters
         ----------
-        batch : imgaug.augmentables.batches.Batch or imgaug.augmentables.batches.UnnormalizedBatch or imgaug.augmentables.batch.BatchInAugmentation
+        batch : imgaug.augmentables.batches.Batch or imgaug.augmentables.batches.UnnormalizedBatch or imgaug.augmentables.batch._BatchInAugmentation
             A single batch to augment.
 
             If :class:`imgaug.augmentables.batches.UnnormalizedBatch`
             or :class:`imgaug.augmentables.batches.Batch`, then the ``*_aug``
             attributes may be modified in-place, while the ``*_unaug``
             attributes will not be modified.
-            If :class:`imgaug.augmentables.batches.BatchInAugmentation`,
+            If :class:`imgaug.augmentables.batches._BatchInAugmentation`,
             then all attributes may be modified in-place.
 
         parents : None or list of imgaug.augmenters.Augmenter, optional
@@ -586,11 +599,11 @@ class Augmenter(object):
         """
         # this chain of if/elses would be more beautiful if it was
         # (1st) UnnormalizedBatch, (2nd) Batch, (3rd) BatchInAugmenation.
-        # We check for BatchInAugmentation first as it is expected to be the
+        # We check for _BatchInAugmentation first as it is expected to be the
         # most common input (due to child calls).
         batch_unnorm = None
         batch_norm = None
-        if isinstance(batch, BatchInAugmentation):
+        if isinstance(batch, _BatchInAugmentation):
             batch_inaug = batch
         elif isinstance(batch, UnnormalizedBatch):
             batch_unnorm = batch
@@ -601,7 +614,7 @@ class Augmenter(object):
             batch_inaug = batch_norm.to_batch_in_augmentation()
         else:
             raise ValueError(
-                "Expected UnnormalizedBatch, Batch or BatchInAugmentation, "
+                "Expected UnnormalizedBatch, Batch or _BatchInAugmentation, "
                 "got %s." % (type(batch).__name__,))
 
         columns = batch_inaug.columns
@@ -682,9 +695,11 @@ class Augmenter(object):
         Augmenter instance's ``random_state`` variable. The parameter
         ``random_state`` takes care of both of these.
 
+        Added in 0.4.0.
+
         Parameters
         ----------
-        batch : imgaug.augmentables.batches.BatchInAugmentation
+        batch : imgaug.augmentables.batches._BatchInAugmentation
             The normalized batch to augment. May be changed in-place.
 
         random_state : imgaug.random.RNG
@@ -699,7 +714,7 @@ class Augmenter(object):
 
         Returns
         ----------
-        imgaug.augmentables.batches.BatchInAugmentation
+        imgaug.augmentables.batches._BatchInAugmentation
             The augmented batch.
 
         """
@@ -758,9 +773,15 @@ class Augmenter(object):
             The corresponding augmented image.
 
         """
+        assert ia.is_np_array(image), (
+            "Expected to get a single numpy array of shape (H,W) or (H,W,C) "
+            "for `image`. Got instead type %d. Use `augment_images(images)` "
+            "to augment a list of multiple images." % (
+                type(image).__name__),)
         assert image.ndim in [2, 3], (
             "Expected image to have shape (height, width, [channels]), "
             "got shape %s." % (image.shape,))
+        iabase._warn_on_suspicious_single_image_shape(image)
         return self.augment_images([image], hooks=hooks)[0]
 
     def augment_images(self, images, parents=None, hooks=None):
@@ -811,19 +832,7 @@ class Augmenter(object):
         gaussian blurring to them.
 
         """
-        # TODO place that warning somehow in augment_batch()
-        if ia.is_np_array(images):
-            if images.ndim == 3 and images.shape[-1] in [1, 3]:
-                ia.warn(
-                    "You provided a numpy array of shape %s as input to "
-                    "augment_images(), which was interpreted as "
-                    "(N, H, W). The last dimension however has value 1 or "
-                    "3, which indicates that you provided a single image "
-                    "with shape (H, W, C) instead. If that is the case, "
-                    "you should use augment_image(image) or "
-                    "augment_images([image]), otherwise you will not get "
-                    "the expected augmentations." % (images.shape,))
-
+        iabase._warn_on_suspicious_multi_image_shapes(images)
         return self.augment_batch_(
             UnnormalizedBatch(images=images),
             parents=parents,
@@ -1343,6 +1352,8 @@ class Augmenter(object):
             is now the preferred way of implementing custom augmentation
             routines.
 
+        Added in 0.4.0.
+
         Parameters
         ----------
         bounding_boxes_on_images : list of imgaug.augmentables.bbs.BoundingBoxesOnImage
@@ -1456,6 +1467,8 @@ class Augmenter(object):
         """
         Augment BBs by applying keypoint augmentation to their corners.
 
+        Added in 0.4.0.
+
         Parameters
         ----------
         bounding_boxes_on_images : list of imgaug.augmentables.bbs.BoundingBoxesOnImages or imgaug.augmentables.bbs.BoundingBoxesOnImages
@@ -1566,6 +1579,8 @@ class Augmenter(object):
         """
         Augment bounding boxes by applying KP augmentation to their corners.
 
+        Added in 0.4.0.
+
         Parameters
         ----------
         cbaois : list of imgaug.augmentables.bbs.BoundingBoxesOnImage or list of imgaug.augmentables.polys.PolygonsOnImage or list of imgaug.augmentables.lines.LineStringsOnImage or imgaug.augmentables.bbs.BoundingBoxesOnImage or imgaug.augmentables.polys.PolygonsOnImage or imgaug.augmentables.lines.LineStringsOnImage
@@ -1599,6 +1614,8 @@ class Augmenter(object):
                                         recoverer=None, random_state=None):
         """
         Apply a callback to polygons in keypoint-representation.
+
+        Added in 0.4.0.
 
         Parameters
         ----------
@@ -1656,6 +1673,8 @@ class Augmenter(object):
     def _apply_to_cbaois_as_keypoints(cls, cbaois, func):
         """
         Augment bounding boxes by applying KP augmentation to their corners.
+
+        Added in 0.4.0.
 
         Parameters
         ----------
@@ -1923,8 +1942,10 @@ class Augmenter(object):
                 "You may only provide the argument 'image' OR 'images' to "
                 "augment(), not both of them.")
             images = [kwargs["image"]]
+            iabase._warn_on_suspicious_single_image_shape(images[0])
         else:
             images = kwargs.get("images", None)
+            iabase._warn_on_suspicious_multi_image_shapes(images)
 
         # Decide whether to return the final tuple in the order of the kwargs
         # keys or the default order based on python version. Only 3.6+ uses
@@ -2281,7 +2302,11 @@ class Augmenter(object):
 
     @ia.deprecated("imgaug.augmenters.meta.Augmenter.seed_")
     def reseed(self, random_state=None, deterministic_too=False):
-        """Old name of :func:`~imgaug.augmenters.meta.Augmenter.seed_`."""
+        """Old name of :func:`~imgaug.augmenters.meta.Augmenter.seed_`.
+
+        Deprecated since 0.4.0.
+
+        """
         self.seed_(entropy=random_state, deterministic_too=deterministic_too)
 
     # TODO mark this as in-place
@@ -2311,6 +2336,8 @@ class Augmenter(object):
         use the same seeds and therefore apply the same augmentations.
         Note that :func:`Augmenter.augment_batches` and :func:`Augmenter.pool`
         already do this automatically.
+
+        Added in 0.4.0.
 
         Parameters
         ----------
@@ -2832,7 +2859,7 @@ class Augmenter(object):
             This can only be ``False`` if copy is set to ``True``.
 
         noop_if_topmost : bool, optional
-            Deprecated.
+            Deprecated since 0.4.0.
 
         Returns
         -------
@@ -2876,7 +2903,11 @@ class Augmenter(object):
 
     @ia.deprecated("remove_augmenters_")
     def remove_augmenters_inplace(self, func, parents=None):
-        """Old name for :func:`~imgaug.meta.Augmenter.remove_augmenters_`."""
+        """Old name for :func:`~imgaug.meta.Augmenter.remove_augmenters_`.
+
+        Deprecated since 0.4.0.
+
+        """
         self.remove_augmenters_(func=func, parents=parents)
 
     # TODO allow first arg to be string name, class type or func
@@ -2888,6 +2919,8 @@ class Augmenter(object):
         :func:`~imgaug.augmenters.meta.remove_augmenters` with
         ``copy=False``, except that it does not affect the topmost augmenter
         (the one on which this function is initially called on).
+
+        Added in 0.4.0.
 
         Parameters
         ----------
@@ -2991,8 +3024,7 @@ class Sequential(Augmenter, list):
         >>> aug = iaa.Fliplr(0.5)
         >>> image_aug = aug.augment_image(image)
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3023,8 +3055,16 @@ class Sequential(Augmenter, list):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3057,8 +3097,12 @@ class Sequential(Augmenter, list):
     """
 
     def __init__(self, children=None, random_order=False,
-                 seed=None, name=None, **old_kwargs):
-        Augmenter.__init__(self, seed=seed, name=name, **old_kwargs)
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        Augmenter.__init__(
+            self,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         if children is None:
             list.__init__(self, [])
@@ -3082,6 +3126,7 @@ class Sequential(Augmenter, list):
                 type(random_order),))
         self.random_order = random_order
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             if self.random_order:
@@ -3151,8 +3196,7 @@ class SomeOf(Augmenter, list):
     child multiple times) due to implementation difficulties in connection
     with deterministic augmenters.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3201,8 +3245,16 @@ class SomeOf(Augmenter, list):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3244,8 +3296,12 @@ class SomeOf(Augmenter, list):
     """
 
     def __init__(self, n=None, children=None, random_order=False,
-                 seed=None, name=None, **old_kwargs):
-        Augmenter.__init__(self, seed=seed, name=name, **old_kwargs)
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        Augmenter.__init__(
+            self,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         # TODO use handle_children_list() here?
         if children is None:
@@ -3331,6 +3387,7 @@ class SomeOf(Augmenter, list):
             random_state.shuffle(row)
         return augmenter_active
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             # This must happen before creating the augmenter_active array,
@@ -3408,8 +3465,7 @@ class SomeOf(Augmenter, list):
 class OneOf(SomeOf):
     """Augmenter that always executes exactly one of its children.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`imgaug.augmenters.meta.SomeOf`.
 
@@ -3424,8 +3480,16 @@ class OneOf(SomeOf):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3457,12 +3521,14 @@ class OneOf(SomeOf):
     """
 
     def __init__(self, children,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(OneOf, self).__init__(
             n=1,
             children=children,
             random_order=False,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Sometimes(Augmenter):
@@ -3475,8 +3541,7 @@ class Sometimes(Augmenter):
     Let ``N`` be the number of input images (or other entities).
     Then (on average) ``p*N`` images of ``I`` will be augmented using ``C``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3517,8 +3582,16 @@ class Sometimes(Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3535,9 +3608,11 @@ class Sometimes(Augmenter):
     """
 
     def __init__(self, p=0.5, then_list=None, else_list=None,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Sometimes, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.p = iap.handle_probability_param(p, "p")
 
@@ -3546,6 +3621,7 @@ class Sometimes(Augmenter):
         self.else_list = handle_children_list(else_list, self.name, "else",
                                               default=None)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         with batch.propagation_hooks_ctx(self, hooks, parents):
             samples = self.p.draw_samples((batch.nb_rows,),
@@ -3624,8 +3700,7 @@ class WithChannels(Augmenter):
     The result of the augmentation will be merged back into the original
     images.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3658,8 +3733,16 @@ class WithChannels(Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3672,9 +3755,11 @@ class WithChannels(Augmenter):
     """
 
     def __init__(self, channels=None, children=None,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(WithChannels, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         # TODO change this to a stochastic parameter
         if channels is None:
@@ -3694,6 +3779,7 @@ class WithChannels(Augmenter):
 
         self.children = handle_children_list(children, self.name, "then")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if self.channels is not None and len(self.channels) == 0:
             return batch
@@ -3738,6 +3824,7 @@ class WithChannels(Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     @classmethod
     def _assert_lengths_not_changed(cls, images_aug, images):
         assert len(images_aug) == len(images), (
@@ -3745,6 +3832,7 @@ class WithChannels(Augmenter):
             "augmentation, but got %d vs. originally %d images." % (
                 len(images_aug), len(images)))
 
+    # Added in 0.4.0.
     @classmethod
     def _assert_shapes_not_changed(cls, images_aug, images):
         if ia.is_np_array(images_aug) and ia.is_np_array(images):
@@ -3761,6 +3849,7 @@ class WithChannels(Augmenter):
                 str([image_aug.shape[0:2] for image_aug in images_aug]),
             ))
 
+    # Added in 0.4.0.
     @classmethod
     def _assert_dtypes_not_changed(cls, images_aug, images):
         if ia.is_np_array(images_aug) and ia.is_np_array(images):
@@ -3778,12 +3867,14 @@ class WithChannels(Augmenter):
                 str([image_aug.dtype.name for image_aug in images_aug]),
             ))
 
+    # Added in 0.4.0.
     @classmethod
     def _recover_images_array(cls, images_aug, images):
         if ia.is_np_array(images):
             return np.array(images_aug)
         return images_aug
 
+    # Added in 0.4.0.
     def _reduce_images_to_channels(self, images):
         if self.channels is None:
             return images
@@ -3791,6 +3882,7 @@ class WithChannels(Augmenter):
             return images[..., self.channels]
         return [image[..., self.channels] for image in images]
 
+    # Added in 0.4.0.
     def _invert_reduce_images_to_channels(self, images_aug, images):
         if self.channels is None:
             return images_aug
@@ -3799,6 +3891,7 @@ class WithChannels(Augmenter):
             image[..., self.channels] = image_aug
         return images
 
+    # Added in 0.4.0.
     def _replace_unaugmented_cells(self, augmentables_aug, augmentables):
         if self.channels is None:
             return augmentables_aug
@@ -3848,8 +3941,9 @@ class Identity(Augmenter):
     This augmenter is useful e.g. during validation/testing as it allows
     to re-use the training code without actually performing any augmentation.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3873,17 +3967,39 @@ class Identity(Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.Identity()
+
+    Create an augmenter that does not change inputs.
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
-        super(Identity, self).__init__(seed=seed, name=name, **old_kwargs)
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(Identity, self).__init__(
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         return batch
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []
@@ -3895,8 +4011,7 @@ class Noop(Identity):
     It is recommended to now use :class:`Identity`. :class:`Noop` might be
     deprecated in the future.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.meta.Identity`.
 
@@ -3908,13 +4023,32 @@ class Noop(Identity):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.Noop()
+
+    Create an augmenter that does not change inputs.
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
-        super(Noop, self).__init__(seed=seed, name=name, **old_kwargs)
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(Noop, self).__init__(
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Lambda(Augmenter):
@@ -3922,8 +4056,7 @@ class Lambda(Augmenter):
 
     This is useful to add missing functions to a list of augmenters.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -4004,6 +4137,8 @@ class Lambda(Augmenter):
         bounding boxes will automatically be augmented by transforming their
         corner vertices to keypoints and calling `func_keypoints`.
 
+        Added in 0.4.0.
+
     func_polygons : "keypoints" or None or callable, optional
         The function to call for each batch of polygons.
         It must follow the form::
@@ -4034,14 +4169,24 @@ class Lambda(Augmenter):
         line strings will automatically be augmented by transforming their
         corner vertices to keypoints and calling `func_keypoints`.
 
+        Added in 0.4.0.
+
     seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4086,8 +4231,11 @@ class Lambda(Augmenter):
                  func_segmentation_maps=None, func_keypoints=None,
                  func_bounding_boxes="keypoints", func_polygons="keypoints",
                  func_line_strings="keypoints",
-                 seed=None, name=None, **old_kwargs):
-        super(Lambda, self).__init__(seed=seed, name=name, **old_kwargs)
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(Lambda, self).__init__(
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.func_images = func_images
         self.func_heatmaps = func_heatmaps
         self.func_segmentation_maps = func_segmentation_maps
@@ -4176,6 +4324,7 @@ class Lambda(Augmenter):
             return result
         return polygons_on_images
 
+    # Added in 0.4.0.
     def _augment_line_strings(self, line_strings_on_images, random_state,
                               parents, hooks):
         if self.func_line_strings == "keypoints":
@@ -4197,6 +4346,7 @@ class Lambda(Augmenter):
             return result
         return line_strings_on_images
 
+    # Added in 0.4.0.
     def _augment_bounding_boxes(self, bounding_boxes_on_images, random_state,
                                 parents, hooks):
         if self.func_bounding_boxes == "keypoints":
@@ -4241,8 +4391,7 @@ class AssertLambda(Lambda):
     This is useful to ensure that generic assumption about the input data
     are actually the case and error out early otherwise.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -4310,6 +4459,8 @@ class AssertLambda(Lambda):
         It essentially re-uses the interface of
         :func:`~imgaug.augmenters.meta.Augmenter._augment_bounding_boxes`.
 
+        Added in 0.4.0.
+
     func_polygons : None or callable, optional
         The function to call for each batch of polygons.
         It must follow the form::
@@ -4330,14 +4481,24 @@ class AssertLambda(Lambda):
         It essentially re-uses the interface of
         :func:`~imgaug.augmenters.meta.Augmenter._augment_line_strings`.
 
+        Added in 0.4.0.
+
     seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     """
 
@@ -4345,7 +4506,8 @@ class AssertLambda(Lambda):
                  func_segmentation_maps=None, func_keypoints=None,
                  func_bounding_boxes=None, func_polygons=None,
                  func_line_strings=None,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         def _default(var, augmentable_name):
             return (
                 _AssertLambdaCallback(var, augmentable_name=augmentable_name)
@@ -4362,14 +4524,18 @@ class AssertLambda(Lambda):
             func_bounding_boxes=_default(func_bounding_boxes, "bounding_boxes"),
             func_polygons=_default(func_polygons, "polygons"),
             func_line_strings=_default(func_line_strings, "line_strings"),
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
+# Added in 0.4.0.
 class _AssertLambdaCallback(object):
+    # Added in 0.4.0.
     def __init__(self, func, augmentable_name):
         self.func = func
         self.augmentable_name = augmentable_name
 
+    # Added in 0.4.0.
     def __call__(self, augmentables, random_state, parents, hooks):
         assert self.func(augmentables, random_state, parents, hooks), (
             "Input %s did not fulfill user-defined assertion in "
@@ -4383,8 +4549,7 @@ class _AssertLambdaCallback(object):
 class AssertShape(Lambda):
     """Assert that inputs have a specified shape.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -4453,6 +4618,8 @@ class AssertShape(Lambda):
         :class:`~imgaug.augmentables.bbs.BoundingBoxesOnImage` instance the
         ``.shape`` attribute, i.e. the shape of the corresponding image.
 
+        Added in 0.4.0.
+
     check_polygons : bool, optional
         Whether to validate input polygons via the given shape.
         This will check (a) the number of polygons and (b) for each
@@ -4465,14 +4632,24 @@ class AssertShape(Lambda):
         :class:`~imgaug.augmentables.lines.LineStringsOnImage` instance the
         ``.shape`` attribute, i.e. the shape of the corresponding image.
 
+        Added in 0.4.0.
+
     seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4501,7 +4678,8 @@ class AssertShape(Lambda):
                  check_segmentation_maps=True, check_keypoints=True,
                  check_bounding_boxes=True, check_polygons=True,
                  check_line_strings=True,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         assert len(shape) == 4, (
             "Expected shape to have length 4, got %d with shape: %s." % (
                 len(shape), str(shape)))
@@ -4525,7 +4703,8 @@ class AssertShape(Lambda):
                                    check_polygons),
             func_line_strings=_default(_AssertShapeLineStringsCheck(shape),
                                        check_line_strings),
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     @classmethod
     def _compare(cls, observed, expected, dimension, image_index):
@@ -4570,6 +4749,7 @@ class AssertShape(Lambda):
 
 # turning these checks below into classmethods of AssertShape breaks pickling
 # in python 2.7
+# Added in 0.4.0.
 class _AssertShapeImagesCheck(object):
     def __init__(self, shape):
         self.shape = shape
@@ -4582,6 +4762,7 @@ class _AssertShapeImagesCheck(object):
         return images
 
 
+# Added in 0.4.0.
 class _AssertShapeHeatmapsCheck(object):
     def __init__(self, shape):
         self.shape = shape
@@ -4592,6 +4773,7 @@ class _AssertShapeHeatmapsCheck(object):
         return heatmaps
 
 
+# Added in 0.4.0.
 class _AssertShapeSegmapCheck(object):
     def __init__(self, shape):
         self.shape = shape
@@ -4602,6 +4784,7 @@ class _AssertShapeSegmapCheck(object):
         return segmaps
 
 
+# Added in 0.4.0.
 class _AssertShapeKeypointsCheck(object):
     def __init__(self, shape):
         self.shape = shape
@@ -4612,6 +4795,7 @@ class _AssertShapeKeypointsCheck(object):
         return keypoints_on_images
 
 
+# Added in 0.4.0.
 class _AssertShapeBoundingBoxesCheck(object):
     def __init__(self, shape):
         self.shape = shape
@@ -4624,6 +4808,7 @@ class _AssertShapeBoundingBoxesCheck(object):
         return bounding_boxes_on_images
 
 
+# Added in 0.4.0.
 class _AssertShapePolygonsCheck(object):
     def __init__(self, shape):
         self.shape = shape
@@ -4634,6 +4819,7 @@ class _AssertShapePolygonsCheck(object):
         return polygons_on_images
 
 
+# Added in 0.4.0.
 class _AssertShapeLineStringsCheck(object):
     def __init__(self, shape):
         self.shape = shape
@@ -4649,8 +4835,7 @@ class _AssertShapeLineStringsCheck(object):
 class ChannelShuffle(Augmenter):
     """Randomize the order of channels in input images.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -4688,8 +4873,16 @@ class ChannelShuffle(Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4708,9 +4901,11 @@ class ChannelShuffle(Augmenter):
     """
 
     def __init__(self, p=1.0, channels=None,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ChannelShuffle, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.p = iap.handle_probability_param(p, "p")
         valid_channels = (
             channels is None
@@ -4724,6 +4919,7 @@ class ChannelShuffle(Augmenter):
                 type(channels),))
         self.channels = channels
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -4747,8 +4943,7 @@ class ChannelShuffle(Augmenter):
 def shuffle_channels(image, random_state, channels=None):
     """Randomize the order of (color) channels in an image.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; indirectly tested (1)
@@ -4821,8 +5016,9 @@ class RemoveCBAsByOutOfImageFraction(Augmenter):
     augmentable's area that is outside of the image, e.g. for a bounding box
     that has half of its area outside of the image it would be ``0.5``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -4851,8 +5047,16 @@ class RemoveCBAsByOutOfImageFraction(Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4891,13 +5095,17 @@ class RemoveCBAsByOutOfImageFraction(Augmenter):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self, fraction,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(RemoveCBAsByOutOfImageFraction, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.fraction = fraction
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         for column in batch.columns:
             if column.name in ["keypoints", "bounding_boxes", "polygons",
@@ -4908,6 +5116,7 @@ class RemoveCBAsByOutOfImageFraction(Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.fraction]
@@ -4923,8 +5132,9 @@ class ClipCBAsToImagePlanes(Augmenter):
     it removes any single points outside of the image plane. Any augmentable
     that is completely outside of the image plane will be removed.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -4948,8 +5158,16 @@ class ClipCBAsToImagePlanes(Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4965,10 +5183,15 @@ class ClipCBAsToImagePlanes(Augmenter):
 
     """
 
-    def __init__(self, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ClipCBAsToImagePlanes, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         for column in batch.columns:
             if column.name in ["keypoints", "bounding_boxes", "polygons",
@@ -4978,6 +5201,7 @@ class ClipCBAsToImagePlanes(Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return []

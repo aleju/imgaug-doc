@@ -62,8 +62,7 @@ def add_scalar(image, value):
 
     This method ensures that ``uint8`` does not overflow during the addition.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: limited; tested (1)
@@ -210,8 +209,7 @@ def add_elementwise(image, values):
 
     This method ensures that ``uint8`` does not overflow during the addition.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: limited; tested (1)
@@ -333,8 +331,7 @@ def multiply_scalar(image, multiplier):
     This method ensures that ``uint8`` does not overflow during the
     multiplication.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: limited; tested (1)
@@ -500,8 +497,7 @@ def multiply_elementwise(image, multipliers):
 
     This method ensures that ``uint8`` does not overflow during the addition.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: limited; tested (1)
@@ -646,10 +642,11 @@ def cutout(image, x1, y1, x2, y2,
         in the interval ``[0.0, 1.0]`` and hence sample values from a
         gaussian within that interval, i.e. from ``N(0.5, std=0.5/3)``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.cutout_`.
+
+    Added in 0.4.0.
 
     Parameters
     ----------
@@ -705,9 +702,9 @@ def cutout_(image, x1, y1, x2, y2,
         in the interval ``[0.0, 1.0]`` and hence sample values from a
         gaussian within that interval, i.e. from ``N(0.5, std=0.5/3)``.
 
+    Added in 0.4.0.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     minimum of (
         :func:`~imgaug.augmenters.arithmetic._fill_rectangle_gaussian_`,
@@ -788,8 +785,9 @@ def _fill_rectangle_gaussian_(image, x1, y1, x2, y2, cval, per_channel,
                               random_state):
     """Fill a rectangular image area with samples from a gaussian.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -857,8 +855,9 @@ def _fill_rectangle_constant_(image, x1, y1, x2, y2, cval, per_channel,
     in `cval` does not match the number of channels in `image`, it may
     be tiled up to the number of channels.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -897,8 +896,7 @@ def _fill_rectangle_constant_(image, x1, y1, x2, y2, cval, per_channel,
 def replace_elementwise_(image, mask, replacements):
     """Replace components in an image array with new values.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -1010,8 +1008,7 @@ def invert(image, min_value=None, max_value=None, threshold=None,
            invert_above_threshold=True):
     """Invert an array.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.invert_`.
 
@@ -1047,8 +1044,9 @@ def invert_(image, min_value=None, max_value=None, threshold=None,
             invert_above_threshold=True):
     """Invert an array in-place.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     if (min_value=None and max_value=None):
 
@@ -1195,6 +1193,7 @@ def _invert_bool(arr, min_value, max_value):
     return ~arr
 
 
+# Added in 0.4.0.
 def _invert_uint8_(arr, min_value, max_value, threshold,
                    invert_above_threshold):
     table = _generate_table_for_invert_uint8(
@@ -1203,6 +1202,7 @@ def _invert_uint8_(arr, min_value, max_value, threshold,
     return arr
 
 
+# Added in 0.4.0.
 def _invert_uint16_or_larger_(arr, min_value, max_value):
     min_max_is_vr = (min_value == 0
                      and max_value == np.iinfo(arr.dtype).max)
@@ -1214,6 +1214,7 @@ def _invert_uint16_or_larger_(arr, min_value, max_value):
     )
 
 
+# Added in 0.4.0.
 def _invert_int_(arr, min_value, max_value):
     # note that for int dtypes the max value is
     #   (-1) * min_value - 1
@@ -1280,6 +1281,7 @@ def _invert_by_distance(arr, min_value, max_value):
     return arr_inv
 
 
+# Added in 0.4.0.
 def _generate_table_for_invert_uint8(min_value, max_value, threshold,
                                      invert_above_threshold):
     table = np.arange(256).astype(np.int32)
@@ -1310,10 +1312,11 @@ def _generate_table_for_invert_uint8(min_value, max_value, threshold,
 def solarize(image, threshold=128):
     """Invert pixel values above a threshold.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
 
-    See :func:`solarize_`.
+    **Supported dtypes**:
+
+    See :func:`~imgaug.augmenters.arithmetic.solarize_`.
 
     Parameters
     ----------
@@ -1340,10 +1343,11 @@ def solarize_(image, threshold=128):
     This function performs the same transformation as
     :func:`PIL.ImageOps.solarize`.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
 
-    See ``invert_(min_value=None and max_value=None)``.
+    **Supported dtypes**:
+
+    See ``~imgaug.augmenters.arithmetic.invert_(min_value=None and max_value=None)``.
 
     Parameters
     ----------
@@ -1368,8 +1372,7 @@ def solarize_(image, threshold=128):
 def compress_jpeg(image, compression):
     """Compress an image using jpeg compression.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: ?
@@ -1471,8 +1474,7 @@ class Add(meta.Augmenter):
     """
     Add a value to all pixels in an image.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.add_scalar`.
 
@@ -1506,8 +1508,16 @@ class Add(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1536,9 +1546,12 @@ class Add(meta.Augmenter):
 
     """
 
-    def __init__(self, value=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
-        super(Add, self).__init__(seed=seed, name=name, **old_kwargs)
+    def __init__(self, value=(-20, 20), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(Add, self).__init__(
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.value = iap.handle_continuous_param(
             value, "value", value_range=None, tuple_to_uniform=True,
@@ -1546,6 +1559,7 @@ class Add(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -1607,8 +1621,7 @@ class AddElementwise(meta.Augmenter):
     and *per pixel* (and optionally per channel), i.e. intensities of
     neighbouring pixels may be increased/decreased by different amounts.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.add_elementwise`.
 
@@ -1642,8 +1655,16 @@ class AddElementwise(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1671,10 +1692,12 @@ class AddElementwise(meta.Augmenter):
 
     """
 
-    def __init__(self, value=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, value=(-20, 20), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(AddElementwise, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.value = iap.handle_continuous_param(
             value, "value", value_range=None, tuple_to_uniform=True,
@@ -1682,6 +1705,7 @@ class AddElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -1722,8 +1746,7 @@ class AdditiveGaussianNoise(AddElementwise):
     different noise values to neighbouring pixels and is comparable
     to ``AddElementwise``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.AddElementwise`.
 
@@ -1770,8 +1793,16 @@ class AdditiveGaussianNoise(AddElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1799,8 +1830,9 @@ class AdditiveGaussianNoise(AddElementwise):
     active for 50 percent of all images.
 
     """
-    def __init__(self, loc=0, scale=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, loc=0, scale=(0, 15), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         loc2 = iap.handle_continuous_param(
             loc, "loc", value_range=None, tuple_to_uniform=True,
             list_to_choice=True)
@@ -1812,9 +1844,11 @@ class AdditiveGaussianNoise(AddElementwise):
 
         super(AdditiveGaussianNoise, self).__init__(
             value, per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
+# TODO add tests
 # TODO rename to AddLaplaceNoise?
 class AdditiveLaplaceNoise(AddElementwise):
     """
@@ -1835,8 +1869,7 @@ class AdditiveLaplaceNoise(AddElementwise):
     different noise values to neighbouring pixels and is comparable
     to ``AddElementwise``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.AddElementwise`.
 
@@ -1883,8 +1916,16 @@ class AdditiveLaplaceNoise(AddElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1912,8 +1953,9 @@ class AdditiveLaplaceNoise(AddElementwise):
     active for 50 percent of all images.
 
     """
-    def __init__(self, loc=0, scale=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, loc=0, scale=(0, 15), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         loc2 = iap.handle_continuous_param(
             loc, "loc", value_range=None, tuple_to_uniform=True,
             list_to_choice=True)
@@ -1926,9 +1968,11 @@ class AdditiveLaplaceNoise(AddElementwise):
         super(AdditiveLaplaceNoise, self).__init__(
             value,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
+# TODO add tests
 # TODO rename to AddPoissonNoise?
 class AdditivePoissonNoise(AddElementwise):
     """
@@ -1947,8 +1991,7 @@ class AdditivePoissonNoise(AddElementwise):
     different noise values to neighbouring pixels and is comparable
     to ``AddElementwise``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.AddElementwise`.
 
@@ -1983,8 +2026,16 @@ class AdditivePoissonNoise(AddElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1995,10 +2046,10 @@ class AdditivePoissonNoise(AddElementwise):
     parameter of ``5.0`` to images.
     The samples are drawn per image and pixel.
 
-    >>> aug = iaa.AdditivePoissonNoise(lam=(0.0, 10.0))
+    >>> aug = iaa.AdditivePoissonNoise(lam=(0.0, 15.0))
 
     Adds poisson noise sampled from ``Poisson(x)`` to images, where ``x`` is
-    randomly sampled per image from the interval ``[0.0, 10.0]``.
+    randomly sampled per image from the interval ``[0.0, 15.0]``.
 
     >>> aug = iaa.AdditivePoissonNoise(lam=5.0, per_channel=True)
 
@@ -2006,20 +2057,21 @@ class AdditivePoissonNoise(AddElementwise):
     where the values are different per image and pixel *and* channel (e.g. a
     different one for red, green and blue channels for the same pixel).
 
-    >>> aug = iaa.AdditivePoissonNoise(lam=(0.0, 10.0), per_channel=True)
+    >>> aug = iaa.AdditivePoissonNoise(lam=(0.0, 15.0), per_channel=True)
 
     Adds poisson noise sampled from ``Poisson(x)`` to images,
-    with ``x`` being sampled from ``uniform(0.0, 10.0)`` per image and
+    with ``x`` being sampled from ``uniform(0.0, 15.0)`` per image and
     channel. This is the *recommended* configuration.
 
-    >>> aug = iaa.AdditivePoissonNoise(lam=(0.0, 10.0), per_channel=0.5)
+    >>> aug = iaa.AdditivePoissonNoise(lam=(0.0, 15.0), per_channel=0.5)
 
     Identical to the previous example, but the `per_channel` feature is only
     active for 50 percent of all images.
 
     """
-    def __init__(self, lam=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, lam=(0.0, 15.0), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         lam2 = iap.handle_continuous_param(
             lam, "lam",
             value_range=(0, None), tuple_to_uniform=True, list_to_choice=True)
@@ -2029,7 +2081,8 @@ class AdditivePoissonNoise(AddElementwise):
         super(AdditivePoissonNoise, self).__init__(
             value,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Multiply(meta.Augmenter):
@@ -2038,8 +2091,7 @@ class Multiply(meta.Augmenter):
 
     This augmenter can be used to make images lighter or darker.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.multiply_scalar`.
 
@@ -2073,8 +2125,16 @@ class Multiply(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2101,10 +2161,12 @@ class Multiply(meta.Augmenter):
 
     """
 
-    def __init__(self, mul=1.0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, mul=(0.8, 1.2), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Multiply, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.mul = iap.handle_continuous_param(
             mul, "mul", value_range=None, tuple_to_uniform=True,
@@ -2112,6 +2174,7 @@ class Multiply(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(
             per_channel, "per_channel")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -2171,8 +2234,7 @@ class MultiplyElementwise(meta.Augmenter):
     image* (and optionally channel), this augmenter samples the multipliers
     to use per image and *per pixel* (and optionally per channel).
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.multiply_elementwise`.
 
@@ -2206,8 +2268,16 @@ class MultiplyElementwise(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2235,10 +2305,12 @@ class MultiplyElementwise(meta.Augmenter):
 
     """
 
-    def __init__(self, mul=1.0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, mul=(0.8, 1.2), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MultiplyElementwise, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.mul = iap.handle_continuous_param(
             mul, "mul",
@@ -2246,6 +2318,7 @@ class MultiplyElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(per_channel,
                                                         "per_channel")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -2284,7 +2357,9 @@ class MultiplyElementwise(meta.Augmenter):
         return [self.mul, self.per_channel]
 
 
+# Added in 0.4.0.
 class _CutoutSamples(object):
+    # Added in 0.4.0.
     def __init__(self, nb_iterations, pos_x, pos_y, size_h, size_w, squared,
                  fill_mode, cval, fill_per_channel):
         self.nb_iterations = nb_iterations
@@ -2324,8 +2399,9 @@ class Cutout(meta.Augmenter):
         in the interval ``[0.0, 1.0]`` and hence sample values from a
         gaussian within that interval, i.e. from ``N(0.5, std=0.5/3)``.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.cutout_`.
 
@@ -2464,6 +2540,7 @@ class Cutout(meta.Augmenter):
 
     """
 
+    # Added in 0.4.0.
     def __init__(self,
                  nb_iterations=1,
                  position="uniform",
@@ -2472,12 +2549,14 @@ class Cutout(meta.Augmenter):
                  fill_mode="constant",
                  cval=128,
                  fill_per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         from .size import _handle_position_parameter  # TODO move to iap
         from .geometric import _handle_cval_arg  # TODO move to iap
 
         super(Cutout, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.nb_iterations = iap.handle_discrete_param(
             nb_iterations, "nb_iterations", value_range=(0, None),
             tuple_to_uniform=True, list_to_choice=True, allow_floats=False)
@@ -2491,6 +2570,7 @@ class Cutout(meta.Augmenter):
         self.fill_per_channel = iap.handle_probability_param(
             fill_per_channel, "fill_per_channel")
 
+    # Added in 0.4.0.
     @classmethod
     def _handle_fill_mode_param(cls, fill_mode):
         if ia.is_string(fill_mode):
@@ -2506,6 +2586,7 @@ class Cutout(meta.Augmenter):
                 type(fill_mode).__name__))
         return iap.Choice(fill_mode)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -2545,6 +2626,7 @@ class Cutout(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _draw_samples(self, images, random_state):
         rngs = random_state.duplicate(8)
         nb_rows = len(images)
@@ -2590,6 +2672,7 @@ class Cutout(meta.Augmenter):
             fill_per_channel=fill_per_channel
         )
 
+    # Added in 0.4.0.
     @classmethod
     def _augment_image_by_samples(cls, image, x1, y1, x2, y2, squared,
                                   fill_mode, cval, fill_per_channel,
@@ -2614,6 +2697,7 @@ class Cutout(meta.Augmenter):
                 seed=random_state)
         return image
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.nb_iterations, self.position, self.size, self.squared,
@@ -2626,8 +2710,7 @@ class Dropout(MultiplyElementwise):
     """
     Set a fraction of pixels in images to zero.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.MultiplyElementwise`.
 
@@ -2669,8 +2752,16 @@ class Dropout(MultiplyElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2695,16 +2786,19 @@ class Dropout(MultiplyElementwise):
     active for ``50`` percent of all images.
 
     """
-    def __init__(self, p=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, p=(0.0, 0.05), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         p_param = _handle_dropout_probability_param(p, "p")
 
         super(Dropout, self).__init__(
             p_param,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
+# Added in 0.4.0.
 def _handle_dropout_probability_param(p, name):
     if ia.is_single_number(p):
         p_param = iap.Binomial(1 - p)
@@ -2740,8 +2834,7 @@ def _handle_dropout_probability_param(p, name):
     return p_param
 
 
-# TODO add similar cutout augmenter
-# TODO invert size_p and size_percent so that larger values denote larger
+# TODO invert size_px and size_percent so that larger values denote larger
 #      areas being dropped instead of the opposite way around
 class CoarseDropout(MultiplyElementwise):
     """
@@ -2762,8 +2855,7 @@ class CoarseDropout(MultiplyElementwise):
     ``CoarseDropout`` can drop multiple rectangles (with some correlation
     between the sizes of these rectangles).
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.MultiplyElementwise`.
 
@@ -2848,8 +2940,16 @@ class CoarseDropout(MultiplyElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2886,9 +2986,10 @@ class CoarseDropout(MultiplyElementwise):
     for ``50`` percent of all images.
 
     """
-    def __init__(self, p=0, size_px=None, size_percent=None, per_channel=False,
-                 min_size=4,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, p=(0.02, 0.1), size_px=None, size_percent=None,
+                 per_channel=False, min_size=3,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         p_param = _handle_dropout_probability_param(p, "p")
 
         if size_px is not None:
@@ -2900,12 +3001,17 @@ class CoarseDropout(MultiplyElementwise):
                                               size_percent=size_percent,
                                               min_size=min_size)
         else:
-            raise Exception("Either size_px or size_percent must be set.")
+            # default if neither size_px nor size_percent is provided
+            # is size_px=(3, 8)
+            p_param = iap.FromLowerResolution(other_param=p_param,
+                                              size_px=(3, 8),
+                                              min_size=min_size)
 
         super(CoarseDropout, self).__init__(
             p_param,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Dropout2d(meta.Augmenter):
@@ -2921,8 +3027,9 @@ class Dropout2d(meta.Augmenter):
         It does so if and only if *all* channels of an image are dropped.
         If ``nb_keep_channels >= 1`` then that never happens.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -2970,8 +3077,16 @@ class Dropout2d(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2991,10 +3106,13 @@ class Dropout2d(meta.Augmenter):
 
     """
 
-    def __init__(self, p, nb_keep_channels=1,
-                 seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, p=0.1, nb_keep_channels=1,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Dropout2d, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.p = _handle_dropout_probability_param(p, "p")
         self.nb_keep_channels = max(nb_keep_channels, 0)
 
@@ -3009,6 +3127,7 @@ class Dropout2d(meta.Augmenter):
         self._heatmaps_cval = 0.0
         self._segmentation_maps_cval = 0
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         imagewise_drop_channel_ids, all_dropped_ids = self._draw_samples(
             batch, random_state)
@@ -3045,6 +3164,7 @@ class Dropout2d(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         # maybe noteworthy here that the channel axis can have size 0,
         # e.g. (5, 5, 0)
@@ -3088,6 +3208,7 @@ class Dropout2d(meta.Augmenter):
 
         return imagewise_channels_to_drop, all_dropped_ids
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p, self.nb_keep_channels]
@@ -3104,8 +3225,9 @@ class TotalDropout(meta.Augmenter):
         maps to zero and removes all coordinate-based data (e.g. it removes
         all bounding boxes on images that were filled with zeros).
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
+
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -3147,8 +3269,16 @@ class TotalDropout(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3164,9 +3294,13 @@ class TotalDropout(meta.Augmenter):
 
     """
 
-    def __init__(self, p, seed=None, name=None, **old_kwargs):
+    # Added in 0.4.0.
+    def __init__(self, p=1,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(TotalDropout, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.p = _handle_dropout_probability_param(p, "p")
 
         self._drop_images = True
@@ -3180,6 +3314,7 @@ class TotalDropout(meta.Augmenter):
         self._heatmaps_cval = 0.0
         self._segmentation_maps_cval = 0
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         drop_mask = self._draw_samples(batch, random_state)
         drop_ids = None
@@ -3217,17 +3352,20 @@ class TotalDropout(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         p = self.p.draw_samples((batch.nb_rows,), random_state=random_state)
         drop_mask = (p < 0.5)
         return drop_mask
 
+    # Added in 0.4.0.
     @classmethod
     def _generate_drop_ids_once(cls, drop_mask, drop_ids):
         if drop_ids is None:
             drop_ids = np.nonzero(drop_mask)[0]
         return drop_ids
 
+    # Added in 0.4.0.
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p]
@@ -3237,8 +3375,7 @@ class ReplaceElementwise(meta.Augmenter):
     """
     Replace pixels in an image with new values.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.replace_elementwise_`.
 
@@ -3289,8 +3426,16 @@ class ReplaceElementwise(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3333,9 +3478,11 @@ class ReplaceElementwise(meta.Augmenter):
     """
 
     def __init__(self, mask, replacement, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ReplaceElementwise, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.mask = iap.handle_probability_param(
             mask, "mask", tuple_to_uniform=True, list_to_choice=True)
@@ -3344,6 +3491,7 @@ class ReplaceElementwise(meta.Augmenter):
         self.per_channel = iap.handle_probability_param(per_channel,
                                                         "per_channel")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -3397,8 +3545,7 @@ class SaltAndPepper(ReplaceElementwise):
     """
     Replace pixels in images with salt/pepper noise (white/black-ish colors).
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
@@ -3434,8 +3581,16 @@ class SaltAndPepper(ReplaceElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3451,14 +3606,15 @@ class SaltAndPepper(ReplaceElementwise):
     noise.
 
     """
-    def __init__(self, p=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, p=(0.0, 0.03), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(SaltAndPepper, self).__init__(
             mask=p,
             replacement=iap.Beta(0.5, 0.5) * 255,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs
-        )
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class ImpulseNoise(SaltAndPepper):
@@ -3468,8 +3624,7 @@ class ImpulseNoise(SaltAndPepper):
     This is identical to ``SaltAndPepper``, except that `per_channel` is
     always set to ``True``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.SaltAndPepper`.
 
@@ -3494,8 +3649,16 @@ class ImpulseNoise(SaltAndPepper):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3505,11 +3668,15 @@ class ImpulseNoise(SaltAndPepper):
     Replace ``10%`` of all pixels with impulse noise.
 
     """
-    def __init__(self, p=0, seed=None, name=None, **old_kwargs):
+
+    def __init__(self, p=(0.0, 0.03),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(ImpulseNoise, self).__init__(
             p=p,
             per_channel=True,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CoarseSaltAndPepper(ReplaceElementwise):
@@ -3526,8 +3693,7 @@ class CoarseSaltAndPepper(ReplaceElementwise):
     TODO replace dtype support with uint8 only, because replacement is
          geared towards that value range
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
@@ -3607,8 +3773,16 @@ class CoarseSaltAndPepper(ReplaceElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3634,9 +3808,11 @@ class CoarseSaltAndPepper(ReplaceElementwise):
     independently per image channel.
 
     """
-    def __init__(self, p=0, size_px=None, size_percent=None,
-                 per_channel=False, min_size=4,
-                 seed=None, name=None, **old_kwargs):
+
+    def __init__(self, p=(0.02, 0.1), size_px=None, size_percent=None,
+                 per_channel=False, min_size=3,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         mask = iap.handle_probability_param(
             p, "p", tuple_to_uniform=True, list_to_choice=True)
 
@@ -3647,7 +3823,8 @@ class CoarseSaltAndPepper(ReplaceElementwise):
             mask_low = iap.FromLowerResolution(
                 other_param=mask, size_percent=size_percent, min_size=min_size)
         else:
-            raise Exception("Either size_px or size_percent must be set.")
+            mask_low = iap.FromLowerResolution(
+                other_param=mask, size_px=(3, 8), min_size=min_size)
 
         replacement = iap.Beta(0.5, 0.5) * 255
 
@@ -3655,8 +3832,8 @@ class CoarseSaltAndPepper(ReplaceElementwise):
             mask=mask_low,
             replacement=replacement,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs
-        )
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Salt(ReplaceElementwise):
@@ -3666,8 +3843,7 @@ class Salt(ReplaceElementwise):
     This augmenter is similar to ``SaltAndPepper``, but adds no pepper noise to
     images.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
@@ -3703,8 +3879,16 @@ class Salt(ReplaceElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3715,8 +3899,9 @@ class Salt(ReplaceElementwise):
 
     """
 
-    def __init__(self, p=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, p=(0.0, 0.03), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         replacement01 = iap.ForceSign(
             iap.Beta(0.5, 0.5) - 0.5,
             positive=True,
@@ -3729,7 +3914,8 @@ class Salt(ReplaceElementwise):
             mask=p,
             replacement=replacement,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CoarseSalt(ReplaceElementwise):
@@ -3738,8 +3924,7 @@ class CoarseSalt(ReplaceElementwise):
 
     See also the similar ``CoarseSaltAndPepper``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
@@ -3819,8 +4004,16 @@ class CoarseSalt(ReplaceElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3835,9 +4028,10 @@ class CoarseSalt(ReplaceElementwise):
 
     """
 
-    def __init__(self, p=0, size_px=None, size_percent=None, per_channel=False,
-                 min_size=4,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, p=(0.02, 0.1), size_px=None, size_percent=None,
+                 per_channel=False, min_size=3,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         mask = iap.handle_probability_param(
             p, "p", tuple_to_uniform=True, list_to_choice=True)
 
@@ -3848,7 +4042,8 @@ class CoarseSalt(ReplaceElementwise):
             mask_low = iap.FromLowerResolution(
                 other_param=mask, size_percent=size_percent, min_size=min_size)
         else:
-            raise Exception("Either size_px or size_percent must be set.")
+            mask_low = iap.FromLowerResolution(
+                other_param=mask, size_px=(3, 8), min_size=min_size)
 
         replacement01 = iap.ForceSign(
             iap.Beta(0.5, 0.5) - 0.5,
@@ -3861,7 +4056,8 @@ class CoarseSalt(ReplaceElementwise):
             mask=mask_low,
             replacement=replacement,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Pepper(ReplaceElementwise):
@@ -3874,8 +4070,7 @@ class Pepper(ReplaceElementwise):
     This augmenter is similar to ``Dropout``, but slower and the black pixels
     are not uniformly black.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
@@ -3911,8 +4106,16 @@ class Pepper(ReplaceElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -3923,8 +4126,9 @@ class Pepper(ReplaceElementwise):
 
     """
 
-    def __init__(self, p=0, per_channel=False,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, p=(0.0, 0.05), per_channel=False,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         replacement01 = iap.ForceSign(
             iap.Beta(0.5, 0.5) - 0.5,
             positive=False,
@@ -3936,16 +4140,15 @@ class Pepper(ReplaceElementwise):
             mask=p,
             replacement=replacement,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs
-        )
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class CoarsePepper(ReplaceElementwise):
     """
     Replace rectangular areas in images with black-ish pixel noise.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :class:`~imgaug.augmenters.arithmetic.ReplaceElementwise`.
 
@@ -4025,8 +4228,16 @@ class CoarsePepper(ReplaceElementwise):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4041,9 +4252,10 @@ class CoarsePepper(ReplaceElementwise):
 
     """
 
-    def __init__(self, p=0, size_px=None, size_percent=None, per_channel=False,
-                 min_size=4,
-                 seed=None, name=None, **old_kwargs):
+    def __init__(self, p=(0.02, 0.1), size_px=None, size_percent=None,
+                 per_channel=False, min_size=3,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         mask = iap.handle_probability_param(
             p, "p", tuple_to_uniform=True, list_to_choice=True)
 
@@ -4054,7 +4266,8 @@ class CoarsePepper(ReplaceElementwise):
             mask_low = iap.FromLowerResolution(
                 other_param=mask, size_percent=size_percent, min_size=min_size)
         else:
-            raise Exception("Either size_px or size_percent must be set.")
+            mask_low = iap.FromLowerResolution(
+                other_param=mask, size_px=(3, 8), min_size=min_size)
 
         replacement01 = iap.ForceSign(
             iap.Beta(0.5, 0.5) - 0.5,
@@ -4067,8 +4280,8 @@ class CoarsePepper(ReplaceElementwise):
             mask=mask_low,
             replacement=replacement,
             per_channel=per_channel,
-            seed=seed, name=name, **old_kwargs
-        )
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Invert(meta.Augmenter):
@@ -4081,8 +4294,7 @@ class Invert(meta.Augmenter):
     ``v`` a value. Then the distance of ``v`` to ``m`` is ``d=abs(v-m)`` and
     the new value is given by ``v'=M-d``.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.invert_`.
 
@@ -4148,8 +4360,16 @@ class Invert(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4187,11 +4407,13 @@ class Invert(meta.Augmenter):
         ]
     ]
 
-    def __init__(self, p=0, per_channel=False, min_value=None, max_value=None,
+    def __init__(self, p=1, per_channel=False, min_value=None, max_value=None,
                  threshold=None, invert_above_threshold=0.5,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Invert, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         # TODO allow list and tuple for p
         self.p = iap.handle_probability_param(p, "p")
@@ -4209,6 +4431,7 @@ class Invert(meta.Augmenter):
         self.invert_above_threshold = iap.handle_probability_param(
             invert_above_threshold, "invert_above_threshold")
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
@@ -4236,6 +4459,7 @@ class Invert(meta.Augmenter):
 
         return batch
 
+    # Added in 0.4.0.
     def _draw_samples(self, batch, random_state):
         nb_images = batch.nb_rows
         nb_channels = meta.estimate_max_number_of_channels(batch.images)
@@ -4273,7 +4497,9 @@ class Invert(meta.Augmenter):
                 self.threshold, self.invert_above_threshold]
 
 
+# Added in 0.4.0.
 class _InvertSamples(object):
+    # Added in 0.4.0.
     def __init__(self, p, per_channel, min_value, max_value,
                  threshold, invert_above_threshold):
         self.p = p
@@ -4293,10 +4519,11 @@ class Solarize(Invert):
 
     See :class:`Invert` for more details.
 
-    Supported dtypes
-    ----------------
+    Added in 0.4.0.
 
-    See :class:`Invert`.
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.arithmetic.Invert`.
 
     Parameters
     ----------
@@ -4324,8 +4551,16 @@ class Solarize(Invert):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4337,26 +4572,32 @@ class Solarize(Invert):
     per image. The thresholding operation happens per channel.
 
     """
-    def __init__(self, p, per_channel=False, min_value=None, max_value=None,
+    def __init__(self, p=1, per_channel=False, min_value=None, max_value=None,
                  threshold=(128-64, 128+64), invert_above_threshold=True,
-                 seed=None, name=None, **old_kwargs):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Solarize, self).__init__(
             p=p, per_channel=per_channel,
             min_value=min_value, max_value=max_value,
             threshold=threshold, invert_above_threshold=invert_above_threshold,
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 # TODO remove from examples
 @ia.deprecated("imgaug.contrast.LinearContrast")
 def ContrastNormalization(alpha=1.0, per_channel=False,
-                          seed=None, name=None, **old_kwargs):
+                          seed=None, name=None,
+                          random_state="deprecated",
+                          deterministic="deprecated"):
     """
     Change the contrast of images.
 
     dtype support:
 
         See ``imgaug.augmenters.contrast.LinearContrast``.
+
+    Deprecated since 0.3.0.
 
     Parameters
     ----------
@@ -4390,8 +4631,16 @@ def ContrastNormalization(alpha=1.0, per_channel=False,
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4415,7 +4664,7 @@ def ContrastNormalization(alpha=1.0, per_channel=False,
     from . import contrast as contrast_lib
     return contrast_lib.LinearContrast(
         alpha=alpha, per_channel=per_channel,
-        seed=seed, name=name, **old_kwargs)
+        seed=seed, name=name, random_state=random_state, deterministic=deterministic)
 
 
 # TODO try adding per channel somehow
@@ -4433,8 +4682,7 @@ class JpegCompression(meta.Augmenter):
     the images with JPEG compression and then reloads them into arrays). It
     does not return the raw JPEG file content.
 
-    Supported dtypes
-    ----------------
+    **Supported dtypes**:
 
     See :func:`~imgaug.augmenters.arithmetic.compress_jpeg`.
 
@@ -4465,8 +4713,16 @@ class JpegCompression(meta.Augmenter):
     name : None or str, optional
         See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
 
-    **old_kwargs
-        Outdated parameters. Avoid using these.
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -4479,10 +4735,13 @@ class JpegCompression(meta.Augmenter):
     setting of ``1`` to ``30``.
 
     """
-    def __init__(self, compression=50,
-                 seed=None, name=None, **old_kwargs):
+
+    def __init__(self, compression=(0, 100),
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(JpegCompression, self).__init__(
-            seed=seed, name=name, **old_kwargs)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         # will be converted to int during augmentation, which is why we allow
         # floats here
@@ -4490,6 +4749,7 @@ class JpegCompression(meta.Augmenter):
             compression, "compression",
             value_range=(0, 100), tuple_to_uniform=True, list_to_choice=True)
 
+    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
