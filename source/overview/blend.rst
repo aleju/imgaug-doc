@@ -659,6 +659,7 @@ contain the classes ``1`` or ``3``::
 
     import imgaug.augmenters as iaa
     aug = iaa.BlendAlphaSegMapClassIds(
+        [1, 3],
         foreground=iaa.AddToHue((-100, 100)))
 
 .. figure:: ../../images/overview_of_augmenters/blend/blendalphasegmapclassids_hue.jpg
