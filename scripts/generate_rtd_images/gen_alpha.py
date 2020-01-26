@@ -34,41 +34,41 @@ def chapter_alpha_masks_introduction():
     )
 
     seqs = [
-        iaa.Alpha(
+        iaa.BlendAlpha(
             (0.0, 1.0),
-            first=iaa.MedianBlur(11),
+            foreground=iaa.MedianBlur(11),
             per_channel=True
         ),
-        iaa.SimplexNoiseAlpha(
-            first=iaa.EdgeDetect(1.0),
+        iaa.BlendAlphaSimplexNoise(
+            foreground=iaa.EdgeDetect(1.0),
             per_channel=False
         ),
-        iaa.SimplexNoiseAlpha(
-            first=iaa.EdgeDetect(1.0),
-            second=iaa.ContrastNormalization((0.5, 2.0)),
+        iaa.BlendAlphaSimplexNoise(
+            foreground=iaa.EdgeDetect(1.0),
+            background=iaa.LinearContrast((0.5, 2.0)),
             per_channel=0.5
         ),
-        iaa.FrequencyNoiseAlpha(
-            first=iaa.Affine(
+        iaa.BlendAlphaFrequencyNoise(
+            foreground=iaa.Affine(
                 rotate=(-10, 10),
                 translate_px={"x": (-4, 4), "y": (-4, 4)}
             ),
-            second=iaa.AddToHueAndSaturation((-40, 40)),
+            background=iaa.AddToHueAndSaturation((-40, 40)),
             per_channel=0.5
         ),
-        iaa.SimplexNoiseAlpha(
-            first=iaa.SimplexNoiseAlpha(
-                first=iaa.EdgeDetect(1.0),
-                second=iaa.ContrastNormalization((0.5, 2.0)),
+        iaa.BlendAlphaSimplexNoise(
+            foreground=iaa.BlendAlphaSimplexNoise(
+                foreground=iaa.EdgeDetect(1.0),
+                background=iaa.LinearContrast((0.5, 2.0)),
                 per_channel=True
             ),
-            second=iaa.FrequencyNoiseAlpha(
+            second=iaa.BlendAlphaFrequencyNoise(
                 exponent=(-2.5, -1.0),
-                first=iaa.Affine(
+                foreground=iaa.Affine(
                     rotate=(-10, 10),
                     translate_px={"x": (-4, 4), "y": (-4, 4)}
                 ),
-                second=iaa.AddToHueAndSaturation((-40, 40)),
+                background=iaa.AddToHueAndSaturation((-40, 40)),
                 per_channel=True
             ),
             per_channel=True,
@@ -79,7 +79,7 @@ def chapter_alpha_masks_introduction():
 
     cells = []
     for seq in seqs:
-        images_aug = seq.augment_images(images)
+        images_aug = seq(images=images)
         cells.extend(images_aug)
 
     # ------------
@@ -107,13 +107,13 @@ def chapter_alpha_constant():
         dtype=np.uint8
     )
 
-    seq = iaa.Alpha(
+    seq = iaa.BlendAlpha(
         factor=(0.2, 0.8),
-        first=iaa.Sharpen(1.0, lightness=2),
-        second=iaa.CoarseDropout(p=0.1, size_px=8)
+        foreground=iaa.Sharpen(1.0, lightness=2),
+        background=iaa.CoarseDropout(p=0.1, size_px=8)
     )
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
@@ -122,7 +122,6 @@ def chapter_alpha_constant():
         "alpha_constant_example_basic.jpg",
         grid(images_aug, cols=4, rows=2)
     )
-
 
     # -----------------------------------------
     # example 2 (per channel)
@@ -139,14 +138,14 @@ def chapter_alpha_constant():
         dtype=np.uint8
     )
 
-    seq = iaa.Alpha(
+    seq = iaa.BlendAlpha(
         factor=(0.2, 0.8),
-        first=iaa.Sharpen(1.0, lightness=2),
-        second=iaa.CoarseDropout(p=0.1, size_px=8),
+        foreground=iaa.Sharpen(1.0, lightness=2),
+        background=iaa.CoarseDropout(p=0.1, size_px=8),
         per_channel=True
     )
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
@@ -155,7 +154,6 @@ def chapter_alpha_constant():
         "alpha_constant_example_per_channel.jpg",
         grid(images_aug, cols=4, rows=2)
     )
-
 
     # -----------------------------------------
     # example 3 (affine + per channel)
@@ -172,13 +170,13 @@ def chapter_alpha_constant():
         dtype=np.uint8
     )
 
-    seq = iaa.Alpha(
+    seq = iaa.BlendAlpha(
         factor=(0.2, 0.8),
-        first=iaa.Affine(rotate=(-20, 20)),
+        foreground=iaa.Affine(rotate=(-20, 20)),
         per_channel=True
     )
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
@@ -205,11 +203,11 @@ def chapter_alpha_masks_simplex():
         dtype=np.uint8
     )
 
-    seq = iaa.SimplexNoiseAlpha(
-        first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
+    seq = iaa.BlendAlphaSimplexNoise(
+        foreground=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
     )
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
@@ -218,7 +216,6 @@ def chapter_alpha_masks_simplex():
         "alpha_simplex_example_basic.jpg",
         grid(images_aug, cols=4, rows=2)
     )
-
 
     # -----------------------------------------
     # example 1 (per_channel)
@@ -235,12 +232,12 @@ def chapter_alpha_masks_simplex():
         dtype=np.uint8
     )
 
-    seq = iaa.SimplexNoiseAlpha(
-        first=iaa.EdgeDetect(1.0),
+    seq = iaa.BlendAlphaSimplexNoise(
+        foreground=iaa.EdgeDetect(1.0),
         per_channel=True
     )
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
@@ -249,7 +246,6 @@ def chapter_alpha_masks_simplex():
         "alpha_simplex_example_per_channel.jpg",
         grid(images_aug, cols=4, rows=2)
     )
-
 
     # -----------------------------------------
     # noise masks
@@ -260,11 +256,14 @@ def chapter_alpha_masks_simplex():
     seed = 1
     ia.seed(seed)
 
-    seq = iaa.SimplexNoiseAlpha(
-        first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
+    seq = iaa.BlendAlphaSimplexNoise(
+        foreground=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
     )
 
-    masks = [seq.factor.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i)) for i in range(16)]
+    masks = [
+        seq.factor.draw_samples(
+            (64, 64), random_state=ia.new_random_state(seed+1+i)
+        ) for i in range(16)]
     masks = np.hstack(masks)
     masks = np.tile(masks[:, :, np.newaxis], (1, 1, 1, 3))
     masks = (masks * 255).astype(np.uint8)
@@ -276,7 +275,6 @@ def chapter_alpha_masks_simplex():
         "alpha_simplex_noise_masks.jpg",
         grid(masks, cols=16, rows=1)
     )
-
 
     # -----------------------------------------
     # noise masks, upscale=nearest
@@ -292,7 +290,10 @@ def chapter_alpha_masks_simplex():
         upscale_method="nearest"
     )
 
-    masks = [seq.factor.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i)) for i in range(16)]
+    masks = [
+        seq.factor.draw_samples(
+            (64, 64), random_state=ia.new_random_state(seed+1+i)
+        ) for i in range(16)]
     masks = np.hstack(masks)
     masks = np.tile(masks[:, :, np.newaxis], (1, 1, 1, 3))
     masks = (masks * 255).astype(np.uint8)
@@ -305,7 +306,6 @@ def chapter_alpha_masks_simplex():
         grid(masks, cols=16, rows=1)
     )
 
-
     # -----------------------------------------
     # noise masks linear
     # -----------------------------------------
@@ -315,12 +315,15 @@ def chapter_alpha_masks_simplex():
     seed = 1
     ia.seed(seed)
 
-    seq = iaa.SimplexNoiseAlpha(
-        first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
+    seq = iaa.BlendAlphaSimplexNoise(
+        foreground=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
         upscale_method="linear"
     )
 
-    masks = [seq.factor.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i)) for i in range(16)]
+    masks = [
+        seq.factor.draw_samples(
+            (64, 64), random_state=ia.new_random_state(seed+1+i)
+        ) for i in range(16)]
     masks = np.hstack(masks)
     masks = np.tile(masks[:, :, np.newaxis], (1, 1, 1, 3))
     masks = (masks * 255).astype(np.uint8)
@@ -351,11 +354,11 @@ def chapter_alpha_masks_frequency():
         dtype=np.uint8
     )
 
-    seq = iaa.FrequencyNoiseAlpha(
+    seq = iaa.BlendAlphaFrequencyNoise(
         first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
     )
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
@@ -365,13 +368,11 @@ def chapter_alpha_masks_frequency():
         grid(images_aug, cols=4, rows=2)
     )
 
-
     # -----------------------------------------
     # example 1 (per_channel)
     # -----------------------------------------
     import imgaug as ia
     from imgaug import augmenters as iaa
-    from imgaug import parameters as iap
 
     ia.seed(1)
 
@@ -382,12 +383,12 @@ def chapter_alpha_masks_frequency():
         dtype=np.uint8
     )
 
-    seq = iaa.FrequencyNoiseAlpha(
-        first=iaa.EdgeDetect(1.0),
+    seq = iaa.BlendAlphaFrequencyNoise(
+        foreground=iaa.EdgeDetect(1.0),
         per_channel=True
     )
 
-    images_aug = seq.augment_images(images)
+    images_aug = seq(images=images)
 
     # ------------
 
@@ -396,7 +397,6 @@ def chapter_alpha_masks_frequency():
         "alpha_frequency_example_per_channel.jpg",
         grid(images_aug, cols=4, rows=2)
     )
-
 
     # -----------------------------------------
     # noise masks
@@ -408,11 +408,14 @@ def chapter_alpha_masks_frequency():
     seed = 1
     ia.seed(seed)
 
-    seq = iaa.FrequencyNoiseAlpha(
+    seq = iaa.BlendAlphaFrequencyNoise(
         first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True)
     )
 
-    masks = [seq.factor.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i)) for i in range(16)]
+    masks = [
+        seq.factor.draw_samples(
+            (64, 64), random_state=ia.new_random_state(seed+1+i)
+        ) for i in range(16)]
     masks = [np.tile(mask[:, :, np.newaxis], (1, 1, 3)) for mask in masks]
     masks = [(mask * 255).astype(np.uint8) for mask in masks]
 
@@ -423,7 +426,6 @@ def chapter_alpha_masks_frequency():
         "alpha_frequency_noise_masks.jpg",
         grid(masks, cols=8, rows=2)
     )
-
 
     # -----------------------------------------
     # noise masks, varying exponent
@@ -440,9 +442,9 @@ def chapter_alpha_masks_frequency():
     exponents = np.linspace(-4.0, 4.0, 16)
 
     for i, exponent in enumerate(exponents):
-        seq = iaa.FrequencyNoiseAlpha(
+        seq = iaa.BlendAlphaFrequencyNoise(
             exponent=exponent,
-            first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
+            foreground=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
             size_px_max=32,
             upscale_method="linear",
             iterations=1,
@@ -451,12 +453,23 @@ def chapter_alpha_masks_frequency():
 
         group = []
         for row in range(nb_rows):
-            mask = seq.factor.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i*10+row))
+            mask = seq.factor.draw_samples(
+                (64, 64), random_state=ia.new_random_state(seed+1+i*10+row))
             mask = np.tile(mask[:, :, np.newaxis], (1, 1, 3))
             mask = (mask * 255).astype(np.uint8)
             if row == nb_rows - 1:
-                mask = np.pad(mask, ((0, 20), (0, 0), (0, 0)), mode="constant", constant_values=255)
-                mask = ia.draw_text(mask, y=64+2, x=6, text="%.2f" % (exponent,), size=10, color=[0, 0, 0])
+                mask = np.pad(
+                    mask,
+                    ((0, 20), (0, 0), (0, 0)),
+                    mode="constant",
+                    constant_values=255)
+                mask = ia.draw_text(
+                    mask,
+                    y=64+2,
+                    x=6,
+                    text="%.2f" % (exponent,),
+                    size=10,
+                    color=[0, 0, 0])
             group.append(mask)
         masks.append(np.vstack(group))
 
@@ -468,7 +481,6 @@ def chapter_alpha_masks_frequency():
         grid(masks, cols=16, rows=1)
     )
 
-
     # -----------------------------------------
     # noise masks, upscale=nearest
     # -----------------------------------------
@@ -479,12 +491,15 @@ def chapter_alpha_masks_frequency():
     seed = 1
     ia.seed(seed)
 
-    seq = iaa.FrequencyNoiseAlpha(
+    seq = iaa.BlendAlphaFrequencyNoise(
         first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
         upscale_method="nearest"
     )
 
-    masks = [seq.factor.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i)) for i in range(16)]
+    masks = [
+        seq.factor.draw_samples(
+            (64, 64), random_state=ia.new_random_state(seed+1+i)
+        ) for i in range(16)]
     masks = [np.tile(mask[:, :, np.newaxis], (1, 1, 3)) for mask in masks]
     masks = [(mask * 255).astype(np.uint8) for mask in masks]
 
@@ -496,7 +511,6 @@ def chapter_alpha_masks_frequency():
         grid(masks, cols=8, rows=2)
     )
 
-
     # -----------------------------------------
     # noise masks linear
     # -----------------------------------------
@@ -507,12 +521,15 @@ def chapter_alpha_masks_frequency():
     seed = 1
     ia.seed(seed)
 
-    seq = iaa.FrequencyNoiseAlpha(
+    seq = iaa.BlendAlphaFrequencyNoise(
         first=iaa.Multiply(iap.Choice([0.5, 1.5]), per_channel=True),
         upscale_method="linear"
     )
 
-    masks = [seq.factor.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i)) for i in range(16)]
+    masks = [
+        seq.factor.draw_samples(
+            (64, 64), random_state=ia.new_random_state(seed+1+i)
+        ) for i in range(16)]
     masks = [np.tile(mask[:, :, np.newaxis], (1, 1, 3)) for mask in masks]
     masks = [(mask * 255).astype(np.uint8) for mask in masks]
 
@@ -548,12 +565,25 @@ def chapter_alpha_masks_iterative():
             aggregation_method="max"
         )
 
-        row = [noise.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i)) for i in range(16)]
+        row = [
+            noise.draw_samples(
+                (64, 64), random_state=ia.new_random_state(seed+1+i)
+            ) for i in range(16)]
         row = np.hstack(row)
         row = np.tile(row[:, :, np.newaxis], (1, 1, 3))
         row = (row * 255).astype(np.uint8)
-        row = np.pad(row, ((0, 0), (50, 0), (0, 0)), mode="constant", constant_values=255)
-        row = ia.draw_text(row, y=24, x=2, text="%d iter." % (iterations,), size=14, color=[0, 0, 0])
+        row = np.pad(
+            row,
+            ((0, 0), (50, 0), (0, 0)),
+            mode="constant",
+            constant_values=255)
+        row = ia.draw_text(
+            row,
+            y=24,
+            x=2,
+            text="%d iter." % (iterations,),
+            size=14,
+            color=[0, 0, 0])
         masks.append(row)
 
     # ------------
@@ -564,7 +594,6 @@ def chapter_alpha_masks_iterative():
         grid(masks, cols=1, rows=len(iterations_all))
     )
 
-
     # -----------------------------------------
     # IterativeNoiseAggregator varying methods
     # -----------------------------------------
@@ -574,7 +603,6 @@ def chapter_alpha_masks_iterative():
     seed = 1
     ia.seed(seed)
 
-    masks = []
     iterations_all = [1, 2, 3, 4, 5, 6]
     methods = ["min", "avg", "max"]
     cell_idx = 0
@@ -593,17 +621,42 @@ def chapter_alpha_masks_iterative():
                 aggregation_method=method
             )
 
-            cell = noise.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+method_idx))
+            cell = noise.draw_samples(
+                (64, 64), random_state=ia.new_random_state(seed+1+method_idx))
             cell = np.tile(cell[:, :, np.newaxis], (1, 1, 3))
             cell = (cell * 255).astype(np.uint8)
 
             if iterations == 1:
-                cell = np.pad(cell, ((0, 0), (40, 0), (0, 0)), mode="constant", constant_values=255)
-                cell = ia.draw_text(cell, y=27, x=2, text="%s" % (method,), size=14, color=[0, 0, 0])
+                cell = np.pad(
+                    cell,
+                    ((0, 0), (40, 0), (0, 0)),
+                    mode="constant",
+                    constant_values=255)
+                cell = ia.draw_text(
+                    cell,
+                    y=27,
+                    x=2,
+                    text="%s" % (method,),
+                    size=14,
+                    color=[0, 0, 0])
             if method_idx == 0:
-                cell = np.pad(cell, ((20, 0), (0, 0), (0, 0)), mode="constant", constant_values=255)
-                cell = ia.draw_text(cell, y=0, x=12+40*(iterations==1), text="%d iter." % (iterations,), size=14, color=[0, 0, 0])
-            cell = np.pad(cell, ((0, 1), (0, 1), (0, 0)), mode="constant", constant_values=255)
+                cell = np.pad(
+                    cell,
+                    ((20, 0), (0, 0), (0, 0)),
+                    mode="constant",
+                    constant_values=255)
+                cell = ia.draw_text(
+                    cell,
+                    y=0,
+                    x=12+40*(iterations == 1),
+                    text="%d iter." % (iterations,),
+                    size=14,
+                    color=[0, 0, 0])
+            cell = np.pad(
+                cell,
+                ((0, 1), (0, 1), (0, 0)),
+                mode="constant",
+                constant_values=255)
 
             row.append(cell)
             cell_idx += 1
@@ -640,12 +693,26 @@ def chapter_alpha_masks_sigmoid():
             activated=activated
         )
 
-        row = [noise.draw_samples((64, 64), random_state=ia.new_random_state(seed+1+i)) for i in range(16)]
+        row = [
+            noise.draw_samples(
+                (64, 64),
+                random_state=ia.new_random_state(seed+1+i))
+            for i in range(16)]
         row = np.hstack(row)
         row = np.tile(row[:, :, np.newaxis], (1, 1, 3))
         row = (row * 255).astype(np.uint8)
-        row = np.pad(row, ((0, 0), (90, 0), (0, 0)), mode="constant", constant_values=255)
-        row = ia.draw_text(row, y=17, x=2, text="activated=\n%s" % (activated,), size=14, color=[0, 0, 0])
+        row = np.pad(
+            row,
+            ((0, 0), (90, 0), (0, 0)),
+            mode="constant",
+            constant_values=255)
+        row = ia.draw_text(
+            row,
+            y=17,
+            x=2,
+            text="activated=\n%s" % (activated,),
+            size=14,
+            color=[0, 0, 0])
         masks.append(row)
 
     # ------------
@@ -670,11 +737,13 @@ def chapter_alpha_masks_sigmoid():
 
     class ConstantNoise(iap.StochasticParameter):
         def __init__(self, noise, seed):
+            super(ConstantNoise, self).__init__()
             self.noise = noise
             self.seed = seed
 
         def _draw_samples(self, size, random_state):
-            return self.noise.draw_samples(size, random_state=ia.new_random_state(self.seed))
+            return self.noise.draw_samples(
+                size, random_state=ia.new_random_state(self.seed))
 
     for rowidx in range(nb_rows):
         row = []
@@ -691,12 +760,24 @@ def chapter_alpha_masks_sigmoid():
                 threshold=threshold
             )
 
-            cell = noise.draw_samples((64, 64), random_state=ia.new_random_state(seed+tidx))
+            cell = noise.draw_samples(
+                (64, 64),
+                random_state=ia.new_random_state(seed+tidx))
             cell = np.tile(cell[:, :, np.newaxis], (1, 1, 3))
             cell = (cell * 255).astype(np.uint8)
             if rowidx == 0:
-                cell = np.pad(cell, ((20, 0), (0, 0), (0, 0)), mode="constant", constant_values=255)
-                cell = ia.draw_text(cell, y=2, x=15, text="%.1f" % (threshold,), size=14, color=[0, 0, 0])
+                cell = np.pad(
+                    cell,
+                    ((20, 0), (0, 0), (0, 0)),
+                    mode="constant",
+                    constant_values=255)
+                cell = ia.draw_text(
+                    cell,
+                    y=2,
+                    x=15,
+                    text="%.1f" % (threshold,),
+                    size=14,
+                    color=[0, 0, 0])
             row.append(cell)
         row = np.hstack(row)
         masks.append(row)
