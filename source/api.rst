@@ -22,6 +22,7 @@ API
    api_augmentables_utils
    api_augmenters_arithmetic
    api_augmenters_artistic
+   api_augmenters_base
    api_augmenters_blend
    api_augmenters_blur
    api_augmenters_collections
