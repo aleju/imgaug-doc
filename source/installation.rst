@@ -41,7 +41,8 @@ If you encounter any problems with ``Shapely``, try the following::
     pip install --no-dependencies imgaug
 
 The first command installs manually all dependencies except ``Shapely``, the
-second only the library.
+second only the library. Note that Shapely is required for some operations,
+mainly when operating with line strings or polygons.
 
 The version installed above is the latest official release from pypi. That
 release often lags behind the latest version from github by a few months.
