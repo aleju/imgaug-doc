@@ -36,6 +36,9 @@ def main():
     generate_change_color_temperature()
     generate_posterize()
 
+    # randaugment
+    generate_randaugment()
+
     # debug
     generate_debug()
 
@@ -187,7 +190,7 @@ def generate_randaugment():
 
     image = ia.quokka((128, 128))
     images_aug = [image]
-    images_aug.extend(iaa.RandAugment(m=20)(images=(2 * 8 - 1)))
+    images_aug.extend(iaa.RandAugment(m=20)(images=[image] * (2 * 8 - 1)))
     _save("randaugment.jpg", ia.draw_grid(images_aug, cols=8, rows=2))
 
 
