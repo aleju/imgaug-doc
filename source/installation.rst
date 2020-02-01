@@ -3,11 +3,10 @@ Installation
 ============
 
 The library uses python, which must be installed.
-Python 2.7, 3.4, 3.5, 3.6 and 3.7 are supported.
+Python 2.7, 3.4, 3.5, 3.6, 3.7 and 3.8 are supported.
 
-The below sections explain how to install the library in anaconda or via pip.
-If you don't know what anaconda (or conda) are, simply use pip instead as
-that should always work.
+The below sections explain how to install the library in anaconda and pip.
+If you don't know what anaconda (aka conda) is, simply use pip instead.
 
 ------------------------
 Installation in Anaconda
@@ -21,50 +20,40 @@ To install in anaconda simply perform the following commands ::
 Note that you may also use the pip-based installation commands described below.
 They work with and without anaconda.
 
+To also be able to use the augmenters in ``imgaug.augmenters.imgcorruptlike``,
+you have to manually install the ``imagecorruptions`` package::
+
+    pip install imagecorruptions
 
 -------------------
 Installation in pip
 -------------------
 
-Install Requirements
---------------------
-
-To install all requirements, use ::
-
-    pip install six numpy scipy Pillow matplotlib scikit-image opencv-python imageio Shapely
-
-Note that if you already have OpenCV, you might not need ``opencv-python``.
-If you get any "permission denied" errors, try adding ``sudo`` in front of the command.
-If your encounter issues installing ``Shapely`` you can skip that library.
-It is only imported when actually needed. At least polygon and line string
-augmentation will likely crash without it.
-
-Install Library
----------------
-
-Once the required packages are available, ``imgaug`` can be installed using
-the following command::
+To install the library via ``pip``, simply execute::
 
     pip install imgaug
 
-This installs the latest version from pypi, which often lags behind the
-latest version on github by a few months.
-To instead get the very latest version use ::
+This installs the latest version from pypi.
 
-    pip install git+https://github.com/aleju/imgaug
+If you encounter any problems with ``Shapely``, try the following::
 
+    pip install six numpy scipy Pillow matplotlib scikit-image opencv-python imageio
+    pip install --no-dependencies imgaug
 
+The first command installs manually all dependencies except ``Shapely``, the
+second only the library.
 
-------------------------
-Installation from Source
-------------------------
+The version installed above is the latest official release from pypi. That
+release often lags behind the latest version from github by a few months.
+To instead install the very latest version of imgaug use ::
 
-In rare cases, one might prefer to install directly from source.
-This is possible using ::
+    pip install git+https://github.com/aleju/imgaug.git
 
-    git clone https://github.com/aleju/imgaug.git && cd imgaug && python setup.py install
+Independent of whether you install from pypi or github, in order to
+be able to use the augmenters in ``imgaug.augmenters.imgcorruptlike``,
+you have to manually install the ``imagecorruptions`` package::
 
-Note that this is effectively identical to using ``pip install <github link>``.
+    pip install imagecorruptions
 
 
 ---------
