@@ -126,7 +126,13 @@ def generate_cartoon():
     images_aug.append(image2)
     images_aug.extend(iaa.Cartoon()(images=[image2] * 3))
 
-    _save("cartoon.jpg", ia.draw_grid(images_aug, cols=4, rows=2))
+    # if we use a single draw_grid() call here, the function will currently
+    # add an ugly black border at the bottom of the first row, because the
+    # height of image1 is lower than of image2 and it will ensure that both
+    # rows have the same height
+    row1 = ia.draw_grid(images_aug[0:4], cols=4, rows=1)
+    row2 = ia.draw_grid(images_aug[4:], cols=4, rows=1)
+    _save("cartoon.jpg", np.vstack([row1, row2]))
 
 
 def generate_mean_shift_blur():
