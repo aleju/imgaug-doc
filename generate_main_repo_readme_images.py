@@ -574,7 +574,10 @@ def draw_per_augmenter_videos():
 
         def render_main(self):
             urls_str = ", ".join([url.render() for url in self.urls])
-            return "See also: %s" % (urls_str,)
+            return "<td colspan=\"%d\">See also: %s</td>" % (
+                self.colspan,
+                urls_str
+            )
 
         def render_comment(self):
             return ""
