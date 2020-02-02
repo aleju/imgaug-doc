@@ -4008,7 +4008,7 @@ class PerspectiveTransform(meta.Augmenter):
 
         matrix_expanded = cv2.getPerspectiveTransform(rect, dst)
         max_width, max_height = dst.max(axis=0)
-        return matrix_expanded, max_width, max_height
+        return matrix_expanded, int(max_width), int(max_height)
 
     def get_parameters(self):
         """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
@@ -5921,8 +5921,10 @@ class Jigsaw(meta.Augmenter):
                                    "line_strings"]])
         if has_other_cbaoi:
             raise NotImplementedError(
-                "Jigsaw currently only supports augmentation of images "
-                "and keypoints.")
+                "Jigsaw currently only supports augmentation of images, "
+                "heatmaps, segmentation maps and keypoints. "
+                "Explicitly not supported are: bounding boxes, polygons "
+                "and line strings.")
 
         # We don't crop back to the original size, partly because it is
         # rather cumbersome to implement, partly because the padded

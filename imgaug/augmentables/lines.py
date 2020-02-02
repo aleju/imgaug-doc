@@ -644,9 +644,15 @@ class LineString(object):
             intersections_points = []
             for inter in intersections:
                 if isinstance(inter, shapely.geometry.linestring.LineString):
-                    inter_start = (inter.coords[0][0], inter.coords[0][1])
-                    inter_end = (inter.coords[-1][0], inter.coords[-1][1])
-                    intersections_points.extend([inter_start, inter_end])
+                    # Since shapely 1.7a2 (tested in python 3.8),
+                    # .intersection() apprently can return LINE STRING EMPTY
+                    # (i.e. .coords is an empty list). Before that, the result
+                    # of .intersection() was just []. Hence, we first check
+                    # the length here.
+                    if len(inter.coords) > 0:
+                        inter_start = (inter.coords[0][0], inter.coords[0][1])
+                        inter_end = (inter.coords[-1][0], inter.coords[-1][1])
+                        intersections_points.extend([inter_start, inter_end])
                 else:
                     assert isinstance(inter, shapely.geometry.point.Point), (
                         "Expected to find shapely.geometry.point.Point or "
@@ -664,7 +670,7 @@ class LineString(object):
             result.append(inter_sorted)
         return result
 
-    def shift_(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
+    def shift_(self, x=0, y=0):
         """Move this line string along the x/y-axis in-place.
 
         The origin ``(0, 0)`` is at the top left of the image.
@@ -681,26 +687,6 @@ class LineString(object):
             Value to be added to all y-coordinates. Positive values shift
             towards the bottom images.
 
-        top : None or int, optional
-            Deprecated since 0.4.0.
-            Amount of pixels by which to shift this object *from* the
-            top (towards the bottom).
-
-        right : None or int, optional
-            Deprecated since 0.4.0.
-            Amount of pixels by which to shift this object *from* the
-            right (towards the left).
-
-        bottom : None or int, optional
-            Deprecated since 0.4.0.
-            Amount of pixels by which to shift this object *from* the
-            bottom (towards the top).
-
-        left : None or int, optional
-            Deprecated since 0.4.0.
-            Amount of pixels by which to shift this object *from* the
-            left (towards the right).
-
         Returns
         -------
         result : imgaug.augmentables.lines.LineString
@@ -708,8 +694,6 @@ class LineString(object):
             The object may have been modified in-place.
 
         """
-        x, y = _normalize_shift_args(
-            x, y, top=top, right=right, bottom=bottom, left=left)
         self.coords[:, 0] += x
         self.coords[:, 1] += y
         return self
@@ -755,9 +739,9 @@ class LineString(object):
             Shifted line string.
 
         """
-        return self.deepcopy().shift_(x=x, y=y,
-                                      top=top, right=right,
-                                      bottom=bottom, left=left)
+        x, y = _normalize_shift_args(
+            x, y, top=top, right=right, bottom=bottom, left=left)
+        return self.deepcopy().shift_(x=x, y=y)
 
     def draw_mask(self, image_shape, size_lines=1, size_points=0,
                   raise_if_out_of_image=False):
@@ -2091,7 +2075,7 @@ class LineStringsOnImage(IAugmentable):
         """
         return self.copy().clip_out_of_image_()
 
-    def shift_(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
+    def shift_(self, x=0, y=0):
         """Move the line strings along the x/y-axis in-place.
 
         The origin ``(0, 0)`` is at the top left of the image.
@@ -2108,26 +2092,6 @@ class LineStringsOnImage(IAugmentable):
             Value to be added to all y-coordinates. Positive values shift
             towards the bottom images.
 
-        top : None or int, optional
-            Deprecated since 0.4.0.
-            Amount of pixels by which to shift all objects *from* the
-            top (towards the bottom).
-
-        right : None or int, optional
-            Deprecated since 0.4.0.
-            Amount of pixels by which to shift all objects *from* the
-            right (towads the left).
-
-        bottom : None or int, optional
-            Deprecated since 0.4.0.
-            Amount of pixels by which to shift all objects *from* the
-            bottom (towards the top).
-
-        left : None or int, optional
-            Deprecated since 0.4.0.
-            Amount of pixels by which to shift all objects *from* the
-            left (towards the right).
-
         Returns
         -------
         imgaug.augmentables.lines.LineStringsOnImage
@@ -2136,9 +2100,7 @@ class LineStringsOnImage(IAugmentable):
 
         """
         for i, ls in enumerate(self.line_strings):
-            self.line_strings[i] = ls.shift_(x=x, y=y,
-                                             top=top, right=right,
-                                             bottom=bottom, left=left)
+            self.line_strings[i] = ls.shift_(x=x, y=y)
         return self
 
     def shift(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
@@ -2182,9 +2144,9 @@ class LineStringsOnImage(IAugmentable):
             Shifted line strings.
 
         """
-        return self.deepcopy().shift_(x=x, y=y,
-                                      top=top, right=right,
-                                      bottom=bottom, left=left)
+        x, y = _normalize_shift_args(
+            x, y, top=top, right=right, bottom=bottom, left=left)
+        return self.deepcopy().shift_(x=x, y=y)
 
     def to_xy_array(self):
         """Convert all line string coordinates to one array of shape ``(N,2)``.
