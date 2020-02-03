@@ -110,7 +110,7 @@ def grid(images, rows, cols, border=1, border_color=255):
                 #if col_idx > 1:
                 #border_left = 0
                 #image = np.pad(image, ((border_top, border_bottom), (border_left, border_right), (0, 0)), mode="constant", constant_values=border_color)
-                image = ia.pad(
+                image = iaa.pad(
                     image,
                     top=border_top,
                     right=border_right,
@@ -141,7 +141,7 @@ def checkerboard(size):
     return ia.imresize_single_image(img3d, size)
 
 
-def run_and_save_augseq(filename, augseq, images, cols, rows, quality=75,
+def run_and_save_augseq(filename, augseq, images, cols, rows, quality=95,
                         seed=1, image_colorspace="RGB"):
     ia.seed(seed)
     # augseq may be a single seq (applied to all images) or a list (one seq per

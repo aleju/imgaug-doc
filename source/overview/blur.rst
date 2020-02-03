@@ -112,3 +112,28 @@ of either ``-45`` or ``45`` degrees (randomly picked per image)::
 .. figure:: ../../images/overview_of_augmenters/blur/motionblur_angle.jpg
     :alt: MotionBlur with choice of angles
 
+
+MeanShiftBlur
+-------------
+
+Apply a pyramidic mean shift filter to each image.
+
+See also :func:`~imgaug.augmenters.blur.blur_mean_shift_` for details.
+
+This augmenter expects input images of shape ``(H,W)`` or ``(H,W,1)``
+or ``(H,W,3)``.
+
+.. note::
+
+    This augmenter is quite slow.
+
+API link: :class:`~imgaug.augmenters.blur.MeanShiftBlur`
+
+**Example.**
+Create a mean shift blur augmenter::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.MeanShiftBlur()
+
+.. figure:: ../../images/overview_of_augmenters/blur/meanshiftblur.jpg
+    :alt: MeanShiftBlur

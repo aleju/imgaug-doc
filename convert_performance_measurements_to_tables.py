@@ -5,18 +5,21 @@ import numpy as np
 import dashtable
 
 EXP_NAME_MAPPING = OrderedDict([
-    ("Sequential_2xNoop", "Sequential (2xNoop)"),
-    ("Sequential_2xNoop_random_order", "Sequential (2xNoop, random_order)"),
-    ("SomeOf_3xNoop", "SomeOf (1-3, 3xNoop)"),
-    ("SomeOf_3xNoop_random_order", "SomeOf (1-3, 3xNoop, random_order)"),
-    ("OneOf_3xNoop", "OneOf (3xNoop)"),
-    ("Sometimes_Noop", "Sometimes (Noop)"),
-    ("WithChannels_1_and_2_Noop", "WithChannels ([1,2], Noop)"),
+    # meta
+    ("Sequential_2xNoop", "Sequential (2xIdentity)"),
+    ("Sequential_2xNoop_random_order", "Sequential (2xIdentity, random_order)"),
+    ("SomeOf_3xNoop", "SomeOf (1-3, 3xIdentity)"),
+    ("SomeOf_3xNoop_random_order", "SomeOf (1-3, 3xIdentity, random_order)"),
+    ("OneOf_3xNoop", "OneOf (3xIdentity)"),
+    ("Sometimes_Noop", "Sometimes (Identity)"),
+    ("WithChannels_1_and_2_Noop", "WithChannels ([1,2], Identity)"),
+    ("Identity", "Identity"),
     ("Noop", "Noop"),
     ("Lambda", "Lambda (return input)"),
     ("AssertLambda", "AssertLambda (return True)"),
     ("AssertShape", "AssertShape (None, H, W, None)"),
     ("ChannelShuffle", "ChannelShuffle (0.5)"),
+    # arithmetic
     ("Add", "Add"),
     ("AddElementwise", "AddElementwise"),
     ("AdditiveGaussianNoise", "AdditiveGaussianNoise"),
@@ -24,8 +27,11 @@ EXP_NAME_MAPPING = OrderedDict([
     ("AdditivePoissonNoise", "AdditivePoissonNoise"),
     ("Multiply", "Multiply"),
     ("MultiplyElementwise", "MultiplyElementwise"),
+    ("Cutout-fill_constant", "Cutout (1 iter, constant fill)"),
     ("Dropout", "Dropout (1-5%)"),
     ("CoarseDropout", "CoarseDropout (1-5%, size=1-10%)"),
+    ("Dropout2d", "Dropout2d (10%)"),
+    ("TotalDropout", "TotalDropout (10%)"),
     ("ReplaceElementwise", "ReplaceElementwise"),
     ("ImpulseNoise", "ImpulseNoise"),
     ("SaltAndPepper", "SaltAndPepper"),
@@ -36,20 +42,38 @@ EXP_NAME_MAPPING = OrderedDict([
     ("CoarsePepper", "CoarsePepper"),
     ("Invert", "Invert (10%)"),
     ("JpegCompression", "JpegCompression (50-99%)"),
-    ("Alpha", "Alpha (Noop)"),
-    ("AlphaElementwise", "AlphaElementwise (Noop)"),
-    ("SimplexNoiseAlpha", "SimplexNoiseAlpha (Noop)"),
-    ("FrequencyNoiseAlpha", "FrequencyNoiseAlpha (Noop)"),
+    # artistic
+    ("Cartoon", "Cartoon"),
+    # blend
+    ("Alpha", "BlendAlpha (Identity)"),
+    ("AlphaElementwise", "BlendAlphaElementwise (Identity)"),
+    ("SimplexNoiseAlpha", "BlendAlphaSimplexNoise (Identity)"),
+    ("FrequencyNoiseAlpha", "BlendAlphaFrequencyNoise (Identity)"),
+    ("BlendAlphaSomeColors", "BlendAlphaSomeColors (Identity)"),
+    ("BlendAlphaHorizontalLinearGradient", "BlendAlphaHorizontalL.Grad. (Identity)"),
+    ("BlendAlphaVerticalLinearGradient", "BlendAlphaVerticalL.Grad. (Identity)"),
+    ("BlendAlphaRegularGrid", "BlendAlphaRegularGrid (Identity)"),
+    ("BlendAlphaCheckerboard", "BlendAlphaCheckerboard (Identity)"),
+    # blur
     ("GaussianBlur", "GaussianBlur (sigma=(1,5))"),
     ("AverageBlur", "AverageBlur"),
     ("MedianBlur", "MedianBlur"),
     ("BilateralBlur", "BilateralBlur"),
     ("MotionBlur", "MotionBlur"),
-    ("WithColorspace", "WithColorspace (HSV, Noop)"),
+    ("MeanShiftBlur", "MeanShiftBlur"),
+    # collections
+    ("RandAugment", "RandAugment (n=2, m=(6,12))"),
+    # color
+    ("WithColorspace", "WithColorspace (HSV, Identity)"),
+    ("WithBrightnessChannels", "WithBrightnessChannels (Identity)"),
+    ("MultiplyAndAddToBrightness", "MultiplyAndAddToBrightness"),
+    ("MultiplyBrightness", "MultiplyBrightness"),
+    ("AddToBrightness", "AddToBrightness"),
     ("WithHueAndSaturation", "WithHueAndSaturation"),
     ("MultiplyHueAndSaturation", "MultiplyHueAndSaturation"),
     ("MultiplyHue", "MultiplyHue"),
     ("MultiplySaturation", "MultiplySaturation"),
+    ("RemoveSaturation", "RemoveSaturation"),
     ("AddToHueAndSaturation", "AddToHueAndSaturation"),
     ("AddToHue", "AddToHue"),
     ("AddToSaturation", "AddToSaturation"),
@@ -57,6 +81,9 @@ EXP_NAME_MAPPING = OrderedDict([
     ("Grayscale", "Grayscale"),
     ("KMeansColorQuantization", "KMeansColorQuantization (2-16 colors)"),
     ("UniformColorQuantization", "UniformColorQuantization (2-16 colors)"),
+    ("UniformQuantizationToNBits", "UniformColorQuant.NBits (1-7 bits)"),
+    ("Posterize", "Posterize (1-7 bits)"),
+    # contrast
     ("GammaContrast", "GammaContrast"),
     ("SigmoidContrast", "SigmoidContrast"),
     ("LogContrast", "LogContrast"),
@@ -65,14 +92,18 @@ EXP_NAME_MAPPING = OrderedDict([
     ("HistogramEqualization", "HistogramEqualization"),
     ("AllChannelsCLAHE", "AllChannelsCLAHE"),
     ("CLAHE", "CLAHE"),
+    # convolutional
     ("Convolve_3x3", "Convolve (3x3)"),
     ("Sharpen", "Sharpen"),
     ("Emboss", "Emboss"),
     ("EdgeDetect", "EdgeDetect"),
     ("DirectedEdgeDetect", "DirectedEdgeDetect"),
+    # edges
     ("Canny", "Canny"),
+    # flip
     ("Fliplr", "Fliplr (p=100%)"),
     ("Flipud", "Flipud (p=100%)"),
+    # geometric
     ("Affine_order_0_constant", "Affine (order=0, constant)"),
     ("Affine_order_1_constant", "Affine (order=1, constant)"),
     ("Affine_order_3_constant", "Affine (order=3, constant)"),
@@ -90,6 +121,9 @@ EXP_NAME_MAPPING = OrderedDict([
     ("ElasticTransformation_order_1_reflect", "ElasticTransformation (order=1, reflect)"),
     ("Rot90", "Rot90"),
     ("Rot90_keep_size", "Rot90 (keep_size)"),
+    ("WithPolarWarping", "WithPolarWarping (Identity)"),
+    ("Jigsaw", "Jigsaw (rows/cols=(3,8), 1 step)"),
+    # pooling
     ("AveragePooling", "AveragePooling"),
     ("AveragePooling_keep_size", "AveragePooling (keep_size)"),
     ("MaxPooling", "MaxPooling"),
@@ -98,6 +132,47 @@ EXP_NAME_MAPPING = OrderedDict([
     ("MinPooling_keep_size", "MinPooling (keep_size)"),
     ("MedianPooling", "MedianPooling"),
     ("MedianPooling_keep_size", "MedianPooling (keep_size)"),
+    # imgcorruptlike
+    ("imgcorruptlike.GaussianNoise", "imgcorruptlike.GaussianNoise((1,5))"),
+    ("imgcorruptlike.ShotNoise", "imgcorruptlike.ShotNoise((1,5))"),
+    ("imgcorruptlike.ImpulseNoise", "imgcorruptlike.ImpulseNoise((1,5))"),
+    ("imgcorruptlike.SpeckleNoise", "imgcorruptlike.SpeckleNoise((1,5))"),
+    ("imgcorruptlike.GaussianBlur", "imgcorruptlike.GaussianBlur((1,5))"),
+    ("imgcorruptlike.GlassBlur", "imgcorruptlike.GlassBlur((1,5))"),
+    ("imgcorruptlike.DefocusBlur", "imgcorruptlike.DefocusBlur((1,5))"),
+    ("imgcorruptlike.MotionBlur", "imgcorruptlike.MotionBlur((1,5))"),
+    ("imgcorruptlike.ZoomBlur", "imgcorruptlike.ZoomBlur((1,5))"),
+    ("imgcorruptlike.Fog", "imgcorruptlike.Fog((1,5))"),
+    ("imgcorruptlike.Frost", "imgcorruptlike.Frost((1,5))"),
+    ("imgcorruptlike.Snow", "imgcorruptlike.Snow((1,5))"),
+    ("imgcorruptlike.Spatter", "imgcorruptlike.Spatter((1,5))"),
+    ("imgcorruptlike.Contrast", "imgcorruptlike.Contrast((1,5))"),
+    ("imgcorruptlike.Brightness", "imgcorruptlike.Brightness((1,5))"),
+    ("imgcorruptlike.Saturate", "imgcorruptlike.Saturate((1,5))"),
+    ("imgcorruptlike.JpegCompression", "imgcorruptlike.JpegCompression((1,5))"),
+    ("imgcorruptlike.Pixelate", "imgcorruptlike.Pixelate((1,5))"),
+    ("imgcorruptlike.ElasticTransform", "imgcorruptlike.ElasticTransform((1,5))"),
+    # pillike
+    ("pillike.Solarize", "pillike.Solarize (p=1.0)"),
+    ("pillike.Posterize", "pillike.Posterize (1-7 bits)"),
+    ("pillike.Equalize", "pillike.Equalize"),
+    ("pillike.Autocontrast", "pillike.Autocontrast"),
+    ("pillike.EnhanceColor", "pillike.EnhanceColor"),
+    ("pillike.EnhanceContrast", "pillike.EnhanceContrast"),
+    ("pillike.EnhanceBrightness", "pillike.EnhanceBrightness"),
+    ("pillike.EnhanceSharpness", "pillike.EnhanceSharpness"),
+    ("pillike.FilterBlur", "pillike.FilterBlur"),
+    ("pillike.FilterSmooth", "pillike.FilterSmooth"),
+    ("pillike.FilterSmoothMore", "pillike.FilterSmoothMore"),
+    ("pillike.FilterEdgeEnhance", "pillike.FilterEdgeEnhance"),
+    ("pillike.FilterEdgeEnhanceMore", "pillike.FilterEdgeEnhanceMore"),
+    ("pillike.FilterFindEdges", "pillike.FilterFindEdges"),
+    ("pillike.FilterContour", "pillike.FilterContour"),
+    ("pillike.FilterEmboss", "pillike.FilterEmboss"),
+    ("pillike.FilterSharpen", "pillike.FilterSharpen"),
+    ("pillike.FilterDetail", "pillike.FilterDetail"),
+    ("pillike.Affine", "pillike.Affine"),
+    # segmentation
     ("Superpixels_max_size_64_cubic", "Superpixels (max_size=64, cubic)"),
     ("Superpixels_max_size_64_linear", "Superpixels (max_size=64, linear)"),
     ("Superpixels_max_size_128_linear", "Superpixels (max_size=128, linear)"),
@@ -105,6 +180,7 @@ EXP_NAME_MAPPING = OrderedDict([
     ("UniformVoronoi", "UniformVoronoi<br>(250-1000k points, linear)"),
     ("RegularGridVoronoi", "RegularGridVoronoi<br>(16-31 rows/cols)"),
     ("RelativeRegularGridVoronoi", "RelativeRegularGridVoronoi<br>(7%-14% rows/cols)"),
+    # size
     #("Scale_nearest", "Resize (nearest)"),  # legacy support
     #("Scale_linear", "Resize (linear)"),  # legacy support
     #("Scale_cubic", "Resize (cubic)"),  # legacy support
@@ -124,17 +200,20 @@ EXP_NAME_MAPPING = OrderedDict([
     ("KeepSizeByResize_CropToFixedSize_nearest", "KeepSizeByResize<br>(CropToFixedSize(nearest))"),
     ("KeepSizeByResize_CropToFixedSize_linear", "KeepSizeByResize<br>(CropToFixedSize(linear))"),
     ("KeepSizeByResize_CropToFixedSize_cubic", "KeepSizeByResize<br>(CropToFixedSize(cubic))"),
+    # weather
     ("FastSnowyLandscape", "FastSnowyLandscape"),
     ("Clouds", "Clouds"),
     ("Fog", "Fog"),
     ("CloudLayer", "CloudLayer"),
     ("Snowflakes", "Snowflakes"),
-    ("SnowflakesLayer", "SnowflakesLayer")
+    ("SnowflakesLayer", "SnowflakesLayer"),
+    ("Rain", "Rain"),
+    ("RainLayer", "RainLayer")
 ])
 
 
 def main():
-    dir_path = os.path.join("measure_performance_results", "030")
+    dir_path = os.path.join("measure_performance_results", "040")
     with open(os.path.join(dir_path, "results_images.pickle"), "rb") as f:
         measurements_images = pickle.load(f)
 
@@ -234,13 +313,22 @@ def main():
 
     for augmenter_name, exp_name in EXP_NAME_MAPPING.items():
         for table, index in zip([heatmaps_table_imgs_per_sec, heatmaps_table_mbits_per_sec], [0, 1]):
-            table.add_row(
-                exp_name,
-                res_a_bsize_a=rows[augmenter_name][("a", "a")][index],
-                res_a_bsize_b=rows[augmenter_name][("a", "b")][index],
-                res_b_bsize_a=rows[augmenter_name][("b", "a")][index],
-                res_b_bsize_b=rows[augmenter_name][("b", "b")][index]
-            )
+            if len(rows[augmenter_name]) == 0:
+                table.add_row(
+                    exp_name,
+                    res_a_bsize_a="n/a",
+                    res_a_bsize_b="n/a",
+                    res_b_bsize_a="n/a",
+                    res_b_bsize_b="n/a"
+                )
+            else:
+                table.add_row(
+                    exp_name,
+                    res_a_bsize_a=rows[augmenter_name][("a", "a")][index],
+                    res_a_bsize_b=rows[augmenter_name][("a", "b")][index],
+                    res_b_bsize_a=rows[augmenter_name][("b", "a")][index],
+                    res_b_bsize_b=rows[augmenter_name][("b", "b")][index]
+                )
 
     # Without adding one dummy line, the last augmenter is skipped. If only adding one dummy line, the last augmenter
     # is broken (0s appear in cells).
@@ -288,13 +376,24 @@ def main():
 
     for augmenter_name, exp_name in EXP_NAME_MAPPING.items():
         for table, index in zip([keypoints_table_imgs_per_sec, keypoints_table_mbits_per_sec], [0, 1]):
-            table.add_row(
-                exp_name,
-                res_a_bsize_a=rows[augmenter_name][("a", "a")][index],
-                res_a_bsize_b=rows[augmenter_name][("a", "b")][index],
-                res_b_bsize_a=rows[augmenter_name][("b", "a")][index],
-                res_b_bsize_b=rows[augmenter_name][("b", "b")][index]
-            )
+            if len(rows[augmenter_name]) == 0:
+                table.add_row(
+                    exp_name,
+                    res_a_bsize_a="n/a",
+                    res_a_bsize_b="n/a",
+                    res_b_bsize_a="n/a",
+                    res_b_bsize_b="n/a"
+                )
+            else:
+                # (a, a) = KPs on 64x64 with B=1 -> no longer measured
+                # (a, b) = KPs on 64x64 with B=128 -> no longer measured
+                table.add_row(
+                    exp_name,
+                    res_a_bsize_a="n/a",
+                    res_a_bsize_b="n/a",
+                    res_b_bsize_a=rows[augmenter_name][("b", "a")][index],
+                    res_b_bsize_b=rows[augmenter_name][("b", "b")][index]
+                )
 
     # Without adding one dummy line, the last augmenter is skipped. If only adding one dummy line, the last augmenter
     # is broken (0s appear in cells).
@@ -373,9 +472,19 @@ class TableForHeatmapsData(object):
         })
 
     def render_html(self):
-        fmt = tuple([self.cell_format] * 4)
+        fmt = list([self.cell_format] * 4)
+
         rows_html = ""
         for row in self.rows:
+            fmt_row = fmt[:]
+
+            for index, name in enumerate(["res_a_bsize_a",
+                                          "res_a_bsize_b",
+                                          "res_b_bsize_a",
+                                          "res_b_bsize_b"]):
+                if row[name] == "n/a":
+                    fmt_row[index] = "s"
+
             rows_html += ("""
             <tr>
                 <td>{augmenter:s}</td>
@@ -383,7 +492,7 @@ class TableForHeatmapsData(object):
                 <td>{res_a_bsize_b:%s}</td>
                 <td>{res_b_bsize_a:%s}</td>
                 <td>{res_b_bsize_b:%s}</td>
-            </tr>""" % fmt).format(**row)
+            </tr>""" % tuple(fmt_row)).format(**row)
 
         out = """
         <table>
@@ -422,29 +531,39 @@ class TableForKeypointsData(object):
         })
 
     def render_html(self):
-        fmt = tuple([self.cell_format] * 4)
+        fmt = list([self.cell_format] * 4)
+
         rows_html = ""
         for row in self.rows:
+            fmt_row = fmt[:]
+
+            for index, name in enumerate(["res_a_bsize_a",
+                                          "res_a_bsize_b",
+                                          "res_b_bsize_a",
+                                          "res_b_bsize_b"]):
+                if row[name] == "n/a":
+                    fmt_row[index] = "s"
+
             rows_html += ("""
             <tr>
                 <td>{augmenter:s}</td>
-                <td>{res_a_bsize_a:%s}</td>
-                <td>{res_a_bsize_b:%s}</td>
+                <!--<td>{res_a_bsize_a:%s}</td>-->
+                <!--<td>{res_a_bsize_b:%s}</td>-->
                 <td>{res_b_bsize_a:%s}</td>
                 <td>{res_b_bsize_b:%s}</td>
-            </tr>""" % fmt).format(**row)
+            </tr>""" % tuple(fmt_row)).format(**row)
 
         out = """
         <table>
             <tr>
                 <th></th>
-                <th colspan=2>10 KPs on 64x64x3</th>
+                <!--<th colspan=2>10 KPs on 64x64x3</th>-->
                 <th colspan=2>10 KPs on 224x224x3</th>
             </tr>
             <tr>
                 <th>Augmenter</th>
-                <th>B=1</th>
-                <th>B=128</th>
+                <!--<th>B=1</th>-->
+                <!--<th>B=128</th>-->
                 <th>B=1</th>
                 <th>B=128</th>
             </tr>

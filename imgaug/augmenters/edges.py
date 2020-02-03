@@ -1,22 +1,13 @@
 """
 Augmenters that deal with edge detection.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.Canny()
-    ])
-
 List of augmenters:
 
-    * Canny
+    * :class:`Canny`
 
-EdgeDetect and DirectedEdgeDetect are currently still in `convolutional.py`.
+:class:`~imgaug.augmenters.convolutional.EdgeDetect` and
+:class:`~imgaug.augmenters.convolutional.DirectedEdgeDetect` are currently
+still in ``convolutional.py``.
 
 """
 from __future__ import print_function, division, absolute_import
@@ -27,9 +18,10 @@ import numpy as np
 import cv2
 import six
 
+import imgaug as ia
+from imgaug.imgaug import _normalize_cv2_input_arr_
 from . import meta
 from . import blend
-import imgaug as ia
 from .. import parameters as iap
 from .. import dtypes as iadt
 
@@ -38,6 +30,8 @@ from .. import dtypes as iadt
 #      re-used wherever a binary image is the result
 @six.add_metaclass(ABCMeta)
 class IBinaryImageColorizer(object):
+    """Interface for classes that convert binary masks to color images."""
+
     @abstractmethod
     def colorize(self, image_binary, image_original, nth_image, random_state):
         """
@@ -167,14 +161,14 @@ class RandomColorsBinaryImageColorizer(IBinaryImageColorizer):
     def __str__(self):
         return ("RandomColorsBinaryImageColorizer("
                 "color_true=%s, color_false=%s)") % (
-            self.color_true, self.color_false)
+                    self.color_true, self.color_false)
 
 
 class Canny(meta.Augmenter):
     """
     Apply a canny edge detector to input images.
 
-    dtype support::
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: no; not tested
@@ -262,14 +256,22 @@ class Canny(meta.Augmenter):
         color that was uniformly randomly sampled from the space of all
         ``uint8`` colors.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -320,8 +322,11 @@ class Canny(meta.Augmenter):
                  hysteresis_thresholds=((100-40, 100+40), (200-40, 200+40)),
                  sobel_kernel_size=(3, 7),
                  colorizer=None,
-                 name=None, deterministic=False, random_state=None):
-        super(Canny, self).__init__(name=name, deterministic=deterministic, random_state=random_state)
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(Canny, self).__init__(
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.alpha = iap.handle_continuous_param(
             alpha, "alpha", value_range=(0, 1.0), tuple_to_uniform=True,
@@ -409,7 +414,13 @@ class Canny(meta.Augmenter):
 
         return alpha_samples, hthresh_samples, sobel_samples
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        if batch.images is None:
+            return batch
+
+        images = batch.images
+
         iadt.gate_dtypes(images,
                          allowed=["uint8"],
                          disallowed=[
@@ -427,7 +438,6 @@ class Canny(meta.Augmenter):
         alpha_samples = samples[0]
         hthresh_samples = samples[1]
         sobel_samples = samples[2]
-        result = images
 
         gen = enumerate(zip(images, alpha_samples, hthresh_samples,
                             sobel_samples))
@@ -440,7 +450,7 @@ class Canny(meta.Augmenter):
             has_zero_sized_axes = (0 in image.shape[0:2])
             if alpha > 0 and sobel > 1 and not has_zero_sized_axes:
                 image_canny = cv2.Canny(
-                    image[:, :, 0:3],
+                    _normalize_cv2_input_arr_(image[:, :, 0:3]),
                     threshold1=hthreshs[0],
                     threshold2=hthreshs[1],
                     apertureSize=sobel,
@@ -452,11 +462,13 @@ class Canny(meta.Augmenter):
                 image_canny_color = self.colorizer.colorize(
                     image_canny, image, nth_image=i, random_state=rss[i])
 
-                result[i] = blend.blend_alpha(image_canny_color, image, alpha)
+                batch.images[i] = blend.blend_alpha(image_canny_color, image,
+                                                    alpha)
 
-        return result
+        return batch
 
     def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.alpha, self.hysteresis_thresholds, self.sobel_kernel_size,
                 self.colorizer]
 

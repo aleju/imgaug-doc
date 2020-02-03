@@ -23,9 +23,13 @@ def main():
     chapter_augmenters_coarsepepper()
     chapter_augmenters_multiply()
     chapter_augmenters_multiplyelementwise()
+    chapter_augmenters_cutout()
     chapter_augmenters_dropout()
     chapter_augmenters_coarsedropout()
+    chapter_augmenters_dropout2d()
+    chapter_augmenters_totaldropout()
     chapter_augmenters_invert()
+    chapter_augmenters_solarize()
     chapter_augmenters_contrastnormalization()
     chapter_augmenters_jpegcompression()
 
@@ -51,7 +55,7 @@ def chapter_augmenters_addelementwise():
         quality=90
     )
 
-    aug = iaa.AddElementwise((-40, 40), per_channel=0.5)
+    aug = iaa.AddElementwise((-40, 40), per_channel=True)
     run_and_save_augseq(
         "arithmetic/addelementwise_per_channel.jpg", aug,
         [ia.quokka(size=(512, 512)) for _ in range(1)], cols=1, rows=1,
@@ -303,6 +307,34 @@ def chapter_augmenters_multiplyelementwise():
     )
 
 
+def chapter_augmenters_cutout():
+    aug = iaa.Cutout(nb_iterations=2)
+    run_and_save_augseq(
+        "arithmetic/cutout_nb_iterations_2.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.Cutout(nb_iterations=(1, 5), size=0.2, squared=False)
+    run_and_save_augseq(
+        "arithmetic/cutout_non_square.jpg", aug,
+        [ia.quokka(size=(128, 170)) for _ in range(3*2)], cols=3, rows=2)
+
+    aug = iaa.Cutout(fill_mode="constant", cval=255)
+    run_and_save_augseq(
+        "arithmetic/cutout_cval_255.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.Cutout(fill_mode="constant", cval=(0, 255),
+                     fill_per_channel=0.5)
+    run_and_save_augseq(
+        "arithmetic/cutout_rgb.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+    aug = iaa.Cutout(fill_mode="gaussian", fill_per_channel=True)
+    run_and_save_augseq(
+        "arithmetic/cutout_gaussian.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*2)], cols=4, rows=2)
+
+
 def chapter_augmenters_dropout():
     aug = iaa.Dropout(p=(0, 0.2))
     run_and_save_augseq(
@@ -336,6 +368,38 @@ def chapter_augmenters_coarsedropout():
     )
 
 
+def chapter_augmenters_dropout2d():
+    fn_start = "arithmetic/dropout2d"
+
+    aug = iaa.Dropout2d(p=0.5)
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(4*4)], cols=4, rows=4
+    )
+
+    aug = iaa.Dropout2d(p=0.5, nb_keep_channels=0)
+    run_and_save_augseq(
+        fn_start + "_keep_no_channels.jpg", aug,
+        [ia.quokka(size=(100, 100)) for _ in range(6*6)], cols=6, rows=6
+    )
+
+
+def chapter_augmenters_totaldropout():
+    fn_start = "arithmetic/totaldropout"
+
+    aug = iaa.TotalDropout(1.0)
+    run_and_save_augseq(
+        fn_start + "_100_percent.jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(8*1)], cols=8, rows=1
+    )
+
+    aug = iaa.TotalDropout(0.5)
+    run_and_save_augseq(
+        fn_start + "_50_percent.jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(8*2)], cols=8, rows=2
+    )
+
+
 def chapter_augmenters_invert():
     aug = iaa.Invert(0.5)
     run_and_save_augseq(
@@ -346,6 +410,14 @@ def chapter_augmenters_invert():
     aug = iaa.Invert(0.25, per_channel=0.5)
     run_and_save_augseq(
         "arithmetic/invert_per_channel.jpg", aug,
+        [ia.quokka(size=(64, 64)) for _ in range(16)], cols=8, rows=2
+    )
+
+
+def chapter_augmenters_solarize():
+    aug = iaa.Solarize(0.5, threshold=(32, 128))
+    run_and_save_augseq(
+        "arithmetic/solarize.jpg", aug,
         [ia.quokka(size=(64, 64)) for _ in range(16)], cols=8, rows=2
     )
 

@@ -1,12 +1,14 @@
+"""Classes to represent heatmaps, i.e. float arrays of ``[0.0, 1.0]``."""
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
 import six.moves as sm
 
 from .. import imgaug as ia
+from .base import IAugmentable
 
 
-class HeatmapsOnImage(object):
+class HeatmapsOnImage(IAugmentable):
     """Object representing heatmaps on a single image.
 
     Parameters
@@ -118,9 +120,9 @@ class HeatmapsOnImage(object):
         max_is_one = 1.0 - eps < self.max_value < 1.0 + eps
         if min_is_zero and max_is_one:
             return np.copy(arr)
-        else:
-            diff = self.max_value - self.min_value
-            return self.min_value + diff * arr
+
+        diff = self.max_value - self.min_value
+        return self.min_value + diff * arr
 
     # TODO
     # def find_global_maxima(self):
@@ -133,7 +135,7 @@ class HeatmapsOnImage(object):
         ----------
         size : None or float or iterable of int or iterable of float, optional
             Size of the rendered RGB image as ``(height, width)``.
-            See :func:`imgaug.imgaug.imresize_single_image` for details.
+            See :func:`~imgaug.imgaug.imresize_single_image` for details.
             If set to ``None``, no resizing is performed and the size of the
             heatmaps array is used.
 
@@ -305,11 +307,11 @@ class HeatmapsOnImage(object):
             Must be ``0`` or greater.
 
         mode : string, optional
-            Padding mode to use. See :func:`imgaug.imgaug.pad` for details.
+            Padding mode to use. See :func:`~imgaug.imgaug.pad` for details.
 
         cval : number, optional
             Value to use for padding `mode` is ``constant``.
-            See :func:`imgaug.imgaug.pad` for details.
+            See :func:`~imgaug.imgaug.pad` for details.
 
         Returns
         -------
@@ -318,7 +320,8 @@ class HeatmapsOnImage(object):
             width ``W'=W+left+right``.
 
         """
-        arr_0to1_padded = ia.pad(
+        from ..augmenters import size as iasize
+        arr_0to1_padded = iasize.pad(
             self.arr_0to1,
             top=top,
             right=right,
@@ -326,6 +329,7 @@ class HeatmapsOnImage(object):
             left=left,
             mode=mode,
             cval=cval)
+        # TODO change to deepcopy()
         return HeatmapsOnImage.from_0to1(
             arr_0to1_padded,
             shape=self.shape,
@@ -348,11 +352,11 @@ class HeatmapsOnImage(object):
 
         mode : str, optional
             Padding mode to use.
-            See :func:`imgaug.imgaug.pad` for details.
+            See :func:`~imgaug.imgaug.pad` for details.
 
         cval : number, optional
             Value to use for padding if `mode` is ``constant``.
-            See :func:`imgaug.imgaug.pad` for details.
+            See :func:`~imgaug.imgaug.pad` for details.
 
         return_pad_amounts : bool, optional
             If ``False``, then only the padded instance will be returned.
@@ -374,12 +378,14 @@ class HeatmapsOnImage(object):
             ``True``.
 
         """
-        arr_0to1_padded, pad_amounts = ia.pad_to_aspect_ratio(
+        from ..augmenters import size as iasize
+        arr_0to1_padded, pad_amounts = iasize.pad_to_aspect_ratio(
             self.arr_0to1,
             aspect_ratio=aspect_ratio,
             mode=mode,
             cval=cval,
             return_pad_amounts=True)
+        # TODO change to deepcopy()
         heatmaps = HeatmapsOnImage.from_0to1(
             arr_0to1_padded,
             shape=self.shape,
@@ -396,7 +402,7 @@ class HeatmapsOnImage(object):
         ----------
         block_size : int or tuple of int
             Size of each block of values to pool, aka kernel size.
-            See :func:`imgaug.imgaug.pool` for details.
+            See :func:`~imgaug.imgaug.pool` for details.
 
         Returns
         -------
@@ -418,7 +424,7 @@ class HeatmapsOnImage(object):
         ----------
         block_size : int or tuple of int
             Size of each block of values to pool, aka kernel size.
-            See :func:`imgaug.imgaug.pool` for details.
+            See :func:`~imgaug.imgaug.pool` for details.
 
         Returns
         -------
@@ -436,6 +442,7 @@ class HeatmapsOnImage(object):
     @ia.deprecated(alt_func="HeatmapsOnImage.resize()",
                    comment="resize() has the exactly same interface.")
     def scale(self, *args, **kwargs):
+        """Resize the heatmap(s) array given a target size and interpolation."""
         return self.resize(*args, **kwargs)
 
     def resize(self, sizes, interpolation="cubic"):
@@ -445,11 +452,11 @@ class HeatmapsOnImage(object):
         ----------
         sizes : float or iterable of int or iterable of float
             New size of the array in ``(height, width)``.
-            See :func:`imgaug.imgaug.imresize_single_image` for details.
+            See :func:`~imgaug.imgaug.imresize_single_image` for details.
 
         interpolation : None or str or int, optional
             The interpolation to use during resize.
-            See :func:`imgaug.imgaug.imresize_single_image` for details.
+            See :func:`~imgaug.imgaug.imresize_single_image` for details.
 
         Returns
         -------
@@ -511,7 +518,7 @@ class HeatmapsOnImage(object):
             Minimum value of the float heatmaps that the input array
             represents. This will usually be 0.0. In most other cases it will
             be close to the interval ``[0.0, 1.0]``.
-            Calling :func:`imgaug.HeatmapsOnImage.get_arr`, will automatically
+            Calling :func:`~imgaug.HeatmapsOnImage.get_arr`, will automatically
             convert the interval ``[0.0, 1.0]`` float array to this
             ``[min, max]`` interval.
 
@@ -555,7 +562,7 @@ class HeatmapsOnImage(object):
             Minimum value of the float heatmaps that the input array
             represents. This will usually be 0.0. In most other cases it will
             be close to the interval ``[0.0, 1.0]``.
-            Calling :func:`imgaug.HeatmapsOnImage.get_arr`, will automatically
+            Calling :func:`~imgaug.HeatmapsOnImage.get_arr`, will automatically
             convert the interval ``[0.0, 1.0]`` float array to this
             ``[min, max]`` interval.
 

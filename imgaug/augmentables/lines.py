@@ -1,3 +1,4 @@
+"""Classes representing lines."""
 from __future__ import print_function, division, absolute_import
 
 import copy as copylib
@@ -8,7 +9,12 @@ import skimage.measure
 import cv2
 
 from .. import imgaug as ia
-from .utils import normalize_shape, project_coords, interpolate_points
+from .base import IAugmentable
+from .utils import (normalize_shape,
+                    project_coords_,
+                    interpolate_points,
+                    _remove_out_of_image_fraction_,
+                    _normalize_shift_args)
 
 
 # TODO Add Line class and make LineString a list of Line elements
@@ -182,6 +188,7 @@ class LineString(object):
             plane (``True``) or not (``False``).
 
         """
+        # pylint: disable=misplaced-comparison-constant
         if len(self.coords) == 0:
             return np.zeros((0,), dtype=bool)
         shape = normalize_shape(image)
@@ -238,7 +245,7 @@ class LineString(object):
         elif isinstance(other, LineString):
             if len(other.coords) == 0:
                 return default
-            elif len(other.coords) == 1:
+            if len(other.coords) == 1:
                 other = shapely.geometry.Point(other.coords[0, :])
             else:
                 other = shapely.geometry.LineString(other.coords)
@@ -305,6 +312,37 @@ class LineString(object):
         """
         return self.compute_distance(other, default=np.inf) < max_distance
 
+    def project_(self, from_shape, to_shape):
+        """Project the line string onto a differently shaped image in-place.
+
+        E.g. if a point of the line string is on its original image at
+        ``x=(10 of 100 pixels)`` and ``y=(20 of 100 pixels)`` and is projected
+        onto a new image with size ``(width=200, height=200)``, its new
+        position will be ``(x=20, y=40)``.
+
+        This is intended for cases where the original image is resized.
+        It cannot be used for more complex changes (e.g. padding, cropping).
+
+        Added in 0.4.0.
+
+        Parameters
+        ----------
+        from_shape : tuple of int or ndarray
+            Shape of the original image. (Before resize.)
+
+        to_shape : tuple of int or ndarray
+            Shape of the new image. (After resize.)
+
+        Returns
+        -------
+        imgaug.augmentables.lines.LineString
+            Line string with new coordinates.
+            The object may have been modified in-place.
+
+        """
+        self.coords = project_coords_(self.coords, from_shape, to_shape)
+        return self
+
     def project(self, from_shape, to_shape):
         """Project the line string onto a differently shaped image.
 
@@ -330,8 +368,45 @@ class LineString(object):
             Line string with new coordinates.
 
         """
-        coords_proj = project_coords(self.coords, from_shape, to_shape)
-        return self.copy(coords=coords_proj)
+        return self.deepcopy().project_(from_shape, to_shape)
+
+    def compute_out_of_image_fraction(self, image):
+        """Compute fraction of polygon area outside of the image plane.
+
+        This estimates ``f = A_ooi / A``, where ``A_ooi`` is the area of the
+        polygon that is outside of the image plane, while ``A`` is the
+        total area of the bounding box.
+
+        Added in 0.4.0.
+
+        Parameters
+        ----------
+        image : (H,W,...) ndarray or tuple of int
+            Image dimensions to use.
+            If an ``ndarray``, its shape will be used.
+            If a ``tuple``, it is assumed to represent the image shape
+            and must contain at least two integers.
+
+        Returns
+        -------
+        float
+            Fraction of the polygon area that is outside of the image
+            plane. Returns ``0.0`` if the polygon is fully inside of
+            the image plane. If the polygon has an area of zero, the polygon
+            is treated similarly to a :class:`LineString`, i.e. the fraction
+            of the line that is inside the image plane is returned.
+
+        """
+        length = self.length
+        if length == 0:
+            if len(self.coords) == 0:
+                return 0.0
+            points_ooi = ~self.get_pointwise_inside_image_mask(image)
+            return 1.0 if np.all(points_ooi) else 0.0
+        lss_clipped = self.clip_out_of_image(image)
+        length_after_clip = sum([ls.length for ls in lss_clipped])
+        inside_image_factor = length_after_clip / length
+        return 1.0 - inside_image_factor
 
     def is_fully_within_image(self, image, default=False):
         """Estimate whether the line string is fully inside an image plane.
@@ -422,10 +497,9 @@ class LineString(object):
 
         if self.is_fully_within_image(image):
             return False
-        elif self.is_partly_within_image(image):
+        if self.is_partly_within_image(image):
             return partly
-        else:
-            return fully
+        return fully
 
     def clip_out_of_image(self, image):
         """Clip off all parts of the line string that are outside of the image.
@@ -570,9 +644,15 @@ class LineString(object):
             intersections_points = []
             for inter in intersections:
                 if isinstance(inter, shapely.geometry.linestring.LineString):
-                    inter_start = (inter.coords[0][0], inter.coords[0][1])
-                    inter_end = (inter.coords[-1][0], inter.coords[-1][1])
-                    intersections_points.extend([inter_start, inter_end])
+                    # Since shapely 1.7a2 (tested in python 3.8),
+                    # .intersection() apprently can return LINE STRING EMPTY
+                    # (i.e. .coords is an empty list). Before that, the result
+                    # of .intersection() was just []. Hence, we first check
+                    # the length here.
+                    if len(inter.coords) > 0:
+                        inter_start = (inter.coords[0][0], inter.coords[0][1])
+                        inter_end = (inter.coords[-1][0], inter.coords[-1][1])
+                        intersections_points.extend([inter_start, inter_end])
                 else:
                     assert isinstance(inter, shapely.geometry.point.Point), (
                         "Expected to find shapely.geometry.point.Point or "
@@ -584,31 +664,72 @@ class LineString(object):
             # to remove duplicate points
             inter_sorted = sorted(
                 intersections_points,
-                key=lambda p: np.linalg.norm(np.float32(p) - p_start)
+                key=lambda p, ps=p_start: np.linalg.norm(np.float32(p) - ps)
             )
 
             result.append(inter_sorted)
         return result
 
-    # TODO convert this to x/y params?
-    def shift(self, top=None, right=None, bottom=None, left=None):
-        """Move this line string along the x/y-axis.
+    def shift_(self, x=0, y=0):
+        """Move this line string along the x/y-axis in-place.
+
+        The origin ``(0, 0)`` is at the top left of the image.
+
+        Added in 0.4.0.
 
         Parameters
         ----------
+        x : number, optional
+            Value to be added to all x-coordinates. Positive values shift
+            towards the right images.
+
+        y : number, optional
+            Value to be added to all y-coordinates. Positive values shift
+            towards the bottom images.
+
+        Returns
+        -------
+        result : imgaug.augmentables.lines.LineString
+            Shifted line string.
+            The object may have been modified in-place.
+
+        """
+        self.coords[:, 0] += x
+        self.coords[:, 1] += y
+        return self
+
+    def shift(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
+        """Move this line string along the x/y-axis.
+
+        The origin ``(0, 0)`` is at the top left of the image.
+
+        Parameters
+        ----------
+        x : number, optional
+            Value to be added to all x-coordinates. Positive values shift
+            towards the right images.
+
+        y : number, optional
+            Value to be added to all y-coordinates. Positive values shift
+            towards the bottom images.
+
         top : None or int, optional
+            Deprecated since 0.4.0.
             Amount of pixels by which to shift this object *from* the
             top (towards the bottom).
 
         right : None or int, optional
+            Deprecated since 0.4.0.
             Amount of pixels by which to shift this object *from* the
             right (towards the left).
 
         bottom : None or int, optional
+            Deprecated since 0.4.0.
             Amount of pixels by which to shift this object *from* the
             bottom (towards the top).
 
         left : None or int, optional
+            Deprecated since 0.4.0.
             Amount of pixels by which to shift this object *from* the
             left (towards the right).
 
@@ -618,14 +739,9 @@ class LineString(object):
             Shifted line string.
 
         """
-        top = top if top is not None else 0
-        right = right if right is not None else 0
-        bottom = bottom if bottom is not None else 0
-        left = left if left is not None else 0
-        coords = np.copy(self.coords)
-        coords[:, 0] += left - right
-        coords[:, 1] += top - bottom
-        return self.copy(coords=coords)
+        x, y = _normalize_shift_args(
+            x, y, top=top, right=right, bottom=bottom, left=left)
+        return self.deepcopy().shift_(x=x, y=y)
 
     def draw_mask(self, image_shape, size_lines=1, size_points=0,
                   raise_if_out_of_image=False):
@@ -695,8 +811,8 @@ class LineString(object):
         """
         assert len(image_shape) == 2 or (
             len(image_shape) == 3 and image_shape[-1] == 1), (
-            "Expected (H,W) or (H,W,1) as image_shape, got %s." % (
-                image_shape,))
+                "Expected (H,W) or (H,W,1) as image_shape, got %s." % (
+                    image_shape,))
 
         arr = self.draw_lines_on_image(
             np.zeros(image_shape, dtype=np.uint8),
@@ -737,8 +853,8 @@ class LineString(object):
         """
         assert len(image_shape) == 2 or (
             len(image_shape) == 3 and image_shape[-1] == 1), (
-            "Expected (H,W) or (H,W,1) as image_shape, got %s." % (
-                image_shape,))
+                "Expected (H,W) or (H,W,1) as image_shape, got %s." % (
+                    image_shape,))
 
         arr = self.draw_points_on_image(
             np.zeros(image_shape, dtype=np.uint8),
@@ -847,6 +963,7 @@ class LineString(object):
             `image` with line drawn on it.
 
         """
+        # pylint: disable=invalid-name, misplaced-comparison-constant
         from .. import dtypes as iadt
         from ..augmenters import blend as blendlib
 
@@ -1293,9 +1410,9 @@ class LineString(object):
         """Generate a heatmap object from the line string.
 
         This is similar to
-        :func:`imgaug.augmentables.lines.LineString.draw_lines_heatmap_array`,
+        :func:`~imgaug.augmentables.lines.LineString.draw_lines_heatmap_array`,
         executed with ``alpha=1.0``. The result is wrapped in a
-        :class:`imgaug.augmentables.heatmaps.HeatmapsOnImage` object instead
+        :class:`~imgaug.augmentables.heatmaps.HeatmapsOnImage` object instead
         of just an array. No points are drawn.
 
         Parameters
@@ -1337,7 +1454,7 @@ class LineString(object):
         """Generate a segmentation map object from the line string.
 
         This is similar to
-        :func:`imgaug.augmentables.lines.LineString.draw_mask`.
+        :func:`~imgaug.augmentables.lines.LineString.draw_mask`.
         The result is wrapped in a ``SegmentationMapsOnImage`` object
         instead of just an array.
 
@@ -1409,7 +1526,7 @@ class LineString(object):
 
         if len(self.coords) == 0 and len(other.coords) == 0:
             return True
-        elif 0 in [len(self.coords), len(other.coords)]:
+        if 0 in [len(self.coords), len(other.coords)]:
             # only one of the two line strings has no coords
             return False
 
@@ -1427,21 +1544,20 @@ class LineString(object):
         Parameters
         ----------
         other: imgaug.augmentables.lines.LineString
-            The other line string. Must be a LineString instance, not just
-            its coordinates.
+            The other object to compare against. Expected to be a
+            ``LineString``.
 
         max_distance : float, optional
-            See :func:`imgaug.augmentables.lines.LineString.coords_almost_equals`.
+            See :func:`~imgaug.augmentables.lines.LineString.coords_almost_equals`.
 
         points_per_edge : int, optional
-            See :func:`imgaug.augmentables.lines.LineString.coords_almost_equals`.
+            See :func:`~imgaug.augmentables.lines.LineString.coords_almost_equals`.
 
         Returns
         -------
         bool
-            ``True`` if the coordinates are almost equal according to
-            :func:`imgaug.augmentables.lines.LineString.coords_almost_equals`
-            and additionally the labels are equal. Otherwise ``False``.
+            ``True`` if the coordinates are almost equal and additionally
+            the labels are equal. Otherwise ``False``.
 
         """
         if self.label != other.label:
@@ -1494,6 +1610,32 @@ class LineString(object):
             coords=np.copy(self.coords) if coords is None else coords,
             label=copylib.deepcopy(self.label) if label is None else label)
 
+    def __getitem__(self, indices):
+        """Get the coordinate(s) with given indices.
+
+        Added in 0.4.0.
+
+        Returns
+        -------
+        ndarray
+            xy-coordinate(s) as ``ndarray``.
+
+        """
+        return self.coords[indices]
+
+    def __iter__(self):
+        """Iterate over the coordinates of this instance.
+
+        Added in 0.4.0.
+
+        Yields
+        ------
+        ndarray
+            An ``(2,)`` ``ndarray`` denoting an xy-coordinate pair.
+
+        """
+        return iter(self.coords)
+
     def __repr__(self):
         return self.__str__()
 
@@ -1517,7 +1659,7 @@ class LineString(object):
 # concat(other)
 # is_self_intersecting()
 # remove_self_intersections()
-class LineStringsOnImage(object):
+class LineStringsOnImage(IAugmentable):
     """Object that represents all line strings on a single image.
 
     Parameters
@@ -1556,6 +1698,34 @@ class LineStringsOnImage(object):
         self.shape = normalize_shape(shape)
 
     @property
+    def items(self):
+        """Get the line strings in this container.
+
+        Added in 0.4.0.
+
+        Returns
+        -------
+        list of LineString
+            Line strings within this container.
+
+        """
+        return self.line_strings
+
+    @items.setter
+    def items(self, value):
+        """Set the line strings in this container.
+
+        Added in 0.4.0.
+
+        Parameters
+        ----------
+        value : list of LineString
+            Line strings within this container.
+
+        """
+        self.line_strings = value
+
+    @property
     def empty(self):
         """Estimate whether this object contains zero line strings.
 
@@ -1566,6 +1736,36 @@ class LineStringsOnImage(object):
 
         """
         return len(self.line_strings) == 0
+
+    def on_(self, image):
+        """Project the line strings from one image shape to a new one in-place.
+
+        Added in 0.4.0.
+
+        Parameters
+        ----------
+        image : ndarray or tuple of int
+            The new image onto which to project.
+            Either an image with shape ``(H,W,[C])`` or a tuple denoting
+            such an image shape.
+
+        Returns
+        -------
+        imgaug.augmentables.lines.LineStrings
+            Object containing all projected line strings.
+            The object and its items may have been modified in-place.
+
+        """
+        # pylint: disable=invalid-name
+        on_shape = normalize_shape(image)
+        if on_shape[0:2] == self.shape[0:2]:
+            self.shape = on_shape  # channels may differ
+            return self
+
+        for i, item in enumerate(self.items):
+            self.line_strings[i] = item.project_(self.shape, on_shape)
+        self.shape = on_shape
+        return self
 
     def on(self, image):
         """Project the line strings from one image shape to a new one.
@@ -1583,19 +1783,15 @@ class LineStringsOnImage(object):
             Object containing all projected line strings.
 
         """
-        shape = normalize_shape(image)
-        if shape[0:2] == self.shape[0:2]:
-            return self.deepcopy()
-        line_strings = [ls.project(self.shape, shape)
-                        for ls in self.line_strings]
-        return self.deepcopy(line_strings=line_strings, shape=shape)
+        # pylint: disable=invalid-name
+        return self.deepcopy().on_(image)
 
     @classmethod
     def from_xy_arrays(cls, xy, shape):
         """Convert an ``(N,M,2)`` ndarray to a ``LineStringsOnImage`` object.
 
         This is the inverse of
-        :func:`imgaug.augmentables.lines.LineStringsOnImage.to_xy_array`.
+        :func:`~imgaug.augmentables.lines.LineStringsOnImage.to_xy_array`.
 
         Parameters
         ----------
@@ -1625,7 +1821,7 @@ class LineStringsOnImage(object):
         """Convert this object to an iterable of ``(M,2)`` arrays of points.
 
         This is the inverse of
-        :func:`imgaug.augmentables.lines.LineStringsOnImage.from_xy_array`.
+        :func:`~imgaug.augmentables.lines.LineStringsOnImage.from_xy_array`.
 
         Parameters
         ----------
@@ -1726,6 +1922,34 @@ class LineStringsOnImage(object):
 
         return image
 
+    def remove_out_of_image_(self, fully=True, partly=False):
+        """
+        Remove all LS that are fully/partially outside of an image in-place.
+
+        Added in 0.4.0.
+
+        Parameters
+        ----------
+        fully : bool, optional
+            Whether to remove line strings that are fully outside of the image.
+
+        partly : bool, optional
+            Whether to remove line strings that are partially outside of the
+            image.
+
+        Returns
+        -------
+        imgaug.augmentables.lines.LineStringsOnImage
+            Reduced set of line strings. Those that are fully/partially
+            outside of the given image plane are removed.
+            The object and its items may have been modified in-place.
+
+        """
+        self.line_strings = [
+            ls for ls in self.line_strings
+            if not ls.is_out_of_image(self.shape, fully=fully, partly=partly)]
+        return self
+
     def remove_out_of_image(self, fully=True, partly=False):
         """
         Remove all line strings that are fully/partially outside of an image.
@@ -1746,21 +1970,95 @@ class LineStringsOnImage(object):
             outside of the given image plane are removed.
 
         """
-        lss_clean = [ls for ls in self.line_strings
-                     if not ls.is_out_of_image(
-                         self.shape, fully=fully, partly=partly)]
-        return LineStringsOnImage(lss_clean, shape=self.shape)
+        return self.copy().remove_out_of_image_(fully=fully, partly=partly)
+
+    def remove_out_of_image_fraction_(self, fraction):
+        """Remove all LS with an OOI fraction of at least `fraction` in-place.
+
+        'OOI' is the abbreviation for 'out of image'.
+
+        Added in 0.4.0.
+
+        Parameters
+        ----------
+        fraction : number
+            Minimum out of image fraction that a line string has to have in
+            order to be removed. A fraction of ``1.0`` removes only line
+            strings that are ``100%`` outside of the image. A fraction of
+            ``0.0`` removes all line strings.
+
+        Returns
+        -------
+        imgaug.augmentables.lines.LineStringsOnImage
+            Reduced set of line strings, with those that had an out of image
+            fraction greater or equal the given one removed.
+            The object and its items may have been modified in-place.
+
+        """
+        return _remove_out_of_image_fraction_(self, fraction)
+
+    def remove_out_of_image_fraction(self, fraction):
+        """Remove all LS with an out of image fraction of at least `fraction`.
+
+        Parameters
+        ----------
+        fraction : number
+            Minimum out of image fraction that a line string has to have in
+            order to be removed. A fraction of ``1.0`` removes only line
+            strings that are ``100%`` outside of the image. A fraction of
+            ``0.0`` removes all line strings.
+
+        Returns
+        -------
+        imgaug.augmentables.lines.LineStringsOnImage
+            Reduced set of line strings, with those that had an out of image
+            fraction greater or equal the given one removed.
+
+        """
+        return self.copy().remove_out_of_image_fraction_(fraction)
+
+    def clip_out_of_image_(self):
+        """
+        Clip off all parts of the LSs that are outside of an image in-place.
+
+        .. note::
+
+            The result can contain fewer line strings than the input did. That
+            happens when a polygon is fully outside of the image plane.
+
+        .. note::
+
+            The result can also contain *more* line strings than the input
+            did. That happens when distinct parts of a line string are only
+            connected by line segments that are outside of the image plane and
+            hence will be clipped off, resulting in two or more unconnected
+            line string parts that are left in the image plane.
+
+        Added in 0.4.0.
+
+        Returns
+        -------
+        imgaug.augmentables.lines.LineStringsOnImage
+            Line strings, clipped to fall within the image dimensions.
+            The count of output line strings may differ from the input count.
+
+        """
+        self.line_strings = [
+            ls_clipped
+            for ls in self.line_strings
+            for ls_clipped in ls.clip_out_of_image(self.shape)]
+        return self
 
     def clip_out_of_image(self):
         """
         Clip off all parts of the line strings that are outside of an image.
 
-        .. note ::
+        .. note::
 
             The result can contain fewer line strings than the input did. That
             happens when a polygon is fully outside of the image plane.
 
-        .. note ::
+        .. note::
 
             The result can also contain *more* line strings than the input
             did. That happens when distinct parts of a line string are only
@@ -1775,29 +2073,68 @@ class LineStringsOnImage(object):
             The count of output line strings may differ from the input count.
 
         """
-        lss_cut = [ls_clipped
-                   for ls in self.line_strings
-                   for ls_clipped in ls.clip_out_of_image(self.shape)]
-        return LineStringsOnImage(lss_cut, shape=self.shape)
+        return self.copy().clip_out_of_image_()
 
-    def shift(self, top=None, right=None, bottom=None, left=None):
-        """Move the line strings along the x/y-axis.
+    def shift_(self, x=0, y=0):
+        """Move the line strings along the x/y-axis in-place.
+
+        The origin ``(0, 0)`` is at the top left of the image.
+
+        Added in 0.4.0.
 
         Parameters
         ----------
+        x : number, optional
+            Value to be added to all x-coordinates. Positive values shift
+            towards the right images.
+
+        y : number, optional
+            Value to be added to all y-coordinates. Positive values shift
+            towards the bottom images.
+
+        Returns
+        -------
+        imgaug.augmentables.lines.LineStringsOnImage
+            Shifted line strings.
+            The object and its items may have been modified in-place.
+
+        """
+        for i, ls in enumerate(self.line_strings):
+            self.line_strings[i] = ls.shift_(x=x, y=y)
+        return self
+
+    def shift(self, x=0, y=0, top=None, right=None, bottom=None, left=None):
+        """Move the line strings along the x/y-axis.
+
+        The origin ``(0, 0)`` is at the top left of the image.
+
+        Parameters
+        ----------
+        x : number, optional
+            Value to be added to all x-coordinates. Positive values shift
+            towards the right images.
+
+        y : number, optional
+            Value to be added to all y-coordinates. Positive values shift
+            towards the bottom images.
+
         top : None or int, optional
+            Deprecated since 0.4.0.
             Amount of pixels by which to shift all objects *from* the
             top (towards the bottom).
 
         right : None or int, optional
+            Deprecated since 0.4.0.
             Amount of pixels by which to shift all objects *from* the
             right (towads the left).
 
         bottom : None or int, optional
+            Deprecated since 0.4.0.
             Amount of pixels by which to shift all objects *from* the
             bottom (towards the top).
 
         left : None or int, optional
+            Deprecated since 0.4.0.
             Amount of pixels by which to shift all objects *from* the
             left (towards the right).
 
@@ -1807,9 +2144,137 @@ class LineStringsOnImage(object):
             Shifted line strings.
 
         """
-        lss_new = [ls.shift(top=top, right=right, bottom=bottom, left=left)
-                   for ls in self.line_strings]
-        return LineStringsOnImage(lss_new, shape=self.shape)
+        x, y = _normalize_shift_args(
+            x, y, top=top, right=right, bottom=bottom, left=left)
+        return self.deepcopy().shift_(x=x, y=y)
+
+    def to_xy_array(self):
+        """Convert all line string coordinates to one array of shape ``(N,2)``.
+
+        Added in 0.4.0.
+
+        Returns
+        -------
+        (N, 2) ndarray
+            Array containing all xy-coordinates of all line strings within this
+            instance.
+
+        """
+        if self.empty:
+            return np.zeros((0, 2), dtype=np.float32)
+        return np.concatenate([ls.coords for ls in self.line_strings])
+
+    def fill_from_xy_array_(self, xy):
+        """Modify the corner coordinates of all line strings in-place.
+
+        .. note::
+
+            This currently expects that `xy` contains exactly as many
+            coordinates as the line strings within this instance have corner
+            points. Otherwise, an ``AssertionError`` will be raised.
+
+        Added in 0.4.0.
+
+        Parameters
+        ----------
+        xy : (N, 2) ndarray or iterable of iterable of number
+            XY-Coordinates of ``N`` corner points. ``N`` must match the
+            number of corner points in all line strings within this instance.
+
+        Returns
+        -------
+        LineStringsOnImage
+            This instance itself, with updated coordinates.
+            Note that the instance was modified in-place.
+
+        """
+        xy = np.array(xy, dtype=np.float32)
+
+        # note that np.array([]) is (0,), not (0, 2)
+        assert xy.shape[0] == 0 or (xy.ndim == 2 and xy.shape[-1] == 2), (  # pylint: disable=unsubscriptable-object
+            "Expected input array to have shape (N,2), "
+            "got shape %s." % (xy.shape,))
+
+        counter = 0
+        for ls in self.line_strings:
+            nb_points = len(ls.coords)
+            assert counter + nb_points <= len(xy), (
+                "Received fewer points than there are corner points in "
+                "all line strings. Got %d points, expected %d." % (
+                    len(xy),
+                    sum([len(ls_.coords) for ls_ in self.line_strings])))
+
+            ls.coords[:, ...] = xy[counter:counter+nb_points]
+            counter += nb_points
+
+        assert counter == len(xy), (
+            "Expected to get exactly as many xy-coordinates as there are "
+            "points in all line strings polygons within this instance. "
+            "Got %d points, could only assign %d points." % (
+                len(xy), counter,))
+
+        return self
+
+    def to_keypoints_on_image(self):
+        """Convert the line strings to one ``KeypointsOnImage`` instance.
+
+        Added in 0.4.0.
+
+        Returns
+        -------
+        imgaug.augmentables.kps.KeypointsOnImage
+            A keypoints instance containing ``N`` coordinates for a total
+            of ``N`` points in the ``coords`` attributes of all line strings.
+            Order matches the order in ``line_strings`` and ``coords``
+            attributes.
+
+        """
+        from . import KeypointsOnImage
+        if self.empty:
+            return KeypointsOnImage([], shape=self.shape)
+        coords = np.concatenate(
+            [ls.coords for ls in self.line_strings],
+            axis=0)
+        return KeypointsOnImage.from_xy_array(coords,
+                                              shape=self.shape)
+
+    def invert_to_keypoints_on_image_(self, kpsoi):
+        """Invert the output of ``to_keypoints_on_image()`` in-place.
+
+        This function writes in-place into this ``LineStringsOnImage``
+        instance.
+
+        Added in 0.4.0.
+
+        Parameters
+        ----------
+        kpsoi : imgaug.augmentables.kps.KeypointsOnImages
+            Keypoints to convert back to line strings, i.e. the outputs
+            of ``to_keypoints_on_image()``.
+
+        Returns
+        -------
+        LineStringsOnImage
+            Line strings container with updated coordinates.
+            Note that the instance is also updated in-place.
+
+        """
+        lss = self.line_strings
+        coordss = [ls.coords for ls in lss]
+        nb_points_exp = sum([len(coords) for coords in coordss])
+        assert len(kpsoi.keypoints) == nb_points_exp, (
+            "Expected %d coordinates, got %d." % (
+                nb_points_exp, len(kpsoi.keypoints)))
+
+        xy_arr = kpsoi.to_xy_array()
+
+        counter = 0
+        for ls in lss:
+            coords = ls.coords
+            coords[:, :] = xy_arr[counter:counter+len(coords), :]
+            counter += len(coords)
+        self.shape = kpsoi.shape
+        return self
 
     def copy(self, line_strings=None, shape=None):
         """Create a shallow copy of this object.
@@ -1834,9 +2299,13 @@ class LineStringsOnImage(object):
             Shallow copy.
 
         """
-        lss = self.line_strings if line_strings is None else line_strings
-        shape = self.shape if shape is None else shape
-        return LineStringsOnImage(line_strings=lss, shape=shape)
+        if line_strings is None:
+            line_strings = self.line_strings[:]
+        if shape is None:
+            # use tuple() here in case the shape was provided as a list
+            shape = tuple(self.shape)
+
+        return LineStringsOnImage(line_strings, shape)
 
     def deepcopy(self, line_strings=None, shape=None):
         """Create a deep copy of the object.
@@ -1861,11 +2330,55 @@ class LineStringsOnImage(object):
             Deep copy.
 
         """
-        lss = self.line_strings if line_strings is None else line_strings
-        shape = self.shape if shape is None else shape
-        return LineStringsOnImage(
-            line_strings=[ls.deepcopy() for ls in lss],
-            shape=tuple(shape))
+        # Manual copy is far faster than deepcopy, so use manual copy here.
+        if line_strings is None:
+            line_strings = [ls.deepcopy() for ls in self.line_strings]
+        if shape is None:
+            # use tuple() here in case the shape was provided as a list
+            shape = tuple(self.shape)
+
+        return LineStringsOnImage(line_strings, shape)
+
+    def __getitem__(self, indices):
+        """Get the line string(s) with given indices.
+
+        Added in 0.4.0.
+
+        Returns
+        -------
+        list of imgaug.augmentables.lines.LineString
+            Line string(s) with given indices.
+
+        """
+        return self.line_strings[indices]
+
+    def __iter__(self):
+        """Iterate over the line strings in this container.
+
+        Added in 0.4.0.
+
+        Yields
+        ------
+        LineString
+            A line string in this container.
+            The order is identical to the order in the line string list
+            provided upon class initialization.
+
+        """
+        return iter(self.line_strings)
+
+    def __len__(self):
+        """Get the number of items in this instance.
+
+        Added in 0.4.0.
+
+        Returns
+        -------
+        int
+            Number of items in this instance.
+
+        """
+        return len(self.items)
 
     def __repr__(self):
         return self.__str__()
@@ -1888,17 +2401,17 @@ def _flatten_shapely_collection(collection):
     import shapely.geometry
     if not isinstance(collection, list):
         collection = [collection]
-    for el in collection:
-        if hasattr(el, "geoms"):
-            for subel in _flatten_shapely_collection(el.geoms):
+    for item in collection:
+        if hasattr(item, "geoms"):
+            for subitem in _flatten_shapely_collection(item.geoms):
                 # MultiPoint.geoms actually returns a GeometrySequence
-                if isinstance(subel, shapely.geometry.base.GeometrySequence):
-                    for subsubel in subel:
+                if isinstance(subitem, shapely.geometry.base.GeometrySequence):
+                    for subsubel in subitem:
                         yield subsubel
                 else:
-                    yield _flatten_shapely_collection(subel)
+                    yield _flatten_shapely_collection(subitem)
         else:
-            yield el
+            yield item
 
 
 def _convert_var_to_shapely_geometry(var):

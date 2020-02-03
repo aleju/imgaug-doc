@@ -12,6 +12,7 @@ def main():
     chapter_augmenters_medianblur()
     chapter_augmenters_bilateralblur()
     chapter_augmenters_motionblur()
+    chapter_augmenters_meanshiftblur()
 
 
 def chapter_augmenters_gaussianblur():
@@ -69,6 +70,15 @@ def chapter_augmenters_motionblur():
     aug = iaa.MotionBlur(k=15, angle=[-45, 45])
     run_and_save_augseq(
         fn_start + "_angle.jpg", aug,
+        [ia.quokka(size=(128, 128)) for _ in range(16)], cols=4, rows=4)
+
+
+def chapter_augmenters_meanshiftblur():
+    fn_start = "blur/meanshiftblur"
+
+    aug = iaa.MeanShiftBlur()
+    run_and_save_augseq(
+        fn_start + ".jpg", aug,
         [ia.quokka(size=(128, 128)) for _ in range(16)], cols=4, rows=4)
 
 

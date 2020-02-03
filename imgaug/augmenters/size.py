@@ -1,38 +1,46 @@
 """
 Augmenters that somehow change the size of the images.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.Resize({"height": 32, "width": 64})
-        iaa.Crop((0, 20))
-    ])
-
 List of augmenters:
 
-    * Resize
-    * CropAndPad
-    * Crop
-    * Pad
-    * PadToFixedSize
-    * CropToFixedSize
-    * KeepSizeByResize
+    * :class:`Resize`
+    * :class:`CropAndPad`
+    * :class:`Crop`
+    * :class:`Pad`
+    * :class:`PadToFixedSize`
+    * :class:`CenterPadToFixedSize`
+    * :class:`CropToFixedSize`
+    * :class:`CenterCropToFixedSize`
+    * :class:`CropToMultiplesOf`
+    * :class:`CenterCropToMultiplesOf`
+    * :class:`PadToMultiplesOf`
+    * :class:`CenterPadToMultiplesOf`
+    * :class:`CropToPowersOf`
+    * :class:`CenterCropToPowersOf`
+    * :class:`PadToPowersOf`
+    * :class:`CenterPadToPowersOf`
+    * :class:`CropToAspectRatio`
+    * :class:`CenterCropToAspectRatio`
+    * :class:`PadToAspectRatio`
+    * :class:`CenterPadToAspectRatio`
+    * :class:`CropToSquare`
+    * :class:`CenterCropToSquare`
+    * :class:`PadToSquare`
+    * :class:`CenterPadToSquare`
+    * :class:`KeepSizeByResize`
 
 """
 from __future__ import print_function, division, absolute_import
 
 import re
+import functools
 
 import numpy as np
-import six.moves as sm
+import cv2
 
-from . import meta
 import imgaug as ia
+from imgaug.imgaug import _normalize_cv2_input_arr_
+from . import meta
 from .. import parameters as iap
 
 
@@ -70,7 +78,7 @@ def _crop_and_pad_arr(arr, croppings, paddings, pad_mode="constant",
 
     image_cr = _crop_arr_(arr, *croppings)
 
-    image_cr_pa = ia.pad(
+    image_cr_pa = pad(
         image_cr,
         top=paddings[0], right=paddings[1],
         bottom=paddings[2], left=paddings[3],
@@ -122,7 +130,7 @@ def _crop_and_pad_hms_or_segmaps_(augmentable, croppings_img,
     arr_cr = _crop_arr_(arr,
                         croppings_proj[0], croppings_proj[1],
                         croppings_proj[2], croppings_proj[3])
-    arr_cr_pa = ia.pad(
+    arr_cr_pa = pad(
         arr_cr,
         top=paddings_proj[0], right=paddings_proj[1],
         bottom=paddings_proj[2], left=paddings_proj[3],
@@ -139,7 +147,7 @@ def _crop_and_pad_hms_or_segmaps_(augmentable, croppings_img,
     return augmentable
 
 
-def _crop_and_pad_kpsoi(kpsoi, croppings_img, paddings_img, keep_size):
+def _crop_and_pad_kpsoi_(kpsoi, croppings_img, paddings_img, keep_size):
     # using the trbl function instead of croppings_img has the advantage
     # of incorporating prevent_zero_size, dealing with zero-sized input image
     # axis and dealing the negative crop amounts
@@ -147,13 +155,14 @@ def _crop_and_pad_kpsoi(kpsoi, croppings_img, paddings_img, keep_size):
     crop_left = x1
     crop_top = y1
 
-    shifted = kpsoi.shift(
+    shape_orig = kpsoi.shape
+    shifted = kpsoi.shift_(
         x=-crop_left+paddings_img[3],
         y=-crop_top+paddings_img[0])
     shifted.shape = _compute_shape_after_crop_and_pad(
-            kpsoi.shape, croppings_img, paddings_img)
+        shape_orig, croppings_img, paddings_img)
     if keep_size:
-        shifted = shifted.on(kpsoi.shape)
+        shifted = shifted.on_(shape_orig)
     return shifted
 
 
@@ -226,10 +235,20 @@ def _project_size_changes(trbl, from_shape, to_shape):
     bottom = trbl[2]
     left = trbl[3]
 
-    top = _int_r(height_to * (top/height_from))
-    right = _int_r(width_to * (right/width_from))
-    bottom = _int_r(height_to * (bottom/height_from))
-    left = _int_r(width_to * (left/width_from))
+    # Adding/subtracting 1e-4 here helps for the case where a heatmap/segmap
+    # is exactly half the size of an image and the size change on an axis is
+    # an odd value. Then the projected value would end up being <something>.5
+    # and the rounding would always round up to the next integer. If both
+    # sides then have the same change, they are both rounded up, resulting
+    # in more change than expected.
+    # E.g. image height is 8, map height is 4, change is 3 at the top and 3 at
+    # the bottom. The changes are projected to 4*(3/8) = 1.5 and both rounded
+    # up to 2.0. Hence, the maps are changed by 4 (100% of the map height,
+    # vs. 6 for images, which is 75% of the image height).
+    top = _int_r(height_to * (top/height_from) - 1e-4)
+    right = _int_r(width_to * (right/width_from) + 1e-4)
+    bottom = _int_r(height_to * (bottom/height_from) + 1e-4)
+    left = _int_r(width_to * (left/width_from) - 1e-4)
 
     return top, right, bottom, left
 
@@ -238,24 +257,24 @@ def _int_r(value):
     return int(np.round(value))
 
 
-# TODO somehow integrate this with ia.pad()
+# TODO somehow integrate this with pad()
 def _handle_pad_mode_param(pad_mode):
     pad_modes_available = {
         "constant", "edge", "linear_ramp", "maximum", "mean", "median",
         "minimum", "reflect", "symmetric", "wrap"}
     if pad_mode == ia.ALL:
         return iap.Choice(list(pad_modes_available))
-    elif ia.is_string(pad_mode):
+    if ia.is_string(pad_mode):
         assert pad_mode in pad_modes_available, (
             "Value '%s' is not a valid pad mode. Valid pad modes are: %s." % (
                 pad_mode, ", ".join(pad_modes_available)))
         return iap.Deterministic(pad_mode)
-    elif isinstance(pad_mode, list):
+    if isinstance(pad_mode, list):
         assert all([v in pad_modes_available for v in pad_mode]), (
             "At least one in list %s is not a valid pad mode. Valid pad "
             "modes are: %s." % (str(pad_mode), ", ".join(pad_modes_available)))
         return iap.Choice(pad_mode)
-    elif isinstance(pad_mode, iap.StochasticParameter):
+    if isinstance(pad_mode, iap.StochasticParameter):
         return pad_mode
     raise Exception(
         "Expected pad_mode to be ia.ALL or string or list of strings or "
@@ -265,76 +284,851 @@ def _handle_pad_mode_param(pad_mode):
 def _handle_position_parameter(position):
     if position == "uniform":
         return iap.Uniform(0.0, 1.0), iap.Uniform(0.0, 1.0)
-    elif position == "normal":
+    if position == "normal":
         return (
             iap.Clip(iap.Normal(loc=0.5, scale=0.35 / 2),
                      minval=0.0, maxval=1.0),
             iap.Clip(iap.Normal(loc=0.5, scale=0.35 / 2),
                      minval=0.0, maxval=1.0)
         )
-    elif position == "center":
+    if position == "center":
         return iap.Deterministic(0.5), iap.Deterministic(0.5)
-    elif (ia.is_string(position)
-          and re.match(r"^(left|center|right)-(top|center|bottom)$", position)):
+    if (ia.is_string(position)
+            and re.match(r"^(left|center|right)-(top|center|bottom)$",
+                         position)):
         mapping = {"top": 0.0, "center": 0.5, "bottom": 1.0, "left": 0.0,
                    "right": 1.0}
         return (
             iap.Deterministic(mapping[position.split("-")[0]]),
             iap.Deterministic(mapping[position.split("-")[1]])
         )
-    elif isinstance(position, iap.StochasticParameter):
+    if isinstance(position, iap.StochasticParameter):
         return position
-    elif isinstance(position, tuple):
+    if isinstance(position, tuple):
         assert len(position) == 2, (
             "Expected tuple with two entries as position parameter. "
             "Got %d entries with types %s.." % (
-                len(position), str([type(el) for el in position])))
-        for el in position:
-            if ia.is_single_number(el) and (el < 0 or el > 1.0):
+                len(position), str([type(item) for item in position])))
+        for item in position:
+            if ia.is_single_number(item) and (item < 0 or item > 1.0):
                 raise Exception(
                     "Both position values must be within the value range "
                     "[0.0, 1.0]. Got type %s with value %.8f." % (
-                        type(el), el,))
-        position = [iap.Deterministic(el)
-                    if ia.is_single_number(el)
-                    else el for el in position]
+                        type(item), item,))
+        position = [iap.Deterministic(item)
+                    if ia.is_single_number(item)
+                    else item for item in position]
 
-        only_sparams = all([isinstance(el, iap.StochasticParameter)
-                            for el in position])
+        only_sparams = all([isinstance(item, iap.StochasticParameter)
+                            for item in position])
         assert only_sparams, (
             "Expected tuple with two entries that are both either "
             "StochasticParameter or float/int. Got types %s." % (
-                str([type(el) for el in position])
+                str([type(item) for item in position])
             ))
         return tuple(position)
-    else:
-        raise Exception(
-            "Expected one of the following as position parameter: string "
-            "'uniform', string 'normal', string 'center', a string matching "
-            "regex ^(left|center|right)-(top|center|bottom)$, a single "
-            "StochasticParameter or a tuple of two entries, both being either "
-            "StochasticParameter or floats or int. Got instead type %s with "
-            "content '%s'." % (
-                type(position),
-                (str(position)
-                 if len(str(position)) < 20
-                 else str(position)[0:20] + "...")
-            )
+    raise Exception(
+        "Expected one of the following as position parameter: string "
+        "'uniform', string 'normal', string 'center', a string matching "
+        "regex ^(left|center|right)-(top|center|bottom)$, a single "
+        "StochasticParameter or a tuple of two entries, both being either "
+        "StochasticParameter or floats or int. Got instead type %s with "
+        "content '%s'." % (
+            type(position),
+            (str(position)
+             if len(str(position)) < 20
+             else str(position)[0:20] + "...")
         )
+    )
+
+
+# TODO this is the same as in imgaug.py, make DRY
+# Added in 0.4.0.
+def _assert_two_or_three_dims(shape):
+    if hasattr(shape, "shape"):
+        shape = shape.shape
+    assert len(shape) in [2, 3], (
+        "Expected image with two or three dimensions, but got %d dimensions "
+        "and shape %s." % (len(shape), shape))
+
+
+def pad(arr, top=0, right=0, bottom=0, left=0, mode="constant", cval=0):
+    """Pad an image-like array on its top/right/bottom/left side.
+
+    This function is a wrapper around :func:`numpy.pad`.
+
+    Added in 0.4.0. (Previously named ``imgaug.imgaug.pad()``.)
+
+    **Supported dtypes**:
+
+        * ``uint8``: yes; fully tested (1)
+        * ``uint16``: yes; fully tested (1)
+        * ``uint32``: yes; fully tested (2) (3)
+        * ``uint64``: yes; fully tested (2) (3)
+        * ``int8``: yes; fully tested (1)
+        * ``int16``: yes; fully tested (1)
+        * ``int32``: yes; fully tested (1)
+        * ``int64``: yes; fully tested (2) (3)
+        * ``float16``: yes; fully tested (2) (3)
+        * ``float32``: yes; fully tested (1)
+        * ``float64``: yes; fully tested (1)
+        * ``float128``: yes; fully tested (2) (3)
+        * ``bool``: yes; tested (2) (3)
+
+        - (1) Uses ``cv2`` if `mode` is one of: ``"constant"``, ``"edge"``,
+              ``"reflect"``, ``"symmetric"``. Otherwise uses ``numpy``.
+        - (2) Uses ``numpy``.
+        - (3) Rejected by ``cv2``.
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray
+        Image-like array to pad.
+
+    top : int, optional
+        Amount of pixels to add to the top side of the image.
+        Must be ``0`` or greater.
+
+    right : int, optional
+        Amount of pixels to add to the right side of the image.
+        Must be ``0`` or greater.
+
+    bottom : int, optional
+        Amount of pixels to add to the bottom side of the image.
+        Must be ``0`` or greater.
+
+    left : int, optional
+        Amount of pixels to add to the left side of the image.
+        Must be ``0`` or greater.
+
+    mode : str, optional
+        Padding mode to use. See :func:`numpy.pad` for details.
+        In case of mode ``constant``, the parameter `cval` will be used as
+        the ``constant_values`` parameter to :func:`numpy.pad`.
+        In case of mode ``linear_ramp``, the parameter `cval` will be used as
+        the ``end_values`` parameter to :func:`numpy.pad`.
+
+    cval : number or iterable of number, optional
+        Value to use for padding if `mode` is ``constant``.
+        See :func:`numpy.pad` for details. The cval is expected to match the
+        input array's dtype and value range. If an iterable is used, it is
+        expected to contain one value per channel. The number of values
+        and number of channels are expected to match.
+
+    Returns
+    -------
+    (H',W') ndarray or (H',W',C) ndarray
+        Padded array with height ``H'=H+top+bottom`` and width
+        ``W'=W+left+right``.
+
+    """
+    import imgaug.dtypes as iadt
+
+    _assert_two_or_three_dims(arr)
+    assert all([v >= 0 for v in [top, right, bottom, left]]), (
+        "Expected padding amounts that are >=0, but got %d, %d, %d, %d "
+        "(top, right, bottom, left)" % (top, right, bottom, left))
+
+    is_multi_cval = ia.is_iterable(cval)
+
+    if top > 0 or right > 0 or bottom > 0 or left > 0:
+        min_value, _, max_value = iadt.get_value_range_of_dtype(arr.dtype)
+
+        # without the if here there are crashes for float128, e.g. if
+        # cval is an int (just using float(cval) seems to not be accurate
+        # enough)
+        if arr.dtype.name == "float128":
+            cval = np.float128(cval)  # pylint: disable=no-member
+
+        if is_multi_cval:
+            cval = np.clip(cval, min_value, max_value)
+        else:
+            cval = max(min(cval, max_value), min_value)
+
+        # Note that copyMakeBorder() hangs/runs endlessly if arr has an
+        # axis of size 0 and mode is "reflect".
+        # Numpy also complains in these cases if mode is not "constant".
+        has_zero_sized_axis = any([axis == 0 for axis in arr.shape])
+        if has_zero_sized_axis:
+            mode = "constant"
+
+        mapping_mode_np_to_cv2 = {
+            "constant": cv2.BORDER_CONSTANT,
+            "edge": cv2.BORDER_REPLICATE,
+            "linear_ramp": None,
+            "maximum": None,
+            "mean": None,
+            "median": None,
+            "minimum": None,
+            "reflect": cv2.BORDER_REFLECT_101,
+            "symmetric": cv2.BORDER_REFLECT,
+            "wrap": None,
+            cv2.BORDER_CONSTANT: cv2.BORDER_CONSTANT,
+            cv2.BORDER_REPLICATE: cv2.BORDER_REPLICATE,
+            cv2.BORDER_REFLECT_101: cv2.BORDER_REFLECT_101,
+            cv2.BORDER_REFLECT: cv2.BORDER_REFLECT
+        }
+        bad_mode_cv2 = mapping_mode_np_to_cv2.get(mode, None) is None
+
+        # these datatypes all simply generate a "TypeError: src data type = X
+        # is not supported" error
+        bad_datatype_cv2 = (
+            arr.dtype.name
+            in ["uint32", "uint64", "int64", "float16", "float128", "bool"]
+        )
+
+        # OpenCV turns the channel axis for arrays with 0 channels to 512
+        # TODO add direct test for this. indirectly tested via Pad
+        bad_shape_cv2 = (arr.ndim == 3 and arr.shape[-1] == 0)
+
+        if not bad_datatype_cv2 and not bad_mode_cv2 and not bad_shape_cv2:
+            # convert cval to expected type, as otherwise we get TypeError
+            # for np inputs
+            kind = arr.dtype.kind
+            if is_multi_cval:
+                cval = [float(cval_c) if kind == "f" else int(cval_c)
+                        for cval_c in cval]
+            else:
+                cval = float(cval) if kind == "f" else int(cval)
+
+            if arr.ndim == 2 or arr.shape[2] <= 4:
+                # without this, only the first channel is padded with the cval,
+                # all following channels with 0
+                if arr.ndim == 3 and not is_multi_cval:
+                    cval = tuple([cval] * arr.shape[2])
+
+                arr_pad = cv2.copyMakeBorder(
+                    _normalize_cv2_input_arr_(arr),
+                    top=top, bottom=bottom, left=left, right=right,
+                    borderType=mapping_mode_np_to_cv2[mode], value=cval)
+                if arr.ndim == 3 and arr_pad.ndim == 2:
+                    arr_pad = arr_pad[..., np.newaxis]
+            else:
+                result = []
+                channel_start_idx = 0
+                cval = cval if is_multi_cval else tuple([cval] * arr.shape[2])
+                while channel_start_idx < arr.shape[2]:
+                    arr_c = arr[..., channel_start_idx:channel_start_idx+4]
+                    cval_c = cval[channel_start_idx:channel_start_idx+4]
+                    arr_pad_c = cv2.copyMakeBorder(
+                        _normalize_cv2_input_arr_(arr_c),
+                        top=top, bottom=bottom, left=left, right=right,
+                        borderType=mapping_mode_np_to_cv2[mode], value=cval_c)
+                    arr_pad_c = np.atleast_3d(arr_pad_c)
+                    result.append(arr_pad_c)
+                    channel_start_idx += 4
+                arr_pad = np.concatenate(result, axis=2)
+        else:
+            # paddings for 2d case
+            paddings_np = [(top, bottom), (left, right)]
+
+            # add paddings for 3d case
+            if arr.ndim == 3:
+                paddings_np.append((0, 0))
+
+            if mode == "constant":
+                if arr.ndim > 2 and is_multi_cval:
+                    arr_pad_chans = [
+                        np.pad(arr[..., c], paddings_np[0:2], mode=mode,
+                               constant_values=cval[c])
+                        for c in np.arange(arr.shape[2])]
+                    arr_pad = np.stack(arr_pad_chans, axis=-1)
+                else:
+                    arr_pad = np.pad(arr, paddings_np, mode=mode,
+                                     constant_values=cval)
+            elif mode == "linear_ramp":
+                if arr.ndim > 2 and is_multi_cval:
+                    arr_pad_chans = [
+                        np.pad(arr[..., c], paddings_np[0:2], mode=mode,
+                               end_values=cval[c])
+                        for c in np.arange(arr.shape[2])]
+                    arr_pad = np.stack(arr_pad_chans, axis=-1)
+                else:
+                    arr_pad = np.pad(arr, paddings_np, mode=mode,
+                                     end_values=cval)
+            else:
+                arr_pad = np.pad(arr, paddings_np, mode=mode)
+
+        return arr_pad
+    return np.copy(arr)
+
+
+def pad_to_aspect_ratio(arr, aspect_ratio, mode="constant", cval=0,
+                        return_pad_amounts=False):
+    """Pad an image array on its sides so that it matches a target aspect ratio.
+
+    See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
+    explanation of how the required padding amounts are distributed per
+    image axis.
+
+    Added in 0.4.0. (Previously named ``imgaug.imgaug.pad_to_aspect_ratio()``.)
+
+    **Supported dtypes**:
+
+    See :func:`~imgaug.augmenters.size.pad`.
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray
+        Image-like array to pad.
+
+    aspect_ratio : float
+        Target aspect ratio, given as width/height. E.g. ``2.0`` denotes the
+        image having twice as much width as height.
+
+    mode : str, optional
+        Padding mode to use. See :func:`~imgaug.imgaug.pad` for details.
+
+    cval : number, optional
+        Value to use for padding if `mode` is ``constant``.
+        See :func:`numpy.pad` for details.
+
+    return_pad_amounts : bool, optional
+        If ``False``, then only the padded image will be returned. If
+        ``True``, a ``tuple`` with two entries will be returned, where the
+        first entry is the padded image and the second entry are the amounts
+        by which each image side was padded. These amounts are again a
+        ``tuple`` of the form ``(top, right, bottom, left)``, with each value
+        being an ``int``.
+
+    Returns
+    -------
+    (H',W') ndarray or (H',W',C) ndarray
+        Padded image as ``(H',W')`` or ``(H',W',C)`` ndarray, fulfilling the
+        given `aspect_ratio`.
+
+    tuple of int
+        Amounts by which the image was padded on each side, given as a
+        ``tuple`` ``(top, right, bottom, left)``.
+        This ``tuple`` is only returned if `return_pad_amounts` was set to
+        ``True``.
+
+    """
+    pad_top, pad_right, pad_bottom, pad_left = \
+        compute_paddings_to_reach_aspect_ratio(arr, aspect_ratio)
+    arr_padded = pad(
+        arr,
+        top=pad_top,
+        right=pad_right,
+        bottom=pad_bottom,
+        left=pad_left,
+        mode=mode,
+        cval=cval
+    )
+
+    if return_pad_amounts:
+        return arr_padded, (pad_top, pad_right, pad_bottom, pad_left)
+    return arr_padded
+
+
+def pad_to_multiples_of(arr, height_multiple, width_multiple, mode="constant",
+                        cval=0, return_pad_amounts=False):
+    """Pad an image array until its side lengths are multiples of given values.
+
+    See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
+    explanation of how the required padding amounts are distributed per
+    image axis.
+
+    Added in 0.4.0. (Previously named ``imgaug.imgaug.pad_to_multiples_of()``.)
+
+    **Supported dtypes**:
+
+    See :func:`~imgaug.augmenters.size.pad`.
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray
+        Image-like array to pad.
+
+    height_multiple : None or int
+        The desired multiple of the height. The computed padding amount will
+        reflect a padding that increases the y axis size until it is a multiple
+        of this value.
+
+    width_multiple : None or int
+        The desired multiple of the width. The computed padding amount will
+        reflect a padding that increases the x axis size until it is a multiple
+        of this value.
+
+    mode : str, optional
+        Padding mode to use. See :func:`~imgaug.imgaug.pad` for details.
+
+    cval : number, optional
+        Value to use for padding if `mode` is ``constant``.
+        See :func:`numpy.pad` for details.
+
+    return_pad_amounts : bool, optional
+        If ``False``, then only the padded image will be returned. If
+        ``True``, a ``tuple`` with two entries will be returned, where the
+        first entry is the padded image and the second entry are the amounts
+        by which each image side was padded. These amounts are again a
+        ``tuple`` of the form ``(top, right, bottom, left)``, with each value
+        being an integer.
+
+    Returns
+    -------
+    (H',W') ndarray or (H',W',C) ndarray
+        Padded image as ``(H',W')`` or ``(H',W',C)`` ndarray.
+
+    tuple of int
+        Amounts by which the image was padded on each side, given as a
+        ``tuple`` ``(top, right, bottom, left)``.
+        This ``tuple`` is only returned if `return_pad_amounts` was set to
+        ``True``.
+
+    """
+    pad_top, pad_right, pad_bottom, pad_left = \
+        compute_paddings_to_reach_multiples_of(
+            arr, height_multiple, width_multiple)
+    arr_padded = pad(
+        arr,
+        top=pad_top,
+        right=pad_right,
+        bottom=pad_bottom,
+        left=pad_left,
+        mode=mode,
+        cval=cval
+    )
+
+    if return_pad_amounts:
+        return arr_padded, (pad_top, pad_right, pad_bottom, pad_left)
+    return arr_padded
+
+
+def compute_paddings_to_reach_aspect_ratio(arr, aspect_ratio):
+    """Compute pad amounts required to fulfill an aspect ratio.
+
+    "Pad amounts" here denotes the number of pixels that have to be added to
+    each side to fulfill the desired constraint.
+
+    The aspect ratio is given as ``ratio = width / height``.
+    Depending on which dimension is smaller (height or width), only the
+    corresponding sides (top/bottom or left/right) will be padded.
+
+    The axis-wise padding amounts are always distributed equally over the
+    sides of the respective axis (i.e. left and right, top and bottom). For
+    odd pixel amounts, one pixel will be left over after the equal
+    distribution and could be added to either side of the axis. This function
+    will always add such a left over pixel to the bottom (y-axis) or
+    right (x-axis) side.
+
+    Added in 0.4.0. (Previously named
+    ``imgaug.imgaug.compute_paddings_to_reach_aspect_ratio()``.)
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
+        Image-like array or shape tuple for which to compute pad amounts.
+
+    aspect_ratio : float
+        Target aspect ratio, given as width/height. E.g. ``2.0`` denotes the
+        image having twice as much width as height.
+
+    Returns
+    -------
+    tuple of int
+        Required padding amounts to reach the target aspect ratio, given as a
+        ``tuple`` of the form ``(top, right, bottom, left)``.
+
+    """
+    _assert_two_or_three_dims(arr)
+    assert aspect_ratio > 0, (
+        "Expected to get an aspect ratio >0, got %.4f." % (aspect_ratio,))
+
+    pad_top = 0
+    pad_right = 0
+    pad_bottom = 0
+    pad_left = 0
+
+    shape = arr.shape if hasattr(arr, "shape") else arr
+    height, width = shape[0:2]
+
+    if height == 0:
+        height = 1
+        pad_bottom += 1
+    if width == 0:
+        width = 1
+        pad_right += 1
+
+    aspect_ratio_current = width / height
+
+    if aspect_ratio_current < aspect_ratio:
+        # image is more vertical than desired, width needs to be increased
+        diff = (aspect_ratio * height) - width
+        pad_right += int(np.ceil(diff / 2))
+        pad_left += int(np.floor(diff / 2))
+    elif aspect_ratio_current > aspect_ratio:
+        # image is more horizontal than desired, height needs to be increased
+        diff = ((1/aspect_ratio) * width) - height
+        pad_top += int(np.floor(diff / 2))
+        pad_bottom += int(np.ceil(diff / 2))
+
+    return pad_top, pad_right, pad_bottom, pad_left
+
+
+def compute_croppings_to_reach_aspect_ratio(arr, aspect_ratio):
+    """Compute crop amounts required to fulfill an aspect ratio.
+
+    "Crop amounts" here denotes the number of pixels that have to be removed
+    from each side to fulfill the desired constraint.
+
+    The aspect ratio is given as ``ratio = width / height``.
+    Depending on which dimension is smaller (height or width), only the
+    corresponding sides (top/bottom or left/right) will be cropped.
+
+    The axis-wise padding amounts are always distributed equally over the
+    sides of the respective axis (i.e. left and right, top and bottom). For
+    odd pixel amounts, one pixel will be left over after the equal
+    distribution and could be added to either side of the axis. This function
+    will always add such a left over pixel to the bottom (y-axis) or
+    right (x-axis) side.
+
+    If an aspect ratio cannot be reached exactly, this function will return
+    rather one pixel too few than one pixel too many.
+
+    Added in 0.4.0.
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
+        Image-like array or shape tuple for which to compute crop amounts.
+
+    aspect_ratio : float
+        Target aspect ratio, given as width/height. E.g. ``2.0`` denotes the
+        image having twice as much width as height.
+
+    Returns
+    -------
+    tuple of int
+        Required cropping amounts to reach the target aspect ratio, given as a
+        ``tuple`` of the form ``(top, right, bottom, left)``.
+
+    """
+    _assert_two_or_three_dims(arr)
+    assert aspect_ratio > 0, (
+        "Expected to get an aspect ratio >0, got %.4f." % (aspect_ratio,))
+
+    shape = arr.shape if hasattr(arr, "shape") else arr
+    assert shape[0] > 0, (
+        "Expected to get an array with height >0, got shape %s." % (shape,))
+
+    height, width = shape[0:2]
+    aspect_ratio_current = width / height
+
+    top = 0
+    right = 0
+    bottom = 0
+    left = 0
+
+    if aspect_ratio_current < aspect_ratio:
+        # image is more vertical than desired, height needs to be reduced
+        # c = H - W/r
+        crop_amount = height - (width / aspect_ratio)
+        crop_amount = min(crop_amount, height - 1)
+        top = int(np.floor(crop_amount / 2))
+        bottom = int(np.ceil(crop_amount / 2))
+    elif aspect_ratio_current > aspect_ratio:
+        # image is more horizontal than desired, width needs to be reduced
+        # c = W - Hr
+        crop_amount = width - height * aspect_ratio
+        crop_amount = min(crop_amount, width - 1)
+        left = int(np.floor(crop_amount / 2))
+        right = int(np.ceil(crop_amount / 2))
+
+    return top, right, bottom, left
+
+
+def compute_paddings_to_reach_multiples_of(arr, height_multiple,
+                                           width_multiple):
+    """Compute pad amounts until img height/width are multiples of given values.
+
+    See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
+    explanation of how the required padding amounts are distributed per
+    image axis.
+
+    Added in 0.4.0. (Previously named
+    ``imgaug.imgaug.compute_paddings_to_reach_multiples_of()``.)
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
+        Image-like array or shape tuple for which to compute pad amounts.
+
+    height_multiple : None or int
+        The desired multiple of the height. The computed padding amount will
+        reflect a padding that increases the y axis size until it is a multiple
+        of this value.
+
+    width_multiple : None or int
+        The desired multiple of the width. The computed padding amount will
+        reflect a padding that increases the x axis size until it is a multiple
+        of this value.
+
+    Returns
+    -------
+    tuple of int
+        Required padding amounts to reach multiples of the provided values,
+        given as a ``tuple`` of the form ``(top, right, bottom, left)``.
+
+    """
+    def _compute_axis_value(axis_size, multiple):
+        if multiple is None:
+            return 0, 0
+        if axis_size == 0:
+            to_pad = multiple
+        elif axis_size % multiple == 0:
+            to_pad = 0
+        else:
+            to_pad = multiple - (axis_size % multiple)
+        return int(np.floor(to_pad/2)), int(np.ceil(to_pad/2))
+
+    _assert_two_or_three_dims(arr)
+
+    if height_multiple is not None:
+        assert height_multiple > 0, (
+            "Can only pad to multiples of 1 or larger, got %d." % (
+                height_multiple,))
+    if width_multiple is not None:
+        assert width_multiple > 0, (
+            "Can only pad to multiples of 1 or larger, got %d." % (
+                width_multiple,))
+
+    shape = arr.shape if hasattr(arr, "shape") else arr
+    height, width = shape[0:2]
+
+    top, bottom = _compute_axis_value(height, height_multiple)
+    left, right = _compute_axis_value(width, width_multiple)
+
+    return top, right, bottom, left
+
+
+def compute_croppings_to_reach_multiples_of(arr, height_multiple,
+                                            width_multiple):
+    """Compute croppings to reach multiples of given heights/widths.
+
+    See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
+    explanation of how the required cropping amounts are distributed per
+    image axis.
+
+    Added in 0.4.0.
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
+        Image-like array or shape tuple for which to compute crop amounts.
+
+    height_multiple : None or int
+        The desired multiple of the height. The computed croppings will
+        reflect a crop operation that decreases the y axis size until it is
+        a multiple of this value.
+
+    width_multiple : None or int
+        The desired multiple of the width. The computed croppings amount will
+        reflect a crop operation that decreases the x axis size until it is
+        a multiple of this value.
+
+    Returns
+    -------
+    tuple of int
+        Required cropping amounts to reach multiples of the provided values,
+        given as a ``tuple`` of the form ``(top, right, bottom, left)``.
+
+    """
+    def _compute_axis_value(axis_size, multiple):
+        if multiple is None:
+            return 0, 0
+        if axis_size == 0:
+            to_crop = 0
+        elif axis_size % multiple == 0:
+            to_crop = 0
+        else:
+            to_crop = axis_size % multiple
+        return int(np.floor(to_crop/2)), int(np.ceil(to_crop/2))
+
+    _assert_two_or_three_dims(arr)
+
+    if height_multiple is not None:
+        assert height_multiple > 0, (
+            "Can only crop to multiples of 1 or larger, got %d." % (
+                height_multiple,))
+    if width_multiple is not None:
+        assert width_multiple > 0, (
+            "Can only crop to multiples of 1 or larger, got %d." % (
+                width_multiple,))
+
+    shape = arr.shape if hasattr(arr, "shape") else arr
+    height, width = shape[0:2]
+
+    top, bottom = _compute_axis_value(height, height_multiple)
+    left, right = _compute_axis_value(width, width_multiple)
+
+    return top, right, bottom, left
+
+
+def compute_paddings_to_reach_powers_of(arr, height_base, width_base,
+                                        allow_zero_exponent=False):
+    """Compute paddings to reach powers of given base values.
+
+    For given axis size ``S``, padded size ``S'`` (``S' >= S``) and base ``B``
+    this function computes paddings that fulfill ``S' = B^E``, where ``E``
+    is any exponent from the discrete interval ``[0 .. inf)``.
+
+    See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
+    explanation of how the required padding amounts are distributed per
+    image axis.
+
+    Added in 0.4.0. (Previously named
+    ``imgaug.imgaug.compute_paddings_to_reach_exponents_of()``.)
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
+        Image-like array or shape tuple for which to compute pad amounts.
+
+    height_base : None or int
+        The desired base of the height.
+
+    width_base : None or int
+        The desired base of the width.
+
+    allow_zero_exponent : bool, optional
+        Whether ``E=0`` in ``S'=B^E`` is a valid value. If ``True``, axes
+        with size ``0`` or ``1`` will be padded up to size ``B^0=1`` and
+        axes with size ``1 < S <= B`` will be padded up to ``B^1=B``.
+        If ``False``, the minimum output axis size is always at least ``B``.
+
+    Returns
+    -------
+    tuple of int
+        Required padding amounts to fulfill ``S' = B^E`` given as a
+        ``tuple`` of the form ``(top, right, bottom, left)``.
+
+    """
+    def _compute_axis_value(axis_size, base):
+        if base is None:
+            return 0, 0
+        if axis_size == 0:
+            to_pad = 1 if allow_zero_exponent else base
+        elif axis_size <= base:
+            to_pad = base - axis_size
+        else:
+            # log_{base}(axis_size) in numpy
+            exponent = np.log(axis_size) / np.log(base)
+
+            to_pad = (base ** int(np.ceil(exponent))) - axis_size
+
+        return int(np.floor(to_pad/2)), int(np.ceil(to_pad/2))
+
+    _assert_two_or_three_dims(arr)
+
+    if height_base is not None:
+        assert height_base > 1, (
+            "Can only pad to base larger than 1, got %d." % (height_base,))
+    if width_base is not None:
+        assert width_base > 1, (
+            "Can only pad to base larger than 1, got %d." % (width_base,))
+
+    shape = arr.shape if hasattr(arr, "shape") else arr
+    height, width = shape[0:2]
+
+    top, bottom = _compute_axis_value(height, height_base)
+    left, right = _compute_axis_value(width, width_base)
+
+    return top, right, bottom, left
+
+
+def compute_croppings_to_reach_powers_of(arr, height_base, width_base,
+                                         allow_zero_exponent=False):
+    """Compute croppings to reach powers of given base values.
+
+    For given axis size ``S``, cropped size ``S'`` (``S' <= S``) and base ``B``
+    this function computes croppings that fulfill ``S' = B^E``, where ``E``
+    is any exponent from the discrete interval ``[0 .. inf)``.
+
+    See :func:`~imgaug.imgaug.compute_paddings_for_aspect_ratio` for an
+    explanation of how the required cropping amounts are distributed per
+    image axis.
+
+    .. note::
+
+        For axes where ``S == 0``, this function alwayws returns zeros as
+        croppings.
+
+        For axes where ``1 <= S < B`` see parameter `allow_zero_exponent`.
+
+    Added in 0.4.0.
+
+    Parameters
+    ----------
+    arr : (H,W) ndarray or (H,W,C) ndarray or tuple of int
+        Image-like array or shape tuple for which to compute crop amounts.
+
+    height_base : None or int
+        The desired base of the height.
+
+    width_base : None or int
+        The desired base of the width.
+
+    allow_zero_exponent : bool
+        Whether ``E=0`` in ``S'=B^E`` is a valid value. If ``True``, axes
+        with size ``1 <= S < B`` will be cropped to size ``B^0=1``.
+        If ``False``, axes with sizes ``S < B`` will not be changed.
+
+    Returns
+    -------
+    tuple of int
+        Required cropping amounts to fulfill ``S' = B^E`` given as a
+        ``tuple`` of the form ``(top, right, bottom, left)``.
+
+    """
+    def _compute_axis_value(axis_size, base):
+        if base is None:
+            return 0, 0
+        if axis_size == 0:
+            to_crop = 0
+        elif axis_size < base:
+            # crop down to B^0 = 1
+            to_crop = axis_size - 1 if allow_zero_exponent else 0
+        else:
+            # log_{base}(axis_size) in numpy
+            exponent = np.log(axis_size) / np.log(base)
+
+            to_crop = axis_size - (base ** int(exponent))
+
+        return int(np.floor(to_crop/2)), int(np.ceil(to_crop/2))
+
+    _assert_two_or_three_dims(arr)
+
+    if height_base is not None:
+        assert height_base > 1, (
+            "Can only crop to base larger than 1, got %d." % (height_base,))
+    if width_base is not None:
+        assert width_base > 1, (
+            "Can only crop to base larger than 1, got %d." % (width_base,))
+
+    shape = arr.shape if hasattr(arr, "shape") else arr
+    height, width = shape[0:2]
+
+    top, bottom = _compute_axis_value(height, height_base)
+    left, right = _compute_axis_value(width, width_base)
+
+    return top, right, bottom, left
 
 
 @ia.deprecated(alt_func="Resize",
                comment="Resize has the exactly same interface as Scale.")
 def Scale(*args, **kwargs):
+    """Augmenter that resizes images to specified heights and widths."""
+    # pylint: disable=invalid-name
     return Resize(*args, **kwargs)
 
 
 class Resize(meta.Augmenter):
     """Augmenter that resizes images to specified heights and widths.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.imgaug.imresize_many_images`.
+    See :func:`~imgaug.imgaug.imresize_many_images`.
 
     Parameters
     ----------
@@ -389,14 +1183,22 @@ class Resize(meta.Augmenter):
               queried per image and is expected to return an ``int`` or
               ``str``.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -460,24 +1262,26 @@ class Resize(meta.Augmenter):
     """
 
     def __init__(self, size, interpolation="cubic",
-                 name=None, deterministic=False, random_state=None):
-        super(Resize, self).__init__(name=name, deterministic=deterministic,
-                                     random_state=random_state)
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(Resize, self).__init__(
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
         self.size, self.size_order = self._handle_size_arg(size, False)
         self.interpolation = self._handle_interpolation_arg(interpolation)
 
     @classmethod
     def _handle_size_arg(cls, size, subcall):
-        def _dict_to_size_tuple(v1, v2):
+        def _dict_to_size_tuple(val1, val2):
             kaa = "keep-aspect-ratio"
-            not_both_kaa = (v1 != kaa or v2 != kaa)
+            not_both_kaa = (val1 != kaa or val2 != kaa)
             assert not_both_kaa, (
                 "Expected at least one value to not be \"keep-aspect-ratio\", "
                 "but got it two times.")
 
             size_tuple = []
-            for k in [v1, v2]:
+            for k in [val1, val2]:
                 if k in ["keep-aspect-ratio", "keep"]:
                     entry = iap.Deterministic(k)
                 else:
@@ -566,64 +1370,85 @@ class Resize(meta.Augmenter):
         elif ia.is_iterable(interpolation):
             interpolation = iap.Choice(interpolation)
         elif isinstance(interpolation, iap.StochasticParameter):
-            interpolation = interpolation
+            pass
         else:
             raise Exception(
                 "Expected int or string or iterable or StochasticParameter, "
                 "got %s." % (type(interpolation),))
         return interpolation
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        nb_rows = batch.nb_rows
+        samples = self._draw_samples(nb_rows, random_state)
+
+        if batch.images is not None:
+            batch.images = self._augment_images_by_samples(batch.images,
+                                                           samples)
+
+        if batch.heatmaps is not None:
+            # TODO this uses the same interpolation as for images for heatmaps
+            #      while other augmenters resort to cubic
+            batch.heatmaps = self._augment_maps_by_samples(
+                batch.heatmaps, "arr_0to1", samples)
+
+        if batch.segmentation_maps is not None:
+            batch.segmentation_maps = self._augment_maps_by_samples(
+                batch.segmentation_maps, "arr",
+                (samples[0], samples[1], [None] * nb_rows))
+
+        for augm_name in ["keypoints", "bounding_boxes", "polygons",
+                          "line_strings"]:
+            augm_value = getattr(batch, augm_name)
+            if augm_value is not None:
+                func = functools.partial(
+                    self._augment_keypoints_by_samples,
+                    samples=samples)
+                cbaois = self._apply_to_cbaois_as_keypoints(augm_value, func)
+                setattr(batch, augm_name, cbaois)
+
+        return batch
+
+    # Added in 0.4.0.
+    def _augment_images_by_samples(self, images, samples):
+        input_was_array = False
+        input_dtype = None
+        if ia.is_np_array(images):
+            input_was_array = True
+            input_dtype = images.dtype
+
+        samples_a, samples_b, samples_ip = samples
         result = []
-        nb_images = len(images)
-        samples_a, samples_b, samples_ip = self._draw_samples(
-            nb_images, random_state, do_sample_ip=True)
-        for i in sm.xrange(nb_images):
-            image = images[i]
-            sample_a, sample_b, sample_ip = (samples_a[i], samples_b[i],
-                                             samples_ip[i])
-            h, w = self._compute_height_width(image.shape, sample_a, sample_b,
-                                              self.size_order)
+        for i, image in enumerate(images):
+            h, w = self._compute_height_width(image.shape, samples_a[i],
+                                              samples_b[i], self.size_order)
             image_rs = ia.imresize_single_image(image, (h, w),
-                                                interpolation=sample_ip)
+                                                interpolation=samples_ip[i])
             result.append(image_rs)
 
-        if not isinstance(images, list):
-            all_same_size = (len(set([image.shape for image in result])) == 1)
+        if input_was_array:
+            all_same_size = (len({image.shape for image in result}) == 1)
             if all_same_size:
-                result = np.array(result, dtype=np.uint8)
+                result = np.array(result, dtype=input_dtype)
 
         return result
 
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        return self._augment_heatmaps_segmaps(heatmaps, random_state,
-                                              do_sample_ip=True)
-
-    def _augment_segmentation_maps(self, segmaps, random_state, parents, hooks):
-        return self._augment_heatmaps_segmaps(segmaps, random_state,
-                                              do_sample_ip=False)
-
-    def _augment_heatmaps_segmaps(self, augmentables, random_state,
-                                  do_sample_ip):
+    # Added in 0.4.0.
+    def _augment_maps_by_samples(self, augmentables, arr_attr_name, samples):
         result = []
-        nb_items = len(augmentables)
-        samples_h, samples_w, samples_ip = self._draw_samples(
-            nb_items, random_state, do_sample_ip=do_sample_ip)
-        for i in sm.xrange(nb_items):
-            augmentable = augmentables[i]
-            arr_shape = (
-                augmentable.arr.shape
-                if hasattr(augmentable, "arr")
-                else augmentable.arr_0to1.shape)
+        samples_h, samples_w, samples_ip = samples
+
+        for i, augmentable in enumerate(augmentables):
+            arr = getattr(augmentable, arr_attr_name)
+            arr_shape = arr.shape
             img_shape = augmentable.shape
-            sample_h, sample_w = samples_h[i], samples_w[i]
             h_img, w_img = self._compute_height_width(
-                img_shape, sample_h, sample_w, self.size_order)
+                img_shape, samples_h[i], samples_w[i], self.size_order)
             h = int(np.round(h_img * (arr_shape[0] / img_shape[0])))
             w = int(np.round(w_img * (arr_shape[1] / img_shape[1])))
             h = max(h, 1)
             w = max(w, 1)
-            if do_sample_ip:
+            if samples_ip[0] is not None:
                 # TODO change this for heatmaps to always have cubic or
                 #      automatic interpolation?
                 augmentable_resize = augmentable.resize(
@@ -635,30 +1460,21 @@ class Resize(meta.Augmenter):
 
         return result
 
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
+    # Added in 0.4.0.
+    def _augment_keypoints_by_samples(self, kpsois, samples):
         result = []
-        nb_images = len(keypoints_on_images)
-        samples_a, samples_b, _samples_ip = self._draw_samples(
-            nb_images, random_state, do_sample_ip=False)
-        for i in sm.xrange(nb_images):
-            keypoints_on_image = keypoints_on_images[i]
-            sample_a, sample_b = samples_a[i], samples_b[i]
+        samples_a, samples_b, _samples_ip = samples
+        for i, kpsoi in enumerate(kpsois):
             h, w = self._compute_height_width(
-                keypoints_on_image.shape, sample_a, sample_b, self.size_order)
-            new_shape = (h, w) + keypoints_on_image.shape[2:]
-            keypoints_on_image_rs = keypoints_on_image.on(new_shape)
+                kpsoi.shape, samples_a[i], samples_b[i], self.size_order)
+            new_shape = (h, w) + kpsoi.shape[2:]
+            keypoints_on_image_rs = kpsoi.on_(new_shape)
 
             result.append(keypoints_on_image_rs)
 
         return result
 
-    def _augment_polygons(self, polygons_on_images, random_state, parents,
-                          hooks):
-        return self._augment_polygons_as_keypoints(
-            polygons_on_images, random_state, parents, hooks)
-
-    def _draw_samples(self, nb_images, random_state, do_sample_ip=True):
+    def _draw_samples(self, nb_images, random_state):
         rngs = random_state.duplicate(3)
         if isinstance(self.size, tuple):
             samples_h = self.size[0].draw_samples(nb_images,
@@ -668,11 +1484,9 @@ class Resize(meta.Augmenter):
         else:
             samples_h = self.size.draw_samples(nb_images, random_state=rngs[0])
             samples_w = samples_h
-        if do_sample_ip:
-            samples_ip = self.interpolation.draw_samples(nb_images,
-                                                         random_state=rngs[2])
-        else:
-            samples_ip = None
+
+        samples_ip = self.interpolation.draw_samples(nb_images,
+                                                     random_state=rngs[2])
         return samples_h, samples_w, samples_ip
 
     @classmethod
@@ -685,7 +1499,6 @@ class Resize(meta.Augmenter):
                 h, w = sample_a, sample_b
             else:
                 w, h = sample_a, sample_b
-
         else:
             # size order: height, width
             h, w = sample_a, sample_b
@@ -716,6 +1529,7 @@ class Resize(meta.Augmenter):
         return h, w
 
     def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.size, self.interpolation, self.size_order]
 
 
@@ -735,10 +1549,12 @@ class _CropAndPadSamplingResult(object):
 
     @property
     def croppings(self):
+        """Get absolute pixel amounts of croppings as a TRBL tuple."""
         return self.crop_top, self.crop_right, self.crop_bottom, self.crop_left
 
     @property
     def paddings(self):
+        """Get absolute pixel amounts of paddings as a TRBL tuple."""
         return self.pad_top, self.pad_right, self.pad_bottom, self.pad_left
 
 
@@ -750,36 +1566,36 @@ class CropAndPad(meta.Augmenter):
 
     This augmenter will never crop images below a height or width of ``1``.
 
-    .. note ::
+    .. note::
 
         This augmenter automatically resizes images back to their original size
         after it has augmented them. To deactivate this, add the
         parameter ``keep_size=False``.
 
-    dtype support::
+    **Supported dtypes**:
 
-        if (keep_size=False)::
+    if (keep_size=False):
 
-            * ``uint8``: yes; fully tested
-            * ``uint16``: yes; tested
-            * ``uint32``: yes; tested
-            * ``uint64``: yes; tested
-            * ``int8``: yes; tested
-            * ``int16``: yes; tested
-            * ``int32``: yes; tested
-            * ``int64``: yes; tested
-            * ``float16``: yes; tested
-            * ``float32``: yes; tested
-            * ``float64``: yes; tested
-            * ``float128``: yes; tested
-            * ``bool``: yes; tested
+        * ``uint8``: yes; fully tested
+        * ``uint16``: yes; tested
+        * ``uint32``: yes; tested
+        * ``uint64``: yes; tested
+        * ``int8``: yes; tested
+        * ``int16``: yes; tested
+        * ``int32``: yes; tested
+        * ``int64``: yes; tested
+        * ``float16``: yes; tested
+        * ``float32``: yes; tested
+        * ``float64``: yes; tested
+        * ``float128``: yes; tested
+        * ``bool``: yes; tested
 
-        if (keep_size=True)::
+    if (keep_size=True):
 
-            minimum of (
-                ``imgaug.augmenters.size.CropAndPad(keep_size=False)``,
-                :func:`imgaug.imgaug.imresize_many_images`
-            )
+        minimum of (
+            ``imgaug.augmenters.size.CropAndPad(keep_size=False)``,
+            :func:`~imgaug.imgaug.imresize_many_images`
+        )
 
     Parameters
     ----------
@@ -847,7 +1663,7 @@ class CropAndPad(meta.Augmenter):
         i.e. ``constant``, ``edge``, ``linear_ramp``, ``maximum``, ``median``,
         ``minimum``, ``reflect``, ``symmetric``, ``wrap``. The modes
         ``constant`` and ``linear_ramp`` use extra values, which are provided
-        by ``pad_cval`` when necessary. See :func:`imgaug.imgaug.pad` for
+        by ``pad_cval`` when necessary. See :func:`~imgaug.imgaug.pad` for
         more details.
 
             * If ``imgaug.ALL``, then a random mode from all available modes
@@ -861,7 +1677,7 @@ class CropAndPad(meta.Augmenter):
     pad_cval : number or tuple of number list of number or imgaug.parameters.StochasticParameter, optional
         The constant value to use if the pad mode is ``constant`` or the end
         value to use if the mode is ``linear_ramp``.
-        See :func:`imgaug.imgaug.pad` for more details.
+        See :func:`~imgaug.imgaug.pad` for more details.
 
             * If ``number``, then that value will be used.
             * If a ``tuple`` of two ``number`` s and at least one of them is
@@ -888,14 +1704,22 @@ class CropAndPad(meta.Augmenter):
         all sides. I.e. the crop/pad amount then is the same for all sides.
         If ``True``, four values will be sampled independently, one per side.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -974,9 +1798,15 @@ class CropAndPad(meta.Augmenter):
 
     def __init__(self, px=None, percent=None, pad_mode="constant", pad_cval=0,
                  keep_size=True, sample_independently=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        # pylint: disable=invalid-name
         super(CropAndPad, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+        if px is None and percent is None:
+            percent = (-0.1, 0.1)
 
         self.mode, self.all_sides, self.top, self.right, self.bottom, \
             self.left = self._handle_px_and_percent_args(px, percent)
@@ -999,6 +1829,7 @@ class CropAndPad(meta.Augmenter):
 
     @classmethod
     def _handle_px_and_percent_args(cls, px, percent):
+        # pylint: disable=invalid-name
         all_sides = None
         top, right, bottom, left = None, None, None, None
 
@@ -1017,6 +1848,7 @@ class CropAndPad(meta.Augmenter):
 
     @classmethod
     def _handle_px_arg(cls, px):
+        # pylint: disable=invalid-name
         all_sides = None
         top, right, bottom, left = None, None, None, None
 
@@ -1030,7 +1862,7 @@ class CropAndPad(meta.Augmenter):
             def handle_param(p):
                 if ia.is_single_integer(p):
                     return iap.Deterministic(p)
-                elif isinstance(p, tuple):
+                if isinstance(p, tuple):
                     assert len(p) == 2, (
                         "Expected tuple of 2 values, got %d." % (len(p)))
                     only_ints = (
@@ -1040,19 +1872,18 @@ class CropAndPad(meta.Augmenter):
                         "Expected tuple of integers, got %s and %s." % (
                             type(p[0]), type(p[1])))
                     return iap.DiscreteUniform(p[0], p[1])
-                elif isinstance(p, list):
+                if isinstance(p, list):
                     assert len(p) > 0, (
                         "Expected non-empty list, but got empty one.")
                     assert all([ia.is_single_integer(val) for val in p]), (
                         "Expected list of ints, got types %s." % (
                             ", ".join([str(type(v)) for v in p])))
                     return iap.Choice(p)
-                elif isinstance(p, iap.StochasticParameter):
+                if isinstance(p, iap.StochasticParameter):
                     return p
-                else:
-                    raise Exception(
-                        "Expected int, tuple of two ints, list of ints or "
-                        "StochasticParameter, got type %s." % (type(p),))
+                raise Exception(
+                    "Expected int, tuple of two ints, list of ints or "
+                    "StochasticParameter, got type %s." % (type(p),))
 
             if len(px) == 2:
                 all_sides = handle_param(px)
@@ -1087,7 +1918,7 @@ class CropAndPad(meta.Augmenter):
             def handle_param(p):
                 if ia.is_single_number(p):
                     return iap.Deterministic(p)
-                elif isinstance(p, tuple):
+                if isinstance(p, tuple):
                     assert len(p) == 2, (
                         "Expected tuple of 2 values, got %d." % (len(p),))
                     only_numbers = (
@@ -1100,7 +1931,7 @@ class CropAndPad(meta.Augmenter):
                         "Expected tuple of values >-1.0, got %.4f and "
                         "%.4f." % (p[0], p[1]))
                     return iap.Uniform(p[0], p[1])
-                elif isinstance(p, list):
+                if isinstance(p, list):
                     assert len(p) > 0, (
                         "Expected non-empty list, but got empty one.")
                     assert all([ia.is_single_number(val) for val in p]), (
@@ -1110,12 +1941,11 @@ class CropAndPad(meta.Augmenter):
                         "Expected list of values >-1.0, got values %s." % (
                             ", ".join(["%.4f" % (v,) for v in p])))
                     return iap.Choice(p)
-                elif isinstance(p, iap.StochasticParameter):
+                if isinstance(p, iap.StochasticParameter):
                     return p
-                else:
-                    raise Exception(
-                        "Expected int, tuple of two ints, list of ints or "
-                        "StochasticParameter, got type %s." % (type(p),))
+                raise Exception(
+                    "Expected int, tuple of two ints, list of ints or "
+                    "StochasticParameter, got type %s." % (type(p),))
 
             if len(percent) == 2:
                 all_sides = handle_param(percent)
@@ -1133,17 +1963,48 @@ class CropAndPad(meta.Augmenter):
                 "StochasticParameter, got type %s." % (type(percent),))
         return all_sides, top, right, bottom, left
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        shapes = batch.get_rowwise_shapes()
+        samples = self._draw_samples(random_state, shapes)
+
+        if batch.images is not None:
+            batch.images = self._augment_images_by_samples(batch.images,
+                                                           samples)
+
+        if batch.heatmaps is not None:
+            batch.heatmaps = self._augment_maps_by_samples(
+                batch.heatmaps,
+                self._pad_mode_heatmaps, self._pad_cval_heatmaps,
+                samples)
+
+        if batch.segmentation_maps is not None:
+            batch.segmentation_maps = self._augment_maps_by_samples(
+                batch.segmentation_maps,
+                self._pad_mode_segmentation_maps,
+                self._pad_cval_segmentation_maps, samples)
+
+        for augm_name in ["keypoints", "bounding_boxes", "polygons",
+                          "line_strings"]:
+            augm_value = getattr(batch, augm_name)
+            if augm_value is not None:
+                func = functools.partial(
+                    self._augment_keypoints_by_samples,
+                    samples=samples)
+                cbaois = self._apply_to_cbaois_as_keypoints(augm_value, func)
+                setattr(batch, augm_name, cbaois)
+
+        return batch
+
+    # Added in 0.4.0.
+    def _augment_images_by_samples(self, images, samples):
         result = []
-        nb_images = len(images)
-        rngs = random_state.duplicate(nb_images)
-        for image, rng in zip(images, rngs):
-            height, width = image.shape[0:2]
-            samples = self._draw_samples_image(rng, height, width)
+        for i, image in enumerate(images):
+            samples_i = samples[i]
 
             image_cr_pa = _crop_and_pad_arr(
-                image, samples.croppings, samples.paddings, samples.pad_mode,
-                samples.pad_cval, self.keep_size)
+                image, samples_i.croppings, samples_i.paddings,
+                samples_i.pad_mode, samples_i.pad_cval, self.keep_size)
 
             result.append(image_cr_pa)
 
@@ -1151,31 +2012,18 @@ class CropAndPad(meta.Augmenter):
             if self.keep_size:
                 result = np.array(result, dtype=images.dtype)
             else:
-                nb_shapes = len(set([image.shape for image in result]))
+                nb_shapes = len({image.shape for image in result})
                 if nb_shapes == 1:
                     result = np.array(result, dtype=images.dtype)
 
         return result
 
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        return self._augment_hms_and_segmaps(
-            heatmaps,
-            self._pad_mode_heatmaps, self._pad_cval_heatmaps,
-            random_state)
-
-    def _augment_segmentation_maps(self, segmaps, random_state, parents, hooks):
-        return self._augment_hms_and_segmaps(
-            segmaps,
-            self._pad_mode_segmentation_maps, self._pad_cval_segmentation_maps,
-            random_state)
-
-    def _augment_hms_and_segmaps(self, augmentables, pad_mode, pad_cval,
-                                 random_state):
+    # Added in 0.4.0.
+    def _augment_maps_by_samples(self, augmentables, pad_mode, pad_cval,
+                                 samples):
         result = []
-        rngs = random_state.duplicate(len(augmentables))
-        for augmentable, rng in zip(augmentables, rngs):
-            height_img, width_img = augmentable.shape[0:2]
-            samples_img = self._draw_samples_image(rng, height_img, width_img)
+        for i, augmentable in enumerate(augmentables):
+            samples_img = samples[i]
 
             augmentable = _crop_and_pad_hms_or_segmaps_(
                 augmentable,
@@ -1194,118 +2042,134 @@ class CropAndPad(meta.Augmenter):
 
         return result
 
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
+    # Added in 0.4.0.
+    def _augment_keypoints_by_samples(self, keypoints_on_images, samples):
         result = []
-        nb_images = len(keypoints_on_images)
-        rngs = random_state.duplicate(nb_images)
-        for keypoints_on_image, rng in zip(keypoints_on_images, rngs):
-            height, width = keypoints_on_image.shape[0:2]
-            samples = self._draw_samples_image(rng, height, width)
+        for i, keypoints_on_image in enumerate(keypoints_on_images):
+            samples_i = samples[i]
 
-            kpsoi_aug = _crop_and_pad_kpsoi(
-                keypoints_on_image, croppings_img=samples.croppings,
-                paddings_img=samples.paddings, keep_size=self.keep_size)
+            kpsoi_aug = _crop_and_pad_kpsoi_(
+                keypoints_on_image, croppings_img=samples_i.croppings,
+                paddings_img=samples_i.paddings, keep_size=self.keep_size)
             result.append(kpsoi_aug)
 
         return result
 
-    def _augment_polygons(self, polygons_on_images, random_state, parents,
-                          hooks):
-        return self._augment_polygons_as_keypoints(
-            polygons_on_images, random_state, parents, hooks)
+    def _draw_samples(self, random_state, shapes):
+        nb_rows = len(shapes)
 
-    def _draw_samples_image(self, random_state, height, width):
         if self.mode == "noop":
-            top = right = bottom = left = 0
+            top = right = bottom = left = np.full((nb_rows,), 0,
+                                                  dtype=np.int32)
         else:
             if self.all_sides is not None:
                 if self.sample_independently:
                     samples = self.all_sides.draw_samples(
-                        (4,), random_state=random_state)
-                    top, right, bottom, left = samples
+                        (nb_rows, 4), random_state=random_state)
+                    top = samples[:, 0]
+                    right = samples[:, 1]
+                    bottom = samples[:, 2]
+                    left = samples[:, 3]
                 else:
-                    sample = self.all_sides.draw_sample(
-                        random_state=random_state)
+                    sample = self.all_sides.draw_samples(
+                        (nb_rows,), random_state=random_state)
                     top = right = bottom = left = sample
             else:
-                top = self.top.draw_sample(random_state=random_state)
-                right = self.right.draw_sample(random_state=random_state)
-                bottom = self.bottom.draw_sample(random_state=random_state)
-                left = self.left.draw_sample(random_state=random_state)
+                top = self.top.draw_samples(
+                    (nb_rows,), random_state=random_state)
+                right = self.right.draw_samples(
+                    (nb_rows,), random_state=random_state)
+                bottom = self.bottom.draw_samples(
+                    (nb_rows,), random_state=random_state)
+                left = self.left.draw_samples(
+                    (nb_rows,), random_state=random_state)
 
             if self.mode == "px":
                 # no change necessary for pixel values
                 pass
             elif self.mode == "percent":
                 # percentage values have to be transformed to pixel values
-                top = _int_r(height * top)
-                right = _int_r(width * right)
-                bottom = _int_r(height * bottom)
-                left = _int_r(width * left)
+                shapes_arr = np.array([shape[0:2] for shape in shapes],
+                                      dtype=np.float32)
+                heights = shapes_arr[:, 0]
+                widths = shapes_arr[:, 1]
+                top = np.round(heights * top).astype(np.int32)
+                right = np.round(widths * right).astype(np.int32)
+                bottom = np.round(heights * bottom).astype(np.int32)
+                left = np.round(widths * left).astype(np.int32)
             else:
                 raise Exception("Invalid mode")
 
-        crop_top = (-1) * top if top < 0 else 0
-        crop_right = (-1) * right if right < 0 else 0
-        crop_bottom = (-1) * bottom if bottom < 0 else 0
-        crop_left = (-1) * left if left < 0 else 0
+        def _only_above_zero(arr):
+            arr = np.copy(arr)
+            mask = (arr < 0)
+            arr[mask] = 0
+            return arr
 
-        pad_top = top if top > 0 else 0
-        pad_right = right if right > 0 else 0
-        pad_bottom = bottom if bottom > 0 else 0
-        pad_left = left if left > 0 else 0
+        crop_top = _only_above_zero((-1) * top)
+        crop_right = _only_above_zero((-1) * right)
+        crop_bottom = _only_above_zero((-1) * bottom)
+        crop_left = _only_above_zero((-1) * left)
 
-        pad_mode = self.pad_mode.draw_sample(random_state=random_state)
-        pad_cval = self.pad_cval.draw_sample(random_state=random_state)
+        pad_top = _only_above_zero(top)
+        pad_right = _only_above_zero(right)
+        pad_bottom = _only_above_zero(bottom)
+        pad_left = _only_above_zero(left)
 
-        crop_top, crop_right, crop_bottom, crop_left = _crop_prevent_zero_size(
-            height, width, crop_top, crop_right, crop_bottom, crop_left)
+        pad_mode = self.pad_mode.draw_samples((nb_rows,),
+                                              random_state=random_state)
+        pad_cval = self.pad_cval.draw_samples((nb_rows,),
+                                              random_state=random_state)
 
-        assert (
-            crop_top >= 0
-            and crop_right >= 0
-            and crop_bottom >= 0
-            and crop_left >= 0), (
-            "Expected to generate only crop amounts >=0, "
-            "got %d, %d, %d, %d (top, right, bottom, left)." % (
-                crop_top, crop_right, crop_bottom, crop_left))
+        # TODO vectorize this part -- especially return only one instance
+        result = []
+        for i, shape in enumerate(shapes):
+            height, width = shape[0:2]
+            crop_top_i, crop_right_i, crop_bottom_i, crop_left_i = \
+                _crop_prevent_zero_size(
+                    height, width,
+                    crop_top[i], crop_right[i], crop_bottom[i], crop_left[i])
 
-        any_crop_y = (crop_top > 0 or crop_bottom > 0)
-        if any_crop_y and crop_top + crop_bottom >= height:
-            ia.warn(
-                "Expected generated crop amounts in CropAndPad for top and "
-                "bottom image side to be less than the image's height, but "
-                "got %d (top) and %d (bottom) vs. image height %d. This will "
-                "result in an image with output height=1 (if input height "
-                "was >=1) or output height=0 (if input height was 0)." % (
-                    crop_top, crop_bottom, height)
-            )
+            # add here any_crop_y to not warn in case of zero height/width
+            # images
+            any_crop_y = (crop_top_i > 0 or crop_bottom_i > 0)
+            if any_crop_y and crop_top_i + crop_bottom_i >= height:
+                ia.warn(
+                    "Expected generated crop amounts in CropAndPad for top and "
+                    "bottom image side to be less than the image's height, but "
+                    "got %d (top) and %d (bottom) vs. image height %d. This "
+                    "will result in an image with output height=1 (if input "
+                    "height was >=1) or output height=0 (if input height "
+                    "was 0)." % (crop_top_i, crop_bottom_i, height))
 
-        any_crop_x = (crop_left > 0 or crop_right > 0)
-        if any_crop_x and crop_left + crop_right >= width:
-            ia.warn(
-                "Expected generated crop amounts in CropAndPad for left and "
-                "right image side to be less than the image's width, but "
-                "got %d (left) and %d (right) vs. image width %d. This will "
-                "result in an image with output width=1 (if input width "
-                "was >=1) or output width=0 (if input width was 0)." % (
-                    crop_left, crop_right, width)
-            )
+            # add here any_crop_x to not warn in case of zero height/width
+            # images
+            any_crop_x = (crop_left_i > 0 or crop_right_i > 0)
+            if any_crop_x and crop_left_i + crop_right_i >= width:
+                ia.warn(
+                    "Expected generated crop amounts in CropAndPad for left "
+                    "and right image side to be less than the image's width, "
+                    "but got %d (left) and %d (right) vs. image width %d. "
+                    "This will result in an image with output width=1 (if "
+                    "input width was >=1) or output width=0 (if input width "
+                    "was 0)." % (crop_left_i, crop_right_i, width))
 
-        return _CropAndPadSamplingResult(
-            crop_top=crop_top,
-            crop_right=crop_right,
-            crop_bottom=crop_bottom,
-            crop_left=crop_left,
-            pad_top=pad_top,
-            pad_right=pad_right,
-            pad_bottom=pad_bottom,
-            pad_left=pad_left,
-            pad_mode=pad_mode,
-            pad_cval=pad_cval)
+            result.append(
+                _CropAndPadSamplingResult(
+                    crop_top=crop_top_i,
+                    crop_right=crop_right_i,
+                    crop_bottom=crop_bottom_i,
+                    crop_left=crop_left_i,
+                    pad_top=pad_top[i],
+                    pad_right=pad_right[i],
+                    pad_bottom=pad_bottom[i],
+                    pad_left=pad_left[i],
+                    pad_mode=pad_mode[i],
+                    pad_cval=pad_cval[i]))
+        return result
 
     def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.all_sides, self.top, self.right, self.bottom, self.left,
                 self.pad_mode, self.pad_cval]
 
@@ -1313,9 +2177,9 @@ class CropAndPad(meta.Augmenter):
 class Pad(CropAndPad):
     """Pad images, i.e. adds columns/rows of pixels to them.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See ``imgaug.augmenters.size.CropAndPad``.
+    See :class:`~imgaug.augmenters.size.CropAndPad`.
 
     Parameters
     ----------
@@ -1384,7 +2248,7 @@ class Pad(CropAndPad):
         i.e. ``constant``, ``edge``, ``linear_ramp``, ``maximum``, ``median``,
         ``minimum``, ``reflect``, ``symmetric``, ``wrap``. The modes
         ``constant`` and ``linear_ramp`` use extra values, which are provided
-        by ``pad_cval`` when necessary. See :func:`imgaug.imgaug.pad` for
+        by ``pad_cval`` when necessary. See :func:`~imgaug.imgaug.pad` for
         more details.
 
             * If ``imgaug.ALL``, then a random mode from all available modes
@@ -1398,7 +2262,7 @@ class Pad(CropAndPad):
     pad_cval : number or tuple of number list of number or imgaug.parameters.StochasticParameter, optional
         The constant value to use if the pad mode is ``constant`` or the end
         value to use if the mode is ``linear_ramp``.
-        See :func:`imgaug.imgaug.pad` for more details.
+        See :func:`~imgaug.imgaug.pad` for more details.
 
             * If ``number``, then that value will be used.
             * If a ``tuple`` of two ``number`` s and at least one of them is
@@ -1425,14 +2289,22 @@ class Pad(CropAndPad):
         all sides. I.e. the pad amount then is the same for all sides.
         If ``True``, four values will be sampled independently, one per side.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1500,23 +2372,26 @@ class Pad(CropAndPad):
 
     def __init__(self, px=None, percent=None, pad_mode="constant", pad_cval=0,
                  keep_size=True, sample_independently=True,
-                 name=None, deterministic=False, random_state=None):
-        def recursive_validate(v):
-            if v is None:
-                return v
-            elif ia.is_single_number(v):
-                assert v >= 0, "Expected value >0, got %.4f" % (v,)
-                return v
-            elif isinstance(v, iap.StochasticParameter):
-                return v
-            elif isinstance(v, tuple):
-                return tuple([recursive_validate(v_) for v_ in v])
-            elif isinstance(v, list):
-                return [recursive_validate(v_) for v_ in v]
-            else:
-                raise Exception(
-                    "Expected None or int or float or StochasticParameter or "
-                    "list or tuple, got %s." % (type(v),))
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        def recursive_validate(value):
+            if value is None:
+                return value
+            if ia.is_single_number(value):
+                assert value >= 0, "Expected value >0, got %.4f" % (value,)
+                return value
+            if isinstance(value, iap.StochasticParameter):
+                return value
+            if isinstance(value, tuple):
+                return tuple([recursive_validate(v_) for v_ in value])
+            if isinstance(value, list):
+                return [recursive_validate(v_) for v_ in value]
+            raise Exception(
+                "Expected None or int or float or StochasticParameter or "
+                "list or tuple, got %s." % (type(value),))
+
+        if px is None and percent is None:
+            percent = (0.0, 0.1)
 
         px = recursive_validate(px)
         percent = recursive_validate(percent)
@@ -1528,10 +2403,8 @@ class Pad(CropAndPad):
             pad_cval=pad_cval,
             keep_size=keep_size,
             sample_independently=sample_independently,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class Crop(CropAndPad):
@@ -1543,9 +2416,9 @@ class Crop(CropAndPad):
 
     This augmenter will never crop images below a height or width of ``1``.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See ``imgaug.augmenters.size.CropAndPad``.
+    See :class:`~imgaug.augmenters.size.CropAndPad`.
 
     Parameters
     ----------
@@ -1623,14 +2496,22 @@ class Crop(CropAndPad):
         all sides. I.e. the crop amount then is the same for all sides.
         If ``True``, four values will be sampled independently, one per side.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1677,23 +2558,26 @@ class Crop(CropAndPad):
 
     def __init__(self, px=None, percent=None, keep_size=True,
                  sample_independently=True,
-                 name=None, deterministic=False, random_state=None):
-        def recursive_negate(v):
-            if v is None:
-                return v
-            elif ia.is_single_number(v):
-                assert v >= 0, "Expected value >0, got %.4f." % (v,)
-                return -v
-            elif isinstance(v, iap.StochasticParameter):
-                return iap.Multiply(v, -1)
-            elif isinstance(v, tuple):
-                return tuple([recursive_negate(v_) for v_ in v])
-            elif isinstance(v, list):
-                return [recursive_negate(v_) for v_ in v]
-            else:
-                raise Exception(
-                    "Expected None or int or float or StochasticParameter or "
-                    "list or tuple, got %s." % (type(v),))
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        def recursive_negate(value):
+            if value is None:
+                return value
+            if ia.is_single_number(value):
+                assert value >= 0, "Expected value >0, got %.4f." % (value,)
+                return -value
+            if isinstance(value, iap.StochasticParameter):
+                return iap.Multiply(value, -1)
+            if isinstance(value, tuple):
+                return tuple([recursive_negate(v_) for v_ in value])
+            if isinstance(value, list):
+                return [recursive_negate(v_) for v_ in value]
+            raise Exception(
+                "Expected None or int or float or StochasticParameter or "
+                "list or tuple, got %s." % (type(value),))
+
+        if px is None and percent is None:
+            percent = (0.0, 0.1)
 
         px = recursive_negate(px)
         percent = recursive_negate(percent)
@@ -1703,10 +2587,8 @@ class Crop(CropAndPad):
             percent=percent,
             keep_size=keep_size,
             sample_independently=sample_independently,
-            name=name,
-            deterministic=deterministic,
-            random_state=random_state
-        )
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 # TODO maybe rename this to PadToMinimumSize?
@@ -1728,23 +2610,25 @@ class PadToFixedSize(meta.Augmenter):
     and 0px to the left and sometimes add 1px to both sides. Set `position`
     to ``center`` to prevent that.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.imgaug.pad`.
+    See :func:`~imgaug.augmenters.size.pad`.
 
     Parameters
     ----------
-    width : int
+    width : int or None
         Pad images up to this minimum width.
+        If ``None``, image widths will not be altered.
 
-    height : int
+    height : int or None
         Pad images up to this minimum height.
+        If ``None``, image heights will not be altered.
 
     pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
-        See :func:`imgaug.augmenters.size.CropAndPad.__init__`.
+        See :func:`~imgaug.augmenters.size.CropAndPad.__init__`.
 
     pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
-        See :func:`imgaug.augmenters.size.CropAndPad.__init__`.
+        See :func:`~imgaug.augmenters.size.CropAndPad.__init__`.
 
     position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
         Sets the center point of the padding, which determines how the
@@ -1788,14 +2672,22 @@ class PadToFixedSize(meta.Augmenter):
               positions. First parameter is used for ``x`` coordinates,
               second for ``y`` coordinates.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -1834,10 +2726,12 @@ class PadToFixedSize(meta.Augmenter):
 
     def __init__(self, width, height, pad_mode="constant", pad_cval=0,
                  position="uniform",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(PadToFixedSize, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
-        self.size = width, height
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        self.size = (width, height)
 
         # Position of where to pad. The further to the top left this is, the
         # larger the share of pixels that will be added to the top and left
@@ -1861,14 +2755,46 @@ class PadToFixedSize(meta.Augmenter):
         self._pad_cval_heatmaps = 0.0
         self._pad_cval_segmentation_maps = 0
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        # Providing the whole batch to _draw_samples() would not be necessary
+        # for this augmenter. The number of rows would be sufficient. This
+        # formulation however enables derived augmenters to use rowwise shapes
+        # without having to compute them here for this augmenter.
+        samples = self._draw_samples(batch, random_state)
+
+        if batch.images is not None:
+            batch.images = self._augment_images_by_samples(batch.images,
+                                                           samples)
+
+        if batch.heatmaps is not None:
+            batch.heatmaps = self._augment_maps_by_samples(
+                batch.heatmaps, samples, self._pad_mode_heatmaps,
+                self._pad_cval_heatmaps)
+
+        if batch.segmentation_maps is not None:
+            batch.segmentation_maps = self._augment_maps_by_samples(
+                batch.segmentation_maps, samples, self._pad_mode_heatmaps,
+                self._pad_cval_heatmaps)
+
+        for augm_name in ["keypoints", "bounding_boxes", "polygons",
+                          "line_strings"]:
+            augm_value = getattr(batch, augm_name)
+            if augm_value is not None:
+                func = functools.partial(
+                    self._augment_keypoints_by_samples,
+                    samples=samples)
+                cbaois = self._apply_to_cbaois_as_keypoints(augm_value, func)
+                setattr(batch, augm_name, cbaois)
+
+        return batch
+
+    # Added in 0.4.0.
+    def _augment_images_by_samples(self, images, samples):
         result = []
-        nb_images = len(images)
-        width_min, height_min = self.size
-        pad_xs, pad_ys, pad_modes, pad_cvals = self._draw_samples(nb_images,
-                                                                  random_state)
-        for i in sm.xrange(nb_images):
-            image = images[i]
+        sizes, pad_xs, pad_ys, pad_modes, pad_cvals = samples
+        for i, (image, size) in enumerate(zip(images, sizes)):
+            width_min, height_min = size
             height_image, width_image = image.shape[:2]
             paddings = self._calculate_paddings(height_image, width_image,
                                                 height_min, width_min,
@@ -1885,47 +2811,32 @@ class PadToFixedSize(meta.Augmenter):
         #      some might have been larger than desired height/width)
         return result
 
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
+    # Added in 0.4.0.
+    def _augment_keypoints_by_samples(self, keypoints_on_images, samples):
         result = []
-        nb_images = len(keypoints_on_images)
-        width_min, height_min = self.size
-        pad_xs, pad_ys, _, _ = self._draw_samples(nb_images, random_state)
-        for i in sm.xrange(nb_images):
-            keypoints_on_image = keypoints_on_images[i]
-            height_image, width_image = keypoints_on_image.shape[:2]
+        sizes, pad_xs, pad_ys, _, _ = samples
+        for i, (kpsoi, size) in enumerate(zip(keypoints_on_images, sizes)):
+            width_min, height_min = size
+            height_image, width_image = kpsoi.shape[:2]
             paddings_img = self._calculate_paddings(height_image, width_image,
                                                     height_min, width_min,
                                                     pad_xs[i], pad_ys[i])
 
-            keypoints_padded = _crop_and_pad_kpsoi(
-                keypoints_on_image, (0, 0, 0, 0), paddings_img,
+            keypoints_padded = _crop_and_pad_kpsoi_(
+                kpsoi, (0, 0, 0, 0), paddings_img,
                 keep_size=False)
 
             result.append(keypoints_padded)
 
         return result
 
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        return self._augment_hms_or_segmaps(
-            heatmaps,
-            self._pad_mode_heatmaps, self._pad_cval_heatmaps,
-            random_state)
+    # Added in 0.4.0.
+    def _augment_maps_by_samples(self, augmentables, samples, pad_mode,
+                                 pad_cval):
+        sizes, pad_xs, pad_ys, pad_modes, pad_cvals = samples
 
-    def _augment_segmentation_maps(self, segmaps, random_state, parents,
-                                   hooks):
-        return self._augment_hms_or_segmaps(
-            segmaps,
-            self._pad_mode_segmentation_maps, self._pad_cval_segmentation_maps,
-            random_state)
-
-    def _augment_hms_or_segmaps(self, augmentables, pad_mode, pad_cval,
-                                random_state):
-        width_min, height_min = self.size
-        pad_xs, pad_ys, pad_modes, pad_cvals = self._draw_samples(
-            len(augmentables), random_state)
-
-        for i, augmentable in enumerate(augmentables):
+        for i, (augmentable, size) in enumerate(zip(augmentables, sizes)):
+            width_min, height_min = size
             height_img, width_img = augmentable.shape[:2]
             paddings_img = self._calculate_paddings(
                 height_img, width_img, height_min, width_min,
@@ -1948,12 +2859,8 @@ class PadToFixedSize(meta.Augmenter):
 
         return augmentables
 
-    def _augment_polygons(self, polygons_on_images, random_state, parents,
-                          hooks):
-        return self._augment_polygons_as_keypoints(
-            polygons_on_images, random_state, parents, hooks)
-
-    def _draw_samples(self, nb_images, random_state):
+    def _draw_samples(self, batch, random_state):
+        nb_images = batch.nb_rows
         rngs = random_state.duplicate(4)
 
         if isinstance(self.position, tuple):
@@ -1972,7 +2879,9 @@ class PadToFixedSize(meta.Augmenter):
         pad_cvals = self.pad_cval.draw_samples(nb_images,
                                                random_state=rngs[3])
 
-        return pad_xs, pad_ys, pad_modes, pad_cvals
+        # We return here the sizes even though they are static as it allows
+        # derived augmenters to define image-specific heights/widths.
+        return [self.size] * nb_images, pad_xs, pad_ys, pad_modes, pad_cvals
 
     @classmethod
     def _calculate_paddings(cls, height_image, width_image,
@@ -1982,18 +2891,89 @@ class PadToFixedSize(meta.Augmenter):
         pad_bottom = 0
         pad_left = 0
 
-        if width_image < width_min:
-            pad_right = int(pad_xs_i * (width_min - width_image))
-            pad_left = width_min - width_image - pad_right
+        if width_min is not None and width_image < width_min:
+            pad_total_x = width_min - width_image
+            pad_left = int((1-pad_xs_i) * pad_total_x)
+            pad_right = pad_total_x - pad_left
 
-        if height_image < height_min:
-            pad_bottom = int(pad_ys_i * (height_min - height_image))
-            pad_top = height_min - height_image - pad_bottom
+        if height_min is not None and height_image < height_min:
+            pad_total_y = height_min - height_image
+            pad_top = int((1-pad_ys_i) * pad_total_y)
+            pad_bottom = pad_total_y - pad_top
 
         return pad_top, pad_right, pad_bottom, pad_left
 
     def get_parameters(self):
-        return [self.position, self.pad_mode, self.pad_cval]
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.size[0], self.size[1], self.pad_mode, self.pad_cval,
+                self.position]
+
+
+class CenterPadToFixedSize(PadToFixedSize):
+    """Pad images equally on all sides up to given minimum heights/widths.
+
+    This is an alias for :class:`~imgaug.augmenters.size.PadToFixedSize`
+    with ``position="center"``. It spreads the pad amounts equally over
+    all image sides, while :class:`~imgaug.augmenters.size.PadToFixedSize`
+    by defaults spreads them randomly.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    width : int or None
+        See :func:`PadToFixedSize.__init__`.
+
+    height : int or None
+        See :func:`PadToFixedSize.__init__`.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`PadToFixedSize.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`PadToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CenterPadToFixedSize(height=20, width=30)
+
+    Create an augmenter that pads images up to ``20x30``, with the padded
+    rows added *equally* on the top and bottom (analogous for the padded
+    columns).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width, height, pad_mode="constant", pad_cval=0,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterPadToFixedSize, self).__init__(
+            width=width, height=height, pad_mode=pad_mode, pad_cval=pad_cval,
+            position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 # TODO maybe rename this to CropToMaximumSize ?
@@ -2014,7 +2994,7 @@ class CropToFixedSize(meta.Augmenter):
     remove 2px from the right and 0px from the left and sometimes remove 1px
     from both sides. Set `position` to ``center`` to prevent that.
 
-    dtype support::
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; tested
@@ -2032,11 +3012,13 @@ class CropToFixedSize(meta.Augmenter):
 
     Parameters
     ----------
-    width : int
+    width : int or None
         Crop images down to this maximum width.
+        If ``None``, image widths will not be altered.
 
-    height : int
+    height : int or None
         Crop images down to this maximum height.
+        If ``None``, image heights will not be altered.
 
     position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
          Sets the center point of the cropping, which determines how the
@@ -2078,14 +3060,22 @@ class CropToFixedSize(meta.Augmenter):
               positions. First parameter is used for ``x`` coordinates,
               second for ``y`` coordinates.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2114,10 +3104,12 @@ class CropToFixedSize(meta.Augmenter):
     """
 
     def __init__(self, width, height, position="uniform",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(CropToFixedSize, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
-        self.size = width, height
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        self.size = (width, height)
 
         # Position of where to crop. The further to the top left this is,
         # the larger the share of pixels that will be cropped from the top
@@ -2128,13 +3120,44 @@ class CropToFixedSize(meta.Augmenter):
         # (0.0, 1.0) crops left and bottom, (1.0, 0.0) crops right and top.
         self.position = _handle_position_parameter(position)
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        # Providing the whole batch to _draw_samples() would not be necessary
+        # for this augmenter. The number of rows would be sufficient. This
+        # formulation however enables derived augmenters to use rowwise shapes
+        # without having to compute them here for this augmenter.
+        samples = self._draw_samples(batch, random_state)
+
+        if batch.images is not None:
+            batch.images = self._augment_images_by_samples(batch.images,
+                                                           samples)
+
+        if batch.heatmaps is not None:
+            batch.heatmaps = self._augment_maps_by_samples(
+                batch.heatmaps, samples)
+
+        if batch.segmentation_maps is not None:
+            batch.segmentation_maps = self._augment_maps_by_samples(
+                batch.segmentation_maps, samples)
+
+        for augm_name in ["keypoints", "bounding_boxes", "polygons",
+                          "line_strings"]:
+            augm_value = getattr(batch, augm_name)
+            if augm_value is not None:
+                func = functools.partial(
+                    self._augment_keypoints_by_samples,
+                    samples=samples)
+                cbaois = self._apply_to_cbaois_as_keypoints(augm_value, func)
+                setattr(batch, augm_name, cbaois)
+
+        return batch
+
+    # Added in 0.4.0.
+    def _augment_images_by_samples(self, images, samples):
         result = []
-        nb_images = len(images)
-        w, h = self.size
-        offset_xs, offset_ys = self._draw_samples(nb_images, random_state)
-        for i in sm.xrange(nb_images):
-            image = images[i]
+        sizes, offset_xs, offset_ys = samples
+        for i, (image, size) in enumerate(zip(images, sizes)):
+            w, h = size
             height_image, width_image = image.shape[0:2]
 
             croppings = self._calculate_crop_amounts(
@@ -2147,49 +3170,36 @@ class CropToFixedSize(meta.Augmenter):
 
         return result
 
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
+    # Added in 0.4.0.
+    def _augment_keypoints_by_samples(self, kpsois, samples):
         result = []
-        nb_images = len(keypoints_on_images)
-        w, h = self.size
-        offset_xs, offset_ys = self._draw_samples(nb_images, random_state)
-        for i in sm.xrange(nb_images):
-            kpsoi = keypoints_on_images[i]
+        sizes, offset_xs, offset_ys = samples
+        for i, (kpsoi, size) in enumerate(zip(kpsois, sizes)):
+            w, h = size
             height_image, width_image = kpsoi.shape[0:2]
 
             croppings_img = self._calculate_crop_amounts(
                 height_image, width_image, h, w, offset_ys[i], offset_xs[i])
 
-            kpsoi_cropped = _crop_and_pad_kpsoi(
+            kpsoi_cropped = _crop_and_pad_kpsoi_(
                 kpsoi, croppings_img, (0, 0, 0, 0), keep_size=False)
 
             result.append(kpsoi_cropped)
 
         return result
 
-    def _augment_polygons(self, polygons_on_images, random_state, parents,
-                          hooks):
-        return self._augment_polygons_as_keypoints(
-            polygons_on_images, random_state, parents, hooks)
-
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        return self._augment_hms_and_segmaps(heatmaps, random_state)
-
-    def _augment_segmentation_maps(self, segmaps, random_state, parents, hooks):
-        return self._augment_hms_and_segmaps(segmaps, random_state)
-
-    def _augment_hms_and_segmaps(self, augmentables, random_state):
-        nb_images = len(augmentables)
-        w, h = self.size
-        offset_xs, offset_ys = self._draw_samples(nb_images, random_state)
-        for i in sm.xrange(nb_images):
-            height_image, width_image = augmentables[i].shape[0:2]
+    # Added in 0.4.0.
+    def _augment_maps_by_samples(self, augmentables, samples):
+        sizes, offset_xs, offset_ys = samples
+        for i, (augmentable, size) in enumerate(zip(augmentables, sizes)):
+            w, h = size
+            height_image, width_image = augmentable.shape[0:2]
 
             croppings_img = self._calculate_crop_amounts(
                 height_image, width_image, h, w, offset_ys[i], offset_xs[i])
 
             augmentables[i] = _crop_and_pad_hms_or_segmaps_(
-                augmentables[i], croppings_img, (0, 0, 0, 0), keep_size=False)
+                augmentable, croppings_img, (0, 0, 0, 0), keep_size=False)
 
         return augmentables
 
@@ -2202,17 +3212,18 @@ class CropToFixedSize(meta.Augmenter):
         crop_bottom = 0
         crop_left = 0
 
-        if height_image > height_max:
+        if height_max is not None and height_image > height_max:
             crop_top = int(offset_y * (height_image - height_max))
             crop_bottom = height_image - height_max - crop_top
 
-        if width_image > width_max:
+        if width_max is not None and width_image > width_max:
             crop_left = int(offset_x * (width_image - width_max))
             crop_right = width_image - width_max - crop_left
 
         return crop_top, crop_right, crop_bottom, crop_left
 
-    def _draw_samples(self, nb_images, random_state):
+    def _draw_samples(self, batch, random_state):
+        nb_images = batch.nb_rows
         rngs = random_state.duplicate(2)
 
         if isinstance(self.position, tuple):
@@ -2229,10 +3240,1346 @@ class CropToFixedSize(meta.Augmenter):
         offset_xs = 1.0 - offset_xs
         offset_ys = 1.0 - offset_ys
 
-        return offset_xs, offset_ys
+        # We return here the sizes even though they are static as it allows
+        # derived augmenters to define image-specific heights/widths.
+        return [self.size] * nb_images, offset_xs, offset_ys
 
     def get_parameters(self):
-        return [self.position]
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.size[0], self.size[1], self.position]
+
+
+class CenterCropToFixedSize(CropToFixedSize):
+    """Take a crop from the center of each image.
+
+    This is an alias for :class:`~imgaug.augmenters.size.CropToFixedSize` with
+    ``position="center"``.
+
+    .. note::
+
+        If images already have a width and/or height below the provided
+        width and/or height then this augmenter will do nothing for the
+        respective axis. Hence, resulting images can be smaller than the
+        provided axis sizes.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    width : int or None
+        See :func:`CropToFixedSize.__init__`.
+
+    height : int or None
+        See :func:`CropToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> crop = iaa.CenterCropToFixedSize(height=20, width=10)
+
+    Create an augmenter that takes ``20x10`` sized crops from the center of
+    images.
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width, height,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterCropToFixedSize, self).__init__(
+            width=width, height=height, position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class CropToMultiplesOf(CropToFixedSize):
+    """Crop images down until their height/width is a multiple of a value.
+
+    .. note::
+
+        For a given axis size ``A`` and multiple ``M``, if ``A`` is in the
+        interval ``[0 .. M]``, the axis will not be changed.
+        As a result, this augmenter can still produce axis sizes that are
+        not multiples of the given values.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    width_multiple : int or None
+        Multiple for the width. Images will be cropped down until their
+        width is a multiple of this value.
+        If ``None``, image widths will not be altered.
+
+    height_multiple : int or None
+        Multiple for the height. Images will be cropped down until their
+        height is a multiple of this value.
+        If ``None``, image heights will not be altered.
+
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        See :func:`CropToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CropToMultiplesOf(height_multiple=10, width_multiple=6)
+
+    Create an augmenter that crops images to multiples of ``10`` along
+    the y-axis (i.e. 10, 20, 30, ...) and to multiples of ``6`` along the
+    x-axis (i.e. 6, 12, 18, ...).
+    The rows to be cropped will be spread *randomly* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width_multiple, height_multiple, position="uniform",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CropToMultiplesOf, self).__init__(
+            width=None, height=None, position=position,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        self.width_multiple = width_multiple
+        self.height_multiple = height_multiple
+
+    # Added in 0.4.0.
+    def _draw_samples(self, batch, random_state):
+        _sizes, offset_xs, offset_ys = super(
+            CropToMultiplesOf, self
+        )._draw_samples(batch, random_state)
+
+        shapes = batch.get_rowwise_shapes()
+        sizes = []
+        for shape in shapes:
+            height, width = shape[0:2]
+            croppings = compute_croppings_to_reach_multiples_of(
+                shape,
+                height_multiple=self.height_multiple,
+                width_multiple=self.width_multiple)
+
+            # TODO change that
+            # note that these are not in the same order as shape tuples
+            # in CropToFixedSize
+            new_size = (
+                width - croppings[1] - croppings[3],
+                height - croppings[0] - croppings[2]
+            )
+            sizes.append(new_size)
+
+        return sizes, offset_xs, offset_ys
+
+    # Added in 0.4.0.
+    def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.width_multiple, self.height_multiple, self.position]
+
+
+class CenterCropToMultiplesOf(CropToMultiplesOf):
+    """Crop images equally on all sides until H/W are multiples of given values.
+
+    This is the same as :class:`~imgaug.augmenters.size.CropToMultiplesOf`,
+    but uses ``position="center"`` by default, which spreads the crop amounts
+    equally over all image sides, while
+    :class:`~imgaug.augmenters.size.CropToMultiplesOf` by default spreads
+    them randomly.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    width_multiple : int or None
+        See :func:`CropToMultiplesOf.__init__`.
+
+    height_multiple : int or None
+        See :func:`CropToMultiplesOf.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CenterCropToMultiplesOf(height_multiple=10, width_multiple=6)
+
+    Create an augmenter that crops images to multiples of ``10`` along
+    the y-axis (i.e. 10, 20, 30, ...) and to multiples of ``6`` along the
+    x-axis (i.e. 6, 12, 18, ...).
+    The rows to be cropped will be spread *equally* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width_multiple, height_multiple,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterCropToMultiplesOf, self).__init__(
+            width_multiple=width_multiple,
+            height_multiple=height_multiple,
+            position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class PadToMultiplesOf(PadToFixedSize):
+    """Pad images until their height/width is a multiple of a value.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    width_multiple : int or None
+        Multiple for the width. Images will be padded until their
+        width is a multiple of this value.
+        If ``None``, image widths will not be altered.
+
+    height_multiple : int or None
+        Multiple for the height. Images will be padded until their
+        height is a multiple of this value.
+        If ``None``, image heights will not be altered.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToFixedSize.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToFixedSize.__init__`.
+
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        See :func:`PadToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.PadToMultiplesOf(height_multiple=10, width_multiple=6)
+
+    Create an augmenter that pads images to multiples of ``10`` along
+    the y-axis (i.e. 10, 20, 30, ...) and to multiples of ``6`` along the
+    x-axis (i.e. 6, 12, 18, ...).
+    The rows to be padded will be spread *randomly* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width_multiple, height_multiple,
+                 pad_mode="constant", pad_cval=0,
+                 position="uniform",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(PadToMultiplesOf, self).__init__(
+            width=None, height=None, pad_mode=pad_mode, pad_cval=pad_cval,
+            position=position,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        self.width_multiple = width_multiple
+        self.height_multiple = height_multiple
+
+    # Added in 0.4.0.
+    def _draw_samples(self, batch, random_state):
+        _sizes, pad_xs, pad_ys, pad_modes, pad_cvals = super(
+            PadToMultiplesOf, self
+        )._draw_samples(batch, random_state)
+
+        shapes = batch.get_rowwise_shapes()
+        sizes = []
+        for shape in shapes:
+            height, width = shape[0:2]
+            paddings = compute_paddings_to_reach_multiples_of(
+                shape,
+                height_multiple=self.height_multiple,
+                width_multiple=self.width_multiple)
+
+            # TODO change that
+            # note that these are not in the same order as shape tuples
+            # in PadToFixedSize
+            new_size = (
+                width + paddings[1] + paddings[3],
+                height + paddings[0] + paddings[2]
+            )
+            sizes.append(new_size)
+
+        return sizes, pad_xs, pad_ys, pad_modes, pad_cvals
+
+    # Added in 0.4.0.
+    def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.width_multiple, self.height_multiple,
+                self.pad_mode, self.pad_cval,
+                self.position]
+
+
+class CenterPadToMultiplesOf(PadToMultiplesOf):
+    """Pad images equally on all sides until H/W are multiples of given values.
+
+    This is the same as :class:`~imgaug.augmenters.size.PadToMultiplesOf`, but
+    uses ``position="center"`` by default, which spreads the pad amounts
+    equally over all image sides, while
+    :class:`~imgaug.augmenters.size.PadToMultiplesOf` by default spreads them
+    randomly.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    width_multiple : int or None
+        See :func:`PadToMultiplesOf.__init__`.
+
+    height_multiple : int or None
+        See :func:`PadToMultiplesOf.__init__`.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToMultiplesOf.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToMultiplesOf.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CenterPadToMultiplesOf(height_multiple=10, width_multiple=6)
+
+    Create an augmenter that pads images to multiples of ``10`` along
+    the y-axis (i.e. 10, 20, 30, ...) and to multiples of ``6`` along the
+    x-axis (i.e. 6, 12, 18, ...).
+    The rows to be padded will be spread *equally* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width_multiple, height_multiple,
+                 pad_mode="constant", pad_cval=0,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterPadToMultiplesOf, self).__init__(
+            width_multiple=width_multiple,
+            height_multiple=height_multiple,
+            pad_mode=pad_mode,
+            pad_cval=pad_cval,
+            position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class CropToPowersOf(CropToFixedSize):
+    """Crop images until their height/width is a power of a base.
+
+    This augmenter removes pixels from an axis with size ``S`` leading to the
+    new size ``S'`` until ``S' = B^E`` is fulfilled, where ``B`` is a
+    provided base (e.g. ``2``) and ``E`` is an exponent from the discrete
+    interval ``[1 .. inf)``.
+
+    .. note::
+
+        This augmenter does nothing for axes with size less than ``B^1 = B``.
+        If you have images with ``S < B^1``, it is recommended
+        to combine this augmenter with a padding augmenter that pads each
+        axis up to ``B``.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    width_base : int or None
+        Base for the width. Images will be cropped down until their
+        width fulfills ``width' = width_base ^ E`` with ``E`` being any
+        natural number.
+        If ``None``, image widths will not be altered.
+
+    height_base : int or None
+        Base for the height. Images will be cropped down until their
+        height fulfills ``height' = height_base ^ E`` with ``E`` being any
+        natural number.
+        If ``None``, image heights will not be altered.
+
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        See :func:`CropToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CropToPowersOf(height_base=3, width_base=2)
+
+    Create an augmenter that crops each image down to powers of ``3`` along
+    the y-axis (i.e. 3, 9, 27, ...) and powers of ``2`` along the x-axis (i.e.
+    2, 4, 8, 16, ...).
+    The rows to be cropped will be spread *randomly* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width_base, height_base, position="uniform",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CropToPowersOf, self).__init__(
+            width=None, height=None, position=position,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        self.width_base = width_base
+        self.height_base = height_base
+
+    # Added in 0.4.0.
+    def _draw_samples(self, batch, random_state):
+        _sizes, offset_xs, offset_ys = super(
+            CropToPowersOf, self
+        )._draw_samples(batch, random_state)
+
+        shapes = batch.get_rowwise_shapes()
+        sizes = []
+        for shape in shapes:
+            height, width = shape[0:2]
+            croppings = compute_croppings_to_reach_powers_of(
+                shape,
+                height_base=self.height_base,
+                width_base=self.width_base)
+
+            # TODO change that
+            # note that these are not in the same order as shape tuples
+            # in CropToFixedSize
+            new_size = (
+                width - croppings[1] - croppings[3],
+                height - croppings[0] - croppings[2]
+            )
+            sizes.append(new_size)
+
+        return sizes, offset_xs, offset_ys
+
+    # Added in 0.4.0.
+    def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.width_base, self.height_base, self.position]
+
+
+class CenterCropToPowersOf(CropToPowersOf):
+    """Crop images equally on all sides until H/W is a power of a base.
+
+    This is the same as :class:`~imgaug.augmenters.size.CropToPowersOf`, but
+    uses ``position="center"`` by default, which spreads the crop amounts
+    equally over all image sides, while
+    :class:`~imgaug.augmenters.size.CropToPowersOf` by default spreads them
+    randomly.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    width_base : int or None
+        See :func:`CropToPowersOf.__init__`.
+
+    height_base : int or None
+        See :func:`CropToPowersOf.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CropToPowersOf(height_base=3, width_base=2)
+
+    Create an augmenter that crops each image down to powers of ``3`` along
+    the y-axis (i.e. 3, 9, 27, ...) and powers of ``2`` along the x-axis (i.e.
+    2, 4, 8, 16, ...).
+    The rows to be cropped will be spread *equally* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width_base, height_base,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterCropToPowersOf, self).__init__(
+            width_base=width_base, height_base=height_base, position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class PadToPowersOf(PadToFixedSize):
+    """Pad images until their height/width is a power of a base.
+
+    This augmenter adds pixels to an axis with size ``S`` leading to the
+    new size ``S'`` until ``S' = B^E`` is fulfilled, where ``B`` is a
+    provided base (e.g. ``2``) and ``E`` is an exponent from the discrete
+    interval ``[1 .. inf)``.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    width_base : int or None
+        Base for the width. Images will be padded down until their
+        width fulfills ``width' = width_base ^ E`` with ``E`` being any
+        natural number.
+        If ``None``, image widths will not be altered.
+
+    height_base : int or None
+        Base for the height. Images will be padded until their
+        height fulfills ``height' = height_base ^ E`` with ``E`` being any
+        natural number.
+        If ``None``, image heights will not be altered.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToFixedSize.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToFixedSize.__init__`.
+
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        See :func:`PadToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.PadToPowersOf(height_base=3, width_base=2)
+
+    Create an augmenter that pads each image to powers of ``3`` along the
+    y-axis (i.e. 3, 9, 27, ...) and powers of ``2`` along the x-axis (i.e. 2,
+    4, 8, 16, ...).
+    The rows to be padded will be spread *randomly* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width_base, height_base,
+                 pad_mode="constant", pad_cval=0,
+                 position="uniform",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(PadToPowersOf, self).__init__(
+            width=None, height=None, pad_mode=pad_mode, pad_cval=pad_cval,
+            position=position,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        self.width_base = width_base
+        self.height_base = height_base
+
+    # Added in 0.4.0.
+    def _draw_samples(self, batch, random_state):
+        _sizes, pad_xs, pad_ys, pad_modes, pad_cvals = super(
+            PadToPowersOf, self
+        )._draw_samples(batch, random_state)
+
+        shapes = batch.get_rowwise_shapes()
+        sizes = []
+        for shape in shapes:
+            height, width = shape[0:2]
+            paddings = compute_paddings_to_reach_powers_of(
+                shape,
+                height_base=self.height_base,
+                width_base=self.width_base)
+
+            # TODO change that
+            # note that these are not in the same order as shape tuples
+            # in PadToFixedSize
+            new_size = (
+                width + paddings[1] + paddings[3],
+                height + paddings[0] + paddings[2]
+            )
+            sizes.append(new_size)
+
+        return sizes, pad_xs, pad_ys, pad_modes, pad_cvals
+
+    # Added in 0.4.0.
+    def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.width_base, self.height_base,
+                self.pad_mode, self.pad_cval,
+                self.position]
+
+
+class CenterPadToPowersOf(PadToPowersOf):
+    """Pad images equally on all sides until H/W is a power of a base.
+
+    This is the same as :class:`~imgaug.augmenters.size.PadToPowersOf`, but uses
+    ``position="center"`` by default, which spreads the pad amounts equally
+    over all image sides, while :class:`~imgaug.augmenters.size.PadToPowersOf`
+    by default spreads them randomly.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    width_base : int or None
+        See :func:`PadToPowersOf.__init__`.
+
+    height_base : int or None
+        See :func:`PadToPowersOf.__init__`.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToPowersOf.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToPowersOf.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CenterPadToPowersOf(height_base=5, width_base=2)
+
+    Create an augmenter that pads each image to powers of ``3`` along the
+    y-axis (i.e. 3, 9, 27, ...) and powers of ``2`` along the x-axis (i.e. 2,
+    4, 8, 16, ...).
+    The rows to be padded will be spread *equally* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, width_base, height_base,
+                 pad_mode="constant", pad_cval=0,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterPadToPowersOf, self).__init__(
+            width_base=width_base, height_base=height_base,
+            pad_mode=pad_mode, pad_cval=pad_cval,
+            position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class CropToAspectRatio(CropToFixedSize):
+    """Crop images until their width/height matches an aspect ratio.
+
+    This augmenter removes either rows or columns until the image reaches
+    the desired aspect ratio given in ``width / height``. The cropping
+    operation is stopped once the desired aspect ratio is reached or the image
+    side to crop reaches a size of ``1``. If any side of the image starts
+    with a size of ``0``, the image will not be changed.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    aspect_ratio : number
+        The desired aspect ratio, given as ``width/height``. E.g. a ratio
+        of ``2.0`` denotes an image that is twice as wide as it is high.
+
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        See :func:`CropToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CropToAspectRatio(2.0)
+
+    Create an augmenter that crops each image until its aspect ratio is as
+    close as possible to ``2.0`` (i.e. two times as many pixels along the
+    x-axis than the y-axis).
+    The rows to be cropped will be spread *randomly* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, aspect_ratio, position="uniform",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CropToAspectRatio, self).__init__(
+            width=None, height=None, position=position,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        self.aspect_ratio = aspect_ratio
+
+    # Added in 0.4.0.
+    def _draw_samples(self, batch, random_state):
+        _sizes, offset_xs, offset_ys = super(
+            CropToAspectRatio, self
+        )._draw_samples(batch, random_state)
+
+        shapes = batch.get_rowwise_shapes()
+        sizes = []
+        for shape in shapes:
+            height, width = shape[0:2]
+
+            if height == 0 or width == 0:
+                croppings = (0, 0, 0, 0)
+            else:
+                croppings = compute_croppings_to_reach_aspect_ratio(
+                    shape,
+                    aspect_ratio=self.aspect_ratio)
+
+            # TODO change that
+            # note that these are not in the same order as shape tuples
+            # in CropToFixedSize
+            new_size = (
+                width - croppings[1] - croppings[3],
+                height - croppings[0] - croppings[2]
+            )
+            sizes.append(new_size)
+
+        return sizes, offset_xs, offset_ys
+
+    # Added in 0.4.0.
+    def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.aspect_ratio, self.position]
+
+
+class CenterCropToAspectRatio(CropToAspectRatio):
+    """Crop images equally on all sides until they reach an aspect ratio.
+
+    This is the same as :class:`~imgaug.augmenters.size.CropToAspectRatio`, but
+    uses ``position="center"`` by default, which spreads the crop amounts
+    equally over all image sides, while
+    :class:`~imgaug.augmenters.size.CropToAspectRatio` by default spreads
+    them randomly.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    aspect_ratio : number
+        See :func:`CropToAspectRatio.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CenterCropToAspectRatio(2.0)
+
+    Create an augmenter that crops each image until its aspect ratio is as
+    close as possible to ``2.0`` (i.e. two times as many pixels along the
+    x-axis than the y-axis).
+    The rows to be cropped will be spread *equally* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, aspect_ratio,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterCropToAspectRatio, self).__init__(
+            aspect_ratio=aspect_ratio, position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class PadToAspectRatio(PadToFixedSize):
+    """Pad images until their width/height matches an aspect ratio.
+
+    This augmenter adds either rows or columns until the image reaches
+    the desired aspect ratio given in ``width / height``.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    aspect_ratio : number
+        The desired aspect ratio, given as ``width/height``. E.g. a ratio
+        of ``2.0`` denotes an image that is twice as wide as it is high.
+
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        See :func:`PadToFixedSize.__init__`.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToFixedSize.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.PadToAspectRatio(2.0)
+
+    Create an augmenter that pads each image until its aspect ratio is as
+    close as possible to ``2.0`` (i.e. two times as many pixels along the
+    x-axis than the y-axis).
+    The rows to be padded will be spread *randomly* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, aspect_ratio, pad_mode="constant", pad_cval=0,
+                 position="uniform",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(PadToAspectRatio, self).__init__(
+            width=None, height=None, pad_mode=pad_mode, pad_cval=pad_cval,
+            position=position,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+        self.aspect_ratio = aspect_ratio
+
+    # Added in 0.4.0.
+    def _draw_samples(self, batch, random_state):
+        _sizes, pad_xs, pad_ys, pad_modes, pad_cvals = super(
+            PadToAspectRatio, self
+        )._draw_samples(batch, random_state)
+
+        shapes = batch.get_rowwise_shapes()
+        sizes = []
+        for shape in shapes:
+            height, width = shape[0:2]
+
+            paddings = compute_paddings_to_reach_aspect_ratio(
+                shape,
+                aspect_ratio=self.aspect_ratio)
+
+            # TODO change that
+            # note that these are not in the same order as shape tuples
+            # in PadToFixedSize
+            new_size = (
+                width + paddings[1] + paddings[3],
+                height + paddings[0] + paddings[2]
+            )
+            sizes.append(new_size)
+
+        return sizes, pad_xs, pad_ys, pad_modes, pad_cvals
+
+    # Added in 0.4.0.
+    def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
+        return [self.aspect_ratio, self.pad_mode, self.pad_cval,
+                self.position]
+
+
+class CenterPadToAspectRatio(PadToAspectRatio):
+    """Pad images equally on all sides until H/W matches an aspect ratio.
+
+    This is the same as :class:`~imgaug.augmenters.size.PadToAspectRatio`, but
+    uses ``position="center"`` by default, which spreads the pad amounts
+    equally over all image sides, while
+    :class:`~imgaug.augmenters.size.PadToAspectRatio` by default spreads them
+    randomly.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    aspect_ratio : number
+        See :func:`PadToAspectRatio.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToAspectRatio.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToAspectRatio.__init__`.
+
+    deterministic : bool, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.PadToAspectRatio(2.0)
+
+    Create am augmenter that pads each image until its aspect ratio is as
+    close as possible to ``2.0`` (i.e. two times as many pixels along the
+    x-axis than the y-axis).
+    The rows to be padded will be spread *equally* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, aspect_ratio, pad_mode="constant", pad_cval=0,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterPadToAspectRatio, self).__init__(
+            aspect_ratio=aspect_ratio, position="center",
+            pad_mode=pad_mode, pad_cval=pad_cval,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class CropToSquare(CropToAspectRatio):
+    """Crop images until their width and height are identical.
+
+    This is identical to :class:`~imgaug.augmenters.size.CropToAspectRatio`
+    with ``aspect_ratio=1.0``.
+
+    Images with axis sizes of ``0`` will not be altered.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        See :func:`CropToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CropToSquare()
+
+    Create an augmenter that crops each image until its square, i.e. height
+    and width match.
+    The rows to be cropped will be spread *randomly* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, position="uniform",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CropToSquare, self).__init__(
+            aspect_ratio=1.0, position=position,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class CenterCropToSquare(CropToSquare):
+    """Crop images equally on all sides until their height/width are identical.
+
+    In contrast to :class:`~imgaug.augmenters.size.CropToSquare`, this
+    augmenter always tries to spread the columns/rows to remove equally over
+    both sides of the respective axis to be cropped.
+    :class:`~imgaug.augmenters.size.CropToAspectRatio` by default spreads the
+    croppings randomly.
+
+    This augmenter is identical to :class:`~imgaug.augmenters.size.CropToSquare`
+    with ``position="center"``, and thereby the same as
+    :class:`~imgaug.augmenters.size.CropToAspectRatio` with
+    ``aspect_ratio=1.0, position="center"``.
+
+    Images with axis sizes of ``0`` will not be altered.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.CropToFixedSize`.
+
+    Parameters
+    ----------
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CenterCropToSquare()
+
+    Create an augmenter that crops each image until its square, i.e. height
+    and width match.
+    The rows to be cropped will be spread *equally* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterCropToSquare, self).__init__(
+            position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class PadToSquare(PadToAspectRatio):
+    """Pad images until their height and width are identical.
+
+    This augmenter is identical to
+    :class:`~imgaug.augmenters.size.PadToAspectRatio` with ``aspect_ratio=1.0``.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    position : {'uniform', 'normal', 'center', 'left-top', 'left-center', 'left-bottom', 'center-top', 'center-center', 'center-bottom', 'right-top', 'right-center', 'right-bottom'} or tuple of float or StochasticParameter or tuple of StochasticParameter, optional
+        See :func:`PadToFixedSize.__init__`.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToFixedSize.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToFixedSize.__init__`.
+
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
+
+    deterministic : bool, optional
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.PadToSquare()
+
+    Create an augmenter that pads each image until its square, i.e. height
+    and width match.
+    The rows to be padded will be spread *randomly* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, pad_mode="constant", pad_cval=0, position="uniform",
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(PadToSquare, self).__init__(
+            aspect_ratio=1.0, pad_mode=pad_mode, pad_cval=pad_cval,
+            position=position,
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
+
+
+class CenterPadToSquare(PadToSquare):
+    """Pad images equally on all sides until their height & width are identical.
+
+    This is the same as :class:`~imgaug.augmenters.size.PadToSquare`, but uses
+    ``position="center"`` by default, which spreads the pad amounts equally
+    over all image sides, while :class:`~imgaug.augmenters.size.PadToSquare`
+    by default spreads them randomly. This augmenter is thus also identical to
+    :class:`~imgaug.augmenters.size.PadToAspectRatio` with
+    ``aspect_ratio=1.0, position="center"``.
+
+    Added in 0.4.0.
+
+    **Supported dtypes**:
+
+    See :class:`~imgaug.augmenters.size.PadToFixedSize`.
+
+    Parameters
+    ----------
+    name : None or str, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    pad_mode : imgaug.ALL or str or list of str or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToAspectRatio.__init__`.
+
+    pad_cval : number or tuple of number or list of number or imgaug.parameters.StochasticParameter, optional
+        See :func:`~imgaug.augmenters.size.PadToAspectRatio.__init__`.
+
+    deterministic : bool, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    Examples
+    --------
+    >>> import imgaug.augmenters as iaa
+    >>> aug = iaa.CenterPadToSquare()
+
+    Create an augmenter that pads each image until its square, i.e. height
+    and width match.
+    The rows to be padded will be spread *equally* over the top and bottom
+    sides (analogous for the left/right sides).
+
+    """
+
+    # Added in 0.4.0.
+    def __init__(self, pad_mode="constant", pad_cval=0,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
+        super(CenterPadToSquare, self).__init__(
+            pad_mode=pad_mode, pad_cval=pad_cval, position="center",
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
 
 class KeepSizeByResize(meta.Augmenter):
@@ -2245,9 +4592,9 @@ class KeepSizeByResize(meta.Augmenter):
     the interpolation mode and which augmentables to resize (images, heatmaps,
     segmentation maps).
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.imgaug.imresize_many_images`.
+    See :func:`~imgaug.imgaug.imresize_many_images`.
 
     Parameters
     ----------
@@ -2257,7 +4604,7 @@ class KeepSizeByResize(meta.Augmenter):
 
     interpolation : KeepSizeByResize.NO_RESIZE or {'nearest', 'linear', 'area', 'cubic'} or {cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_AREA, cv2.INTER_CUBIC} or list of str or list of int or StochasticParameter, optional
         The interpolation mode to use when resizing images.
-        Can take any value that :func:`imgaug.imgaug.imresize_single_image`
+        Can take any value that :func:`~imgaug.imgaug.imresize_single_image`
         accepts, e.g. ``cubic``.
 
             * If this is ``KeepSizeByResize.NO_RESIZE`` then images will not
@@ -2291,14 +4638,22 @@ class KeepSizeByResize(meta.Augmenter):
         neighbour interpolation (i.e. ``nearest``) make sense in the vast
         majority of all cases.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -2341,9 +4696,11 @@ class KeepSizeByResize(meta.Augmenter):
                  interpolation="cubic",
                  interpolation_heatmaps=SAME_AS_IMAGES,
                  interpolation_segmaps="nearest",
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(KeepSizeByResize, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.children = children
 
         def _validate_param(val, allow_same_as_images):
@@ -2351,9 +4708,9 @@ class KeepSizeByResize(meta.Augmenter):
                                   + [KeepSizeByResize.NO_RESIZE]
             if allow_same_as_images and val == self.SAME_AS_IMAGES:
                 return self.SAME_AS_IMAGES
-            elif val in valid_ips_and_resize:
+            if val in valid_ips_and_resize:
                 return iap.Deterministic(val)
-            elif isinstance(val, list):
+            if isinstance(val, list):
                 assert len(val) > 0, (
                     "Expected a list of at least one interpolation method. "
                     "Got an empty list.")
@@ -2366,13 +4723,12 @@ class KeepSizeByResize(meta.Augmenter):
                     "Expected each interpolations to be one of '%s', got "
                     "'%s'." % (str(valid_ips_here), str(val)))
                 return iap.Choice(val)
-            elif isinstance(val, iap.StochasticParameter):
+            if isinstance(val, iap.StochasticParameter):
                 return val
-            else:
-                raise Exception(
-                    "Expected interpolation to be one of '%s' or a list of "
-                    "these values or a StochasticParameter. Got type %s." % (
-                        str(ia.IMRESIZE_VALID_INTERPOLATIONS), type(val)))
+            raise Exception(
+                "Expected interpolation to be one of '%s' or a list of "
+                "these values or a StochasticParameter. Got type %s." % (
+                    str(ia.IMRESIZE_VALID_INTERPOLATIONS), type(val)))
 
         self.children = meta.handle_children_list(children, self.name, "then")
         self.interpolation = _validate_param(interpolation, False)
@@ -2380,6 +4736,123 @@ class KeepSizeByResize(meta.Augmenter):
                                                       True)
         self.interpolation_segmaps = _validate_param(interpolation_segmaps,
                                                      True)
+
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        with batch.propagation_hooks_ctx(self, hooks, parents):
+            images_were_array = None
+            if batch.images is not None:
+                images_were_array = ia.is_np_array(batch.images)
+            shapes_orig = self._get_shapes(batch)
+
+            samples = self._draw_samples(batch.nb_rows, random_state)
+
+            batch = self.children.augment_batch_(
+                batch, parents=parents + [self], hooks=hooks)
+
+            if batch.images is not None:
+                batch.images = self._keep_size_images(
+                    batch.images, shapes_orig["images"], images_were_array,
+                    samples)
+
+            if batch.heatmaps is not None:
+                # dont use shapes_orig["images"] because they might be None
+                batch.heatmaps = self._keep_size_maps(
+                    batch.heatmaps, shapes_orig["heatmaps"],
+                    shapes_orig["heatmaps_arr"], samples[1])
+
+            if batch.segmentation_maps is not None:
+                # dont use shapes_orig["images"] because they might be None
+                batch.segmentation_maps = self._keep_size_maps(
+                    batch.segmentation_maps, shapes_orig["segmentation_maps"],
+                    shapes_orig["segmentation_maps_arr"], samples[2])
+
+            for augm_name in ["keypoints", "bounding_boxes", "polygons",
+                              "line_strings"]:
+                augm_value = getattr(batch, augm_name)
+                if augm_value is not None:
+                    func = functools.partial(
+                        self._keep_size_keypoints,
+                        shapes_orig=shapes_orig[augm_name],
+                        interpolations=samples[0])
+                    cbaois = self._apply_to_cbaois_as_keypoints(augm_value,
+                                                                func)
+                    setattr(batch, augm_name, cbaois)
+        return batch
+
+    # Added in 0.4.0.
+    @classmethod
+    def _keep_size_images(cls, images, shapes_orig, images_were_array,
+                          samples):
+        interpolations, _, _ = samples
+
+        gen = zip(images, interpolations, shapes_orig)
+        result = []
+        for image, interpolation, input_shape in gen:
+            if interpolation == KeepSizeByResize.NO_RESIZE:
+                result.append(image)
+            else:
+                result.append(
+                    ia.imresize_single_image(image, input_shape[0:2],
+                                             interpolation))
+
+        if images_were_array:
+            # note here that NO_RESIZE can have led to different shapes
+            nb_shapes = len({image.shape for image in result})
+            if nb_shapes == 1:
+                # images.dtype does not necessarily work anymore, children
+                # might have turned 'images' into list
+                result = np.array(result, dtype=result[0].dtype)
+
+        return result
+
+    # Added in 0.4.0.
+    @classmethod
+    def _keep_size_maps(cls, augmentables, shapes_orig_images,
+                        shapes_orig_arrs, interpolations):
+        result = []
+        gen = zip(augmentables, interpolations,
+                  shapes_orig_arrs, shapes_orig_images)
+        for augmentable, interpolation, arr_shape_orig, img_shape_orig in gen:
+            if interpolation == "NO_RESIZE":
+                result.append(augmentable)
+            else:
+                augmentable = augmentable.resize(
+                    arr_shape_orig[0:2], interpolation=interpolation)
+                augmentable.shape = img_shape_orig
+                result.append(augmentable)
+
+        return result
+
+    # Added in 0.4.0.
+    @classmethod
+    def _keep_size_keypoints(cls, kpsois_aug, shapes_orig, interpolations):
+        result = []
+        gen = zip(kpsois_aug, interpolations, shapes_orig)
+        for kpsoi_aug, interpolation, input_shape in gen:
+            if interpolation == KeepSizeByResize.NO_RESIZE:
+                result.append(kpsoi_aug)
+            else:
+                result.append(kpsoi_aug.on_(input_shape))
+
+        return result
+
+    # Added in 0.4.0.
+    @classmethod
+    def _get_shapes(cls, batch):
+        result = dict()
+        for column in batch.columns:
+            result[column.name] = [cell.shape for cell in column.value]
+
+        if batch.heatmaps is not None:
+            result["heatmaps_arr"] = [
+                cell.arr_0to1.shape for cell in batch.heatmaps]
+
+        if batch.segmentation_maps is not None:
+            result["segmentation_maps_arr"] = [
+                cell.arr.shape for cell in batch.segmentation_maps]
+
+        return result
 
     def _draw_samples(self, nb_images, random_state):
         rngs = random_state.duplicate(3)
@@ -2427,138 +4900,6 @@ class KeepSizeByResize(meta.Augmenter):
 
         return interpolations, interpolations_heatmaps, interpolations_segmaps
 
-    def _is_propagating(self, augmentables, parents, hooks):
-        return (
-            hooks is None
-            or hooks.is_propagating(
-                augmentables, augmenter=self, parents=parents, default=True)
-        )
-
-    def _augment_images(self, images, random_state, parents, hooks):
-        input_was_array = ia.is_np_array(images)
-        if self._is_propagating(images, parents, hooks):
-            interpolations, _, _ = self._draw_samples(len(images),
-                                                      random_state)
-            input_shapes = [image.shape[0:2] for image in images]
-
-            images_aug = self.children.augment_images(
-                images=images,
-                parents=parents + [self],
-                hooks=hooks
-            )
-
-            gen = zip(images_aug, interpolations, input_shapes)
-            result = []
-            for image_aug, interpolation, input_shape in gen:
-                if interpolation == KeepSizeByResize.NO_RESIZE:
-                    result.append(image_aug)
-                else:
-                    result.append(
-                        ia.imresize_single_image(image_aug, input_shape[0:2],
-                                                 interpolation))
-
-            if input_was_array:
-                # note here that NO_RESIZE can have led to different shapes
-                nb_shapes = len(set([image.shape for image in result]))
-                if nb_shapes == 1:
-                    result = np.array(result, dtype=images.dtype)
-        else:
-            result = images
-        return result
-
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        if self._is_propagating(heatmaps, parents, hooks):
-            nb_heatmaps = len(heatmaps)
-            _, interpolations_heatmaps, _ = self._draw_samples(
-                nb_heatmaps, random_state)
-            input_arr_shapes = [heatmaps_i.arr_0to1.shape
-                                for heatmaps_i in heatmaps]
-
-            # augment according to if and else list
-            heatmaps_aug = self.children.augment_heatmaps(
-                heatmaps,
-                parents=parents + [self],
-                hooks=hooks
-            )
-
-            result = []
-            gen = zip(heatmaps, heatmaps_aug, interpolations_heatmaps,
-                      input_arr_shapes)
-            for heatmap, heatmap_aug, interpolation, input_arr_shape in gen:
-                if interpolation == "NO_RESIZE":
-                    result.append(heatmap_aug)
-                else:
-                    heatmap_aug = heatmap_aug.resize(
-                        input_arr_shape[0:2], interpolation=interpolation)
-                    heatmap_aug.shape = heatmap.shape
-                    result.append(heatmap_aug)
-        else:
-            result = heatmaps
-
-        return result
-
-    def _augment_segmentation_maps(self, segmaps, random_state, parents, hooks):
-        if self._is_propagating(segmaps, parents, hooks):
-            nb_segmaps = len(segmaps)
-            _, _, interpolations_segmaps = self._draw_samples(nb_segmaps,
-                                                              random_state)
-            input_arr_shapes = [segmaps_i.arr.shape for segmaps_i in segmaps]
-
-            # augment according to if and else list
-            segmaps_aug = self.children.augment_segmentation_maps(
-                segmaps,
-                parents=parents + [self],
-                hooks=hooks
-            )
-
-            result = []
-            gen = zip(segmaps, segmaps_aug, interpolations_segmaps,
-                      input_arr_shapes)
-            for segmaps, segmaps_aug, interpolation, input_arr_shape in gen:
-                if interpolation == "NO_RESIZE":
-                    result.append(segmaps_aug)
-                else:
-                    segmaps_aug = segmaps_aug.resize(
-                        input_arr_shape[0:2], interpolation=interpolation)
-                    segmaps_aug.shape = segmaps.shape
-                    result.append(segmaps_aug)
-        else:
-            result = segmaps
-
-        return result
-
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
-        if self._is_propagating(keypoints_on_images, parents, hooks):
-            interpolations, _, _ = self._draw_samples(
-                len(keypoints_on_images), random_state)
-            input_shapes = [kpsoi_i.shape for kpsoi_i in keypoints_on_images]
-
-            # augment according to if and else list
-            kps_aug = self.children.augment_keypoints(
-                keypoints_on_images=keypoints_on_images,
-                parents=parents + [self],
-                hooks=hooks
-            )
-
-            result = []
-            gen = zip(keypoints_on_images, kps_aug, interpolations,
-                      input_shapes)
-            for kps, kps_aug, interpolation, input_shape in gen:
-                if interpolation == KeepSizeByResize.NO_RESIZE:
-                    result.append(kps_aug)
-                else:
-                    result.append(kps_aug.on(input_shape))
-        else:
-            result = keypoints_on_images
-
-        return result
-
-    def _augment_polygons(self, polygons_on_images, random_state, parents,
-                          hooks):
-        return self._augment_polygons_as_keypoints(
-            polygons_on_images, random_state, parents, hooks)
-
     def _to_deterministic(self):
         aug = self.copy()
         aug.children = aug.children.to_deterministic()
@@ -2567,9 +4908,11 @@ class KeepSizeByResize(meta.Augmenter):
         return aug
 
     def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.interpolation, self.interpolation_heatmaps]
 
     def get_children_lists(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_children_lists`."""
         return [self.children]
 
     def __str__(self):

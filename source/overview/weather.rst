@@ -117,8 +117,6 @@ Add a single layer of clouds to an image.
 
 API link: :class:`~imgaug.augmenters.weather.CloudLayer`
 
-TODO add examples
-
 
 Snowflakes
 ----------
@@ -136,6 +134,9 @@ Add snowflakes to small images (around ``96x128``)::
     import imgaug.augmenters as iaa
     aug = iaa.Snowflakes(flake_size=(0.1, 0.4), speed=(0.01, 0.05))
 
+.. figure:: ../../images/overview_of_augmenters/weather/snowflakes.jpg
+    :alt: Snowflakes
+
 **Example.**
 Add snowflakes to medium-sized images (around ``192x256``)::
 
@@ -146,9 +147,6 @@ Add snowflakes to large images (around ``960x1280``)::
 
     aug = iaa.Snowflakes(flake_size=(0.7, 0.95), speed=(0.001, 0.03))
 
-.. figure:: ../../images/overview_of_augmenters/weather/snowflakes.jpg
-    :alt: Snowflakes
-
 
 SnowflakesLayer
 ---------------
@@ -157,5 +155,49 @@ Add a single layer of falling snowflakes to images.
 
 API link: :class:`~imgaug.augmenters.weather.SnowflakesLayer`
 
-TODO add examples
 
+Rain
+----
+
+Add falling snowflakes to images.
+
+This is a wrapper around
+:class:`~imgaug.augmenters.weather.RainLayer`. It executes 1 to 3
+layers per image.
+
+.. note::
+
+    This augmenter currently seems to work best for medium-sized images
+    around ``192x256``. For smaller images, you may want to increase the
+    `speed` value to e.g. ``(0.1, 0.3)``, otherwise the drops tend to
+    look like snowflakes. For larger images, you may want to increase
+    the `drop_size` to e.g. ``(0.10, 0.20)``.
+
+API link: :class:`~imgaug.augmenters.weather.Rain`
+
+**Example.**
+Add rain to small images (around ``96x128``)::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Rain(speed=(0.1, 0.3))
+
+.. figure:: ../../images/overview_of_augmenters/weather/rain.jpg
+    :alt: Rain
+
+**Example.**
+Add rain to medium sized images (around ``192x256``)::
+
+    aug = iaa.Rain()
+
+**Example.**
+Add rain to large images (around ``960x1280``)::
+
+    aug = iaa.Rain(drop_size=(0.10, 0.20))
+
+
+RainLayer
+---------
+
+Add a single layer of falling raindrops to images.
+
+API link: :class:`~imgaug.augmenters.weather.RainLayer`

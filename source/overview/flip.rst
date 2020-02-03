@@ -23,11 +23,10 @@ Fliplr
 
 Flip/mirror input images horizontally.
 
-.. note ::
+.. note::
 
-    The default value for the probability is ``0.0``.
-    So, to flip *all* input image use ``Fliplr(1.0)`` and *not* just
-    ``Fliplr()``.
+    The default value for the probability is ``1.0``, i.e. all images
+    will be flipped.
 
 API link: :class:`~imgaug.augmenters.flip.Fliplr`
 
@@ -46,11 +45,10 @@ Flipud
 
 Flip/mirror input images vertically.
 
-.. note ::
+.. note::
 
-    The default value for the probability is ``0.0``.
-    So, to flip *all* input image use ``Flipud(1.0)`` and *not* just
-    ``Flipud()``.
+    The default value for the probability is ``1.0``, i.e. all images
+    will be flipped.
 
 API link: :class:`~imgaug.augmenters.flip.Flipud`
 

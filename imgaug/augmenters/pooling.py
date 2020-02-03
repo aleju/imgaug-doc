@@ -1,34 +1,24 @@
 """
 Augmenters that apply pooling operations to images.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.AveragePooling((1, 3))
-    ])
-
 List of augmenters:
 
-    * AveragePooling
-    * MaxPooling
-    * MinPooling
-    * MedianPooling
+    * :class:`AveragePooling`
+    * :class:`MaxPooling`
+    * :class:`MinPooling`
+    * :class:`MedianPooling`
 
 """
 from __future__ import print_function, division, absolute_import
 
 from abc import ABCMeta, abstractmethod
+import functools
 
 import six
 import numpy as np
 
-from . import meta
 import imgaug as ia
+from . import meta
 from .. import parameters as iap
 
 
@@ -54,9 +44,11 @@ class _AbstractPoolingBase(meta.Augmenter):
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
     def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(_AbstractPoolingBase, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.kernel_size = iap.handle_discrete_kernel_size_param(
             kernel_size,
             "kernel_size",
@@ -64,33 +56,47 @@ class _AbstractPoolingBase(meta.Augmenter):
             allow_floats=False)
         self.keep_size = keep_size
 
+        self._resize_hm_and_sm_arrays = True
+
     @abstractmethod
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         """Apply pooling method with given kernel height/width to an image."""
 
-    def _draw_samples(self, augmentables, random_state):
-        nb_images = len(augmentables)
+    def _draw_samples(self, nb_rows, random_state):
         rss = random_state.duplicate(2)
         mode = "single" if self.kernel_size[1] is None else "two"
         kernel_sizes_h = self.kernel_size[0].draw_samples(
-            (nb_images,),
+            (nb_rows,),
             random_state=rss[0])
         if mode == "single":
             kernel_sizes_w = kernel_sizes_h
         else:
             kernel_sizes_w = self.kernel_size[1].draw_samples(
-                (nb_images,), random_state=rss[1])
+                (nb_rows,), random_state=rss[1])
         return (
             np.clip(kernel_sizes_h, 1, None),
             np.clip(kernel_sizes_w, 1, None)
         )
 
-    def _augment_images(self, images, random_state, parents, hooks):
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        if batch.images is None and self.keep_size:
+            return batch
+
+        samples = self._draw_samples(batch.nb_rows, random_state)
+        for column in batch.columns:
+            value_aug = getattr(
+                self, "_augment_%s_by_samples" % (column.name,)
+            )(column.value, samples)
+            setattr(batch, column.attr_name, value_aug)
+        return batch
+
+    # Added in 0.4.0.
+    def _augment_images_by_samples(self, images, samples):
         if not self.keep_size:
             images = list(images)
 
-        kernel_sizes_h, kernel_sizes_w = self._draw_samples(
-            images, random_state)
+        kernel_sizes_h, kernel_sizes_w = samples
 
         gen = enumerate(zip(images, kernel_sizes_h, kernel_sizes_w))
         for i, (image, ksize_h, ksize_w) in gen:
@@ -104,39 +110,51 @@ class _AbstractPoolingBase(meta.Augmenter):
 
         return images
 
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        return self._augment_hms_and_segmaps(heatmaps, random_state)
+    # Added in 0.4.0.
+    def _augment_heatmaps_by_samples(self, heatmaps, samples):
+        return self._augment_hms_and_segmaps_by_samples(heatmaps, samples,
+                                                        "arr_0to1")
 
-    def _augment_segmentation_maps(self, segmaps, random_state, parents, hooks):
-        return self._augment_hms_and_segmaps(segmaps, random_state)
+    # Added in 0.4.0.
+    def _augment_segmentation_maps_by_samples(self, segmaps, samples):
+        return self._augment_hms_and_segmaps_by_samples(segmaps, samples,
+                                                        "arr")
 
-    def _augment_hms_and_segmaps(self, augmentables, random_state):
+    # Added in 0.4.0.
+    def _augment_hms_and_segmaps_by_samples(self, augmentables, samples,
+                                            arr_attr_name):
         if self.keep_size:
             return augmentables
 
-        kernel_sizes_h, kernel_sizes_w = self._draw_samples(
-            augmentables, random_state)
+        kernel_sizes_h, kernel_sizes_w = samples
 
-        gen = zip(augmentables, kernel_sizes_h, kernel_sizes_w)
-        for augmentable, ksize_h, ksize_w in gen:
+        gen = enumerate(zip(augmentables, kernel_sizes_h, kernel_sizes_w))
+        for i, (augmentable, ksize_h, ksize_w) in gen:
             if ksize_h >= 2 or ksize_w >= 2:
-                # we only update the shape of the underlying image here,
-                # because the library can handle heatmaps/segmaps that are
-                # larger/smaller than the corresponding image
+                # We could also keep the size of the HM/SM array unchanged
+                # here as the library can handle HMs/SMs that are larger
+                # than the image. This might be inintuitive however and
+                # could lead to unnecessary performance degredation.
+                if self._resize_hm_and_sm_arrays:
+                    new_shape_arr = _compute_shape_after_pooling(
+                        getattr(augmentable, arr_attr_name).shape,
+                        ksize_h, ksize_w)
+                    augmentable = augmentable.resize(new_shape_arr[0:2])
+
                 new_shape = _compute_shape_after_pooling(
                     augmentable.shape, ksize_h, ksize_w)
-
                 augmentable.shape = new_shape
+
+                augmentables[i] = augmentable
 
         return augmentables
 
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
+    # Added in 0.4.0.
+    def _augment_keypoints_by_samples(self, keypoints_on_images, samples):
         if self.keep_size:
             return keypoints_on_images
 
-        kernel_sizes_h, kernel_sizes_w = self._draw_samples(
-            keypoints_on_images, random_state)
+        kernel_sizes_h, kernel_sizes_w = samples
 
         gen = enumerate(zip(keypoints_on_images, kernel_sizes_h,
                             kernel_sizes_w))
@@ -145,16 +163,33 @@ class _AbstractPoolingBase(meta.Augmenter):
                 new_shape = _compute_shape_after_pooling(
                     kpsoi.shape, ksize_h, ksize_w)
 
-                keypoints_on_images[i] = kpsoi.on(new_shape)
+                keypoints_on_images[i] = kpsoi.on_(new_shape)
 
         return keypoints_on_images
 
-    def _augment_polygons(self, polygons_on_images, random_state, parents,
-                          hooks):
-        return self._augment_polygons_as_keypoints(
-            polygons_on_images, random_state, parents, hooks)
+    # Added in 0.4.0.
+    def _augment_polygons_by_samples(self, polygons_on_images, samples):
+        func = functools.partial(self._augment_keypoints_by_samples,
+                                 samples=samples)
+        return self._apply_to_polygons_as_keypoints(polygons_on_images, func,
+                                                    recoverer=None)
+
+    # Added in 0.4.0.
+    def _augment_line_strings_by_samples(self, line_strings_on_images, samples):
+        func = functools.partial(self._augment_keypoints_by_samples,
+                                 samples=samples)
+        return self._apply_to_cbaois_as_keypoints(line_strings_on_images, func)
+
+    # Added in 0.4.0.
+    def _augment_bounding_boxes_by_samples(self, bounding_boxes_on_images,
+                                           samples):
+        func = functools.partial(self._augment_keypoints_by_samples,
+                                 samples=samples)
+        return self._apply_to_cbaois_as_keypoints(bounding_boxes_on_images,
+                                                  func)
 
     def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.kernel_size, self.keep_size]
 
 
@@ -176,16 +211,16 @@ class AveragePooling(_AbstractPoolingBase):
     to the kernel size, with optional upscaling afterwards. The upscaling
     is configured to create "pixelated"/"blocky" images by default.
 
-    .. note ::
+    .. note::
 
         During heatmap or segmentation map augmentation, the respective
         arrays are not changed, only the shapes of the underlying images
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.imgaug.avg_pool`.
+    See :func:`~imgaug.imgaug.avg_pool`.
 
     Attributes
     ----------
@@ -219,14 +254,22 @@ class AveragePooling(_AbstractPoolingBase):
         to the input image's size, i.e. the augmenter's output shape is always
         identical to the input shape.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -263,11 +306,13 @@ class AveragePooling(_AbstractPoolingBase):
 
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
-    def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+    def __init__(self, kernel_size=(1, 5), keep_size=True,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(AveragePooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         return ia.avg_pool(
@@ -287,16 +332,16 @@ class MaxPooling(_AbstractPoolingBase):
 
     The maximum within each pixel window is always taken channelwise..
 
-    .. note ::
+    .. note::
 
         During heatmap or segmentation map augmentation, the respective
         arrays are not changed, only the shapes of the underlying images
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.imgaug.max_pool`.
+    See :func:`~imgaug.imgaug.max_pool`.
 
     Attributes
     ----------
@@ -330,14 +375,22 @@ class MaxPooling(_AbstractPoolingBase):
         to the input image's size, i.e. the augmenter's output shape is always
         identical to the input shape.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -374,11 +427,13 @@ class MaxPooling(_AbstractPoolingBase):
 
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
-    def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+    def __init__(self, kernel_size=(1, 5), keep_size=True,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MaxPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend max_pool to support pad_mode and set it here
@@ -400,16 +455,16 @@ class MinPooling(_AbstractPoolingBase):
 
     The minimum within each pixel window is always taken channelwise.
 
-    .. note ::
+    .. note::
 
         During heatmap or segmentation map augmentation, the respective
         arrays are not changed, only the shapes of the underlying images
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.imgaug.pool`.
+    See :func:`~imgaug.imgaug.min_pool`.
 
     Attributes
     ----------
@@ -443,14 +498,22 @@ class MinPooling(_AbstractPoolingBase):
         to the input image's size, i.e. the augmenter's output shape is always
         identical to the input shape.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -487,11 +550,13 @@ class MinPooling(_AbstractPoolingBase):
 
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
-    def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+    def __init__(self, kernel_size=(1, 5), keep_size=True,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MinPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend pool to support pad_mode and set it here
@@ -513,16 +578,16 @@ class MedianPooling(_AbstractPoolingBase):
 
     The median within each pixel window is always taken channelwise.
 
-    .. note ::
+    .. note::
 
         During heatmap or segmentation map augmentation, the respective
         arrays are not changed, only the shapes of the underlying images
         are updated. This is because imgaug can handle maps/maks that are
         larger/smaller than their corresponding image.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.imgaug.pool`.
+    See :func:`~imgaug.imgaug.median_pool`.
 
     Attributes
     ----------
@@ -556,14 +621,22 @@ class MedianPooling(_AbstractPoolingBase):
         to the input image's size, i.e. the augmenter's output shape is always
         identical to the input shape.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -600,11 +673,13 @@ class MedianPooling(_AbstractPoolingBase):
 
     # TODO add floats as ksize denoting fractions of image sizes
     #      (note possible overlap with fractional kernel sizes here)
-    def __init__(self, kernel_size, keep_size=True,
-                 name=None, deterministic=False, random_state=None):
+    def __init__(self, kernel_size=(1, 5), keep_size=True,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(MedianPooling, self).__init__(
             kernel_size=kernel_size, keep_size=keep_size,
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
 
     def _pool_image(self, image, kernel_size_h, kernel_size_w):
         # TODO extend pool to support pad_mode and set it here

@@ -1,4 +1,6 @@
+"""Utility functions used in augmentable modules."""
 from __future__ import print_function, absolute_import, division
+import copy as copylib
 import numpy as np
 import six.moves as sm
 import imgaug as ia
@@ -16,6 +18,23 @@ def copy_augmentables(augmentables):
         else:
             result.append(augmentable.deepcopy())
     return result
+
+
+# Added in 0.4.0.
+def deepcopy_fast(obj):
+    if obj is None:
+        return None
+    if ia.is_single_number(obj) or ia.is_string(obj):
+        return obj
+    if isinstance(obj, list):
+        return [deepcopy_fast(el) for el in obj]
+    if isinstance(obj, tuple):
+        return tuple([deepcopy_fast(el) for el in obj])
+    if ia.is_np_array(obj):
+        return np.copy(obj)
+    if hasattr(obj, "deepcopy"):
+        return obj.deepcopy()
+    return copylib.deepcopy(obj)
 
 
 # TODO integrate into keypoints
@@ -40,7 +59,58 @@ def normalize_shape(shape):
     return shape.shape
 
 
-# TODO integrate into keypoints
+def project_coords_(coords, from_shape, to_shape):
+    """Project coordinates from one image shape to another in-place.
+
+    This performs a relative projection, e.g. a point at ``60%`` of the old
+    image width will be at ``60%`` of the new image width after projection.
+
+    Added in 0.4.0.
+
+    Parameters
+    ----------
+    coords : ndarray or list of tuple of number
+        Coordinates to project.
+        Either an ``(N,2)`` numpy array or a ``list`` containing ``(x,y)``
+        coordinate ``tuple`` s.
+
+    from_shape : tuple of int or ndarray
+        Old image shape.
+
+    to_shape : tuple of int or ndarray
+        New image shape.
+
+    Returns
+    -------
+    ndarray
+        Projected coordinates as ``(N,2)`` ``float32`` numpy array.
+        This function may change the input data in-place.
+
+    """
+    from_shape = normalize_shape(from_shape)
+    to_shape = normalize_shape(to_shape)
+    if from_shape[0:2] == to_shape[0:2]:
+        return coords
+
+    from_height, from_width = from_shape[0:2]
+    to_height, to_width = to_shape[0:2]
+
+    no_zeros_in_shapes = (
+        all([v > 0 for v in [from_height, from_width, to_height, to_width]]))
+    assert no_zeros_in_shapes, (
+        "Expected from_shape and to_shape to not contain zeros. Got shapes "
+        "%s (from_shape) and %s (to_shape)." % (from_shape, to_shape))
+
+    coords_proj = coords
+    if not ia.is_np_array(coords) or coords.dtype.kind != "f":
+        coords_proj = np.array(coords).astype(np.float32)
+
+    coords_proj[:, 0] = (coords_proj[:, 0] / from_width) * to_width
+    coords_proj[:, 1] = (coords_proj[:, 1] / from_height) * to_height
+
+    return coords_proj
+
+
 def project_coords(coords, from_shape, to_shape):
     """Project coordinates from one image shape to another.
 
@@ -66,27 +136,10 @@ def project_coords(coords, from_shape, to_shape):
         Projected coordinates as ``(N,2)`` ``float32`` numpy array.
 
     """
-    from_shape = normalize_shape(from_shape)
-    to_shape = normalize_shape(to_shape)
-    if from_shape[0:2] == to_shape[0:2]:
-        return coords
+    if ia.is_np_array(coords):
+        coords = np.copy(coords)
 
-    from_height, from_width = from_shape[0:2]
-    to_height, to_width = to_shape[0:2]
-
-    no_zeros_in_shapes = (
-        all([v > 0 for v in [from_height, from_width, to_height, to_width]]))
-    assert no_zeros_in_shapes, (
-        "Expected from_shape and to_shape to not contain zeros. Got shapes "
-        "%s (from_shape) and %s (to_shape)." % (from_shape, to_shape))
-
-    # make sure to not just call np.float32(coords) here as the following lines
-    # perform in-place changes and np.float32(.) only copies if the input
-    # was *not* a float32 array
-    coords_proj = np.array(coords).astype(np.float32)
-    coords_proj[:, 0] = (coords_proj[:, 0] / from_width) * to_width
-    coords_proj[:, 1] = (coords_proj[:, 1] / from_height) * to_height
-    return coords_proj
+    return project_coords_(coords, from_shape, to_shape)
 
 
 # TODO does that include point_b in the result?
@@ -215,3 +268,94 @@ def interpolate_points_by_max_distance(points, max_distance, closed=True):
     if not closed:
         points_interp.append(points[-1])
     return points_interp
+
+
+def convert_cbaois_to_kpsois(cbaois):
+    """Convert coordinate-based augmentables to KeypointsOnImage instances.
+
+    Added in 0.4.0.
+
+    Parameters
+    ----------
+    cbaois : list of imgaug.augmentables.bbs.BoundingBoxesOnImage or list of imgaug.augmentables.bbs.PolygonsOnImage or list of imgaug.augmentables.bbs.LineStringsOnImage or imgaug.augmentables.bbs.BoundingBoxesOnImage or imgaug.augmentables.bbs.PolygonsOnImage or imgaug.augmentables.bbs.LineStringsOnImage
+        Coordinate-based augmentables to convert, e.g. bounding boxes.
+
+    Returns
+    -------
+    list of imgaug.augmentables.kps.KeypointsOnImage or imgaug.augmentables.kps.KeypointsOnImage
+        ``KeypointsOnImage`` instances containing the coordinates of input
+        `cbaois`.
+
+    """
+    if not isinstance(cbaois, list):
+        return cbaois.to_keypoints_on_image()
+
+    kpsois = []
+    for cbaoi in cbaois:
+        kpsois.append(cbaoi.to_keypoints_on_image())
+    return kpsois
+
+
+def invert_convert_cbaois_to_kpsois_(cbaois, kpsois):
+    """Invert the output of :func:`convert_to_cbaois_to_kpsois` in-place.
+
+    This function writes in-place into `cbaois`.
+
+    Added in 0.4.0.
+
+    Parameters
+    ----------
+    cbaois : list of imgaug.augmentables.bbs.BoundingBoxesOnImage or list of imgaug.augmentables.bbs.PolygonsOnImage or list of imgaug.augmentables.bbs.LineStringsOnImage or imgaug.augmentables.bbs.BoundingBoxesOnImage or imgaug.augmentables.bbs.PolygonsOnImage or imgaug.augmentables.bbs.LineStringsOnImage
+        Original coordinate-based augmentables before they were converted,
+        i.e. the same inputs as provided to :func:`convert_to_kpsois`.
+
+    kpsois : list of imgaug.augmentables.kps.KeypointsOnImages or imgaug.augmentables.kps.KeypointsOnImages
+        Keypoints to convert back to the types of `cbaois`, i.e. the outputs
+        of :func:`convert_cbaois_to_kpsois`.
+
+    Returns
+    -------
+    list of imgaug.augmentables.bbs.BoundingBoxesOnImage or list of imgaug.augmentables.bbs.PolygonsOnImage or list of imgaug.augmentables.bbs.LineStringsOnImage or imgaug.augmentables.bbs.BoundingBoxesOnImage or imgaug.augmentables.bbs.PolygonsOnImage or imgaug.augmentables.bbs.LineStringsOnImage
+        Parameter `cbaois`, with updated coordinates and shapes derived from
+        `kpsois`. `cbaois` is modified in-place.
+
+    """
+    if not isinstance(cbaois, list):
+        assert not isinstance(kpsois, list), (
+            "Expected non-list for `kpsois` when `cbaois` is non-list. "
+            "Got type %s." % (type(kpsois.__name__)),)
+        return cbaois.invert_to_keypoints_on_image_(kpsois)
+
+    result = []
+    for cbaoi, kpsoi in zip(cbaois, kpsois):
+        cbaoi_recovered = cbaoi.invert_to_keypoints_on_image_(kpsoi)
+        result.append(cbaoi_recovered)
+
+    return result
+
+
+# Added in 0.4.0.
+def _remove_out_of_image_fraction_(cbaoi, fraction):
+    cbaoi.items = [
+        item for item in cbaoi.items
+        if item.compute_out_of_image_fraction(cbaoi.shape) < fraction]
+    return cbaoi
+
+
+# Added in 0.4.0.
+def _normalize_shift_args(x, y, top=None, right=None, bottom=None, left=None):
+    """Normalize ``shift()`` arguments to x, y and handle deprecated args."""
+    if any([v is not None for v in [top, right, bottom, left]]):
+        ia.warn_deprecated(
+            "Got one of the arguments `top` (%s), `right` (%s), "
+            "`bottom` (%s), `left` (%s) in a shift() call. "
+            "These are deprecated. Use `x` and `y` instead." % (
+                top, right, bottom, left),
+            stacklevel=3)
+        top = top if top is not None else 0
+        right = right if right is not None else 0
+        bottom = bottom if bottom is not None else 0
+        left = left if left is not None else 0
+        x = x + left - right
+        y = y + top - bottom
+    return x, y

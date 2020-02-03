@@ -1,22 +1,10 @@
 """
 Augmenters that apply mirroring/flipping operations to images.
 
-Do not import directly from this file, as the categorization is not final.
-Use instead ::
-
-    from imgaug import augmenters as iaa
-
-and then e.g. ::
-
-    seq = iaa.Sequential([
-        iaa.Fliplr((0.0, 1.0)),
-        iaa.Flipud((0.0, 1.0))
-    ])
-
 List of augmenters:
 
-    * Fliplr
-    * Flipud
+    * :class:`Fliplr`
+    * :class:`Flipud`
 
 """
 from __future__ import print_function, division, absolute_import
@@ -25,6 +13,7 @@ import numpy as np
 import cv2
 import six.moves as sm
 
+from imgaug.imgaug import _normalize_cv2_input_arr_
 from . import meta
 from .. import parameters as iap
 
@@ -690,7 +679,7 @@ _FLIPLR_DTYPES_CV2 = {"uint8", "uint16", "int8", "int16"}
 def fliplr(arr):
     """Flip an image-like array horizontally.
 
-    dtype support::
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -748,10 +737,24 @@ def _fliplr_cv2(arr):
     # cv2.flip() fails for more than 512 channels
     if arr.ndim == 3 and arr.shape[-1] > 512:
         # TODO this is quite inefficient right now
-        channels = [cv2.flip(arr[..., c], 1) for c in sm.xrange(arr.shape[-1])]
+        channels = [
+            cv2.flip(_normalize_cv2_input_arr_(arr[..., c]), 1)
+            for c
+            in sm.xrange(arr.shape[-1])
+        ]
         result = np.stack(channels, axis=-1)
     else:
-        result = cv2.flip(arr, 1)
+        # Normalization from imgaug.imgaug._normalize_cv2_input_arr_().
+        # Moved here for performance reasons. Keep this aligned.
+        # TODO recalculate timings, they were computed without this.
+        flags = arr.flags
+        if not flags["OWNDATA"]:
+            arr = np.copy(arr)
+            flags = arr.flags
+        if not flags["C_CONTIGUOUS"]:
+            arr = np.ascontiguousarray(arr)
+
+        result = cv2.flip(_normalize_cv2_input_arr_(arr), 1)
 
     if result.ndim == 2 and arr.ndim == 3:
         return result[..., np.newaxis]
@@ -761,7 +764,7 @@ def _fliplr_cv2(arr):
 def flipud(arr):
     """Flip an image-like array vertically.
 
-    dtype support::
+    **Supported dtypes**:
 
         * ``uint8``: yes; fully tested
         * ``uint16``: yes; fully tested
@@ -804,40 +807,50 @@ def flipud(arr):
 
 def HorizontalFlip(*args, **kwargs):
     """Alias for Fliplr."""
+    # pylint: disable=invalid-name
     return Fliplr(*args, **kwargs)
 
 
 def VerticalFlip(*args, **kwargs):
     """Alias for Flipud."""
+    # pylint: disable=invalid-name
     return Flipud(*args, **kwargs)
 
 
 class Fliplr(meta.Augmenter):
     """Flip/mirror input images horizontally.
 
-    .. note ::
+    .. note::
 
         The default value for the probability is ``0.0``.
         So, to flip *all* input images use ``Fliplr(1.0)`` and *not* just
         ``Fliplr()``.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.augmenters.flip.fliplr`.
+    See :func:`~imgaug.augmenters.flip.fliplr`.
 
     Parameters
     ----------
     p : number or imgaug.parameters.StochasticParameter, optional
         Probability of each image to get flipped.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -853,62 +866,66 @@ class Fliplr(meta.Augmenter):
 
     """
 
-    def __init__(self, p=0, name=None, deterministic=False, random_state=None):
+    def __init__(self, p=1,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Fliplr, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.p = iap.handle_probability_param(p, "p")
 
-    def _augment_images(self, images, random_state, parents, hooks):
-        nb_images = len(images)
-        samples = self.p.draw_samples((nb_images,), random_state=random_state)
-        for i, (image, sample) in enumerate(zip(images, samples)):
-            if sample > 0.5:
-                images[i] = fliplr(image)
-        return images
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        samples = self.p.draw_samples((batch.nb_rows,),
+                                      random_state=random_state)
+        for i, sample in enumerate(samples):
+            if sample >= 0.5:
+                if batch.images is not None:
+                    batch.images[i] = fliplr(batch.images[i])
 
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        arrs_flipped = self._augment_images(
-            [heatmaps_i.arr_0to1 for heatmaps_i in heatmaps],
-            random_state=random_state,
-            parents=parents,
-            hooks=hooks
-        )
-        for heatmaps_i, arr_flipped in zip(heatmaps, arrs_flipped):
-            heatmaps_i.arr_0to1 = arr_flipped
-        return heatmaps
+                if batch.heatmaps is not None:
+                    batch.heatmaps[i].arr_0to1 = fliplr(
+                        batch.heatmaps[i].arr_0to1)
 
-    def _augment_segmentation_maps(self, segmaps, random_state, parents, hooks):
-        arrs_flipped = self._augment_images(
-            [segmaps_i.arr for segmaps_i in segmaps],
-            random_state=random_state,
-            parents=parents,
-            hooks=hooks
-        )
-        for segmaps_i, arr_flipped in zip(segmaps, arrs_flipped):
-            segmaps_i.arr = arr_flipped
-        return segmaps
+                if batch.segmentation_maps is not None:
+                    batch.segmentation_maps[i].arr = fliplr(
+                        batch.segmentation_maps[i].arr)
 
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
-        nb_images = len(keypoints_on_images)
-        samples = self.p.draw_samples((nb_images,), random_state=random_state)
-        for i, keypoints_on_image in enumerate(keypoints_on_images):
-            if not keypoints_on_image.keypoints:
-                continue
-            elif samples[i] > 0.5:
-                width = keypoints_on_image.shape[1]
-                for keypoint in keypoints_on_image.keypoints:
-                    keypoint.x = width - float(keypoint.x)
-        return keypoints_on_images
+                if batch.keypoints is not None:
+                    kpsoi = batch.keypoints[i]
+                    width = kpsoi.shape[1]
+                    for kp in kpsoi.keypoints:
+                        kp.x = width - float(kp.x)
 
-    def _augment_polygons(self, polygons_on_images, random_state, parents,
-                          hooks):
-        # TODO maybe reverse the order of points afterwards? the flip probably
-        #      inverts them
-        return self._augment_polygons_as_keypoints(
-            polygons_on_images, random_state, parents, hooks)
+                if batch.bounding_boxes is not None:
+                    bbsoi = batch.bounding_boxes[i]
+                    width = bbsoi.shape[1]
+                    for bb in bbsoi.bounding_boxes:
+                        # after flip, x1 ends up right of x2
+                        x1, x2 = bb.x1, bb.x2
+                        bb.x1 = width - x2
+                        bb.x2 = width - x1
+
+                if batch.polygons is not None:
+                    psoi = batch.polygons[i]
+                    width = psoi.shape[1]
+                    for poly in psoi.polygons:
+                        # TODO maybe reverse the order of points afterwards?
+                        #      the flip probably inverts them
+                        poly.exterior[:, 0] = width - poly.exterior[:, 0]
+
+                if batch.line_strings is not None:
+                    lsoi = batch.line_strings[i]
+                    width = lsoi.shape[1]
+                    for ls in lsoi.line_strings:
+                        # TODO maybe reverse the order of points afterwards?
+                        #      the flip probably inverts them
+                        ls.coords[:, 0] = width - ls.coords[:, 0]
+
+        return batch
 
     def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p]
 
 
@@ -916,29 +933,37 @@ class Fliplr(meta.Augmenter):
 class Flipud(meta.Augmenter):
     """Flip/mirror input images vertically.
 
-    .. note ::
+    .. note::
 
         The default value for the probability is ``0.0``.
         So, to flip *all* input images use ``Flipud(1.0)`` and *not* just
         ``Flipud()``.
 
-    dtype support::
+    **Supported dtypes**:
 
-        See :func:`imgaug.augmenters.flip.flipud`.
+    See :func:`~imgaug.augmenters.flip.flipud`.
 
     Parameters
     ----------
     p : number or imgaug.parameters.StochasticParameter, optional
         Probability of each image to get flipped.
 
+    seed : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
     name : None or str, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        See :func:`~imgaug.augmenters.meta.Augmenter.__init__`.
+
+    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
+        Old name for parameter `seed`.
+        Its usage will not yet cause a deprecation warning,
+        but it is still recommended to use `seed` now.
+        Outdated since 0.4.0.
 
     deterministic : bool, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
-
-    random_state : None or int or imgaug.random.RNG or numpy.random.Generator or numpy.random.bit_generator.BitGenerator or numpy.random.SeedSequence or numpy.random.RandomState, optional
-        See :func:`imgaug.augmenters.meta.Augmenter.__init__`.
+        Deprecated since 0.4.0.
+        See method ``to_deterministic()`` for an alternative and for
+        details about what the "deterministic mode" actually does.
 
     Examples
     --------
@@ -953,61 +978,66 @@ class Flipud(meta.Augmenter):
 
     """
 
-    def __init__(self, p=0, name=None, deterministic=False, random_state=None):
+    def __init__(self, p=1,
+                 seed=None, name=None,
+                 random_state="deprecated", deterministic="deprecated"):
         super(Flipud, self).__init__(
-            name=name, deterministic=deterministic, random_state=random_state)
+            seed=seed, name=name,
+            random_state=random_state, deterministic=deterministic)
         self.p = iap.handle_probability_param(p, "p")
 
-    def _augment_images(self, images, random_state, parents, hooks):
-        nb_images = len(images)
-        samples = self.p.draw_samples((nb_images,), random_state=random_state)
-        for i, (image, sample) in enumerate(zip(images, samples)):
-            if sample > 0.5:
-                # We currently do not use flip.flipud() here, because that
-                # saves a function call.
-                images[i] = image[::-1, ...]
-        return images
+    # Added in 0.4.0.
+    def _augment_batch_(self, batch, random_state, parents, hooks):
+        samples = self.p.draw_samples((batch.nb_rows,),
+                                      random_state=random_state)
+        for i, sample in enumerate(samples):
+            if sample >= 0.5:
+                if batch.images is not None:
+                    # We currently do not use flip.flipud() here, because that
+                    # saves a function call.
+                    batch.images[i] = batch.images[i][::-1, ...]
 
-    def _augment_heatmaps(self, heatmaps, random_state, parents, hooks):
-        arrs_flipped = self._augment_images(
-            [heatmaps_i.arr_0to1 for heatmaps_i in heatmaps],
-            random_state=random_state,
-            parents=parents,
-            hooks=hooks
-        )
-        for heatmaps_i, arr_flipped in zip(heatmaps, arrs_flipped):
-            heatmaps_i.arr_0to1 = arr_flipped
-        return heatmaps
+                if batch.heatmaps is not None:
+                    batch.heatmaps[i].arr_0to1 = \
+                        batch.heatmaps[i].arr_0to1[::-1, ...]
 
-    def _augment_segmentation_maps(self, segmaps, random_state, parents, hooks):
-        arrs_flipped = self._augment_images(
-            [segmaps_i.arr for segmaps_i in segmaps],
-            random_state=random_state,
-            parents=parents,
-            hooks=hooks
-        )
-        for segmaps_i, arr_flipped in zip(segmaps, arrs_flipped):
-            segmaps_i.arr = arr_flipped
-        return segmaps
+                if batch.segmentation_maps is not None:
+                    batch.segmentation_maps[i].arr = \
+                        batch.segmentation_maps[i].arr[::-1, ...]
 
-    def _augment_keypoints(self, keypoints_on_images, random_state, parents,
-                           hooks):
-        nb_images = len(keypoints_on_images)
-        samples = self.p.draw_samples((nb_images,), random_state=random_state)
-        for i, keypoints_on_image in enumerate(keypoints_on_images):
-            if not keypoints_on_image.keypoints:
-                continue
-            elif samples[i] > 0.5:
-                height = keypoints_on_image.shape[0]
-                for keypoint in keypoints_on_image.keypoints:
-                    keypoint.y = height - float(keypoint.y)
-        return keypoints_on_images
+                if batch.keypoints is not None:
+                    kpsoi = batch.keypoints[i]
+                    height = kpsoi.shape[0]
+                    for kp in kpsoi.keypoints:
+                        kp.y = height - float(kp.y)
 
-    def _augment_polygons(self, polygons_on_images, random_state, parents,
-                          hooks):
-        # TODO how does flipping affect the point order?
-        return self._augment_polygons_as_keypoints(
-            polygons_on_images, random_state, parents, hooks)
+                if batch.bounding_boxes is not None:
+                    bbsoi = batch.bounding_boxes[i]
+                    height = bbsoi.shape[0]
+                    for bb in bbsoi.bounding_boxes:
+                        # after flip, y1 ends up right of y2
+                        y1, y2 = bb.y1, bb.y2
+                        bb.y1 = height - y2
+                        bb.y2 = height - y1
+
+                if batch.polygons is not None:
+                    psoi = batch.polygons[i]
+                    height = psoi.shape[0]
+                    for poly in psoi.polygons:
+                        # TODO maybe reverse the order of points afterwards?
+                        #      the flip probably inverts them
+                        poly.exterior[:, 1] = height - poly.exterior[:, 1]
+
+                if batch.line_strings is not None:
+                    lsoi = batch.line_strings[i]
+                    height = lsoi.shape[0]
+                    for ls in lsoi.line_strings:
+                        # TODO maybe reverse the order of points afterwards?
+                        #      the flip probably inverts them
+                        ls.coords[:, 1] = height - ls.coords[:, 1]
+
+        return batch
 
     def get_parameters(self):
+        """See :func:`~imgaug.augmenters.meta.Augmenter.get_parameters`."""
         return [self.p]

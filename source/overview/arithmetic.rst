@@ -88,7 +88,7 @@ distribution ``N(0, 0.05*255)``::
     :alt: AdditiveGaussianNoise large
 
 **Example.**
-Add laplace noise to an image, sampled channelwise from
+Add gaussian noise to an image, sampled channelwise from
 ``N(0, 0.2*255)`` (i.e. three independent samples per pixel)::
 
     aug = iaa.AdditiveGaussianNoise(scale=0.2*255, per_channel=True)
@@ -268,6 +268,82 @@ sample one multiplier independently per channel and pixel::
     :alt: MultiplyElementwise per channel
 
 
+Cutout
+------
+
+Fill one or more rectangular areas in an image using a fill mode.
+
+See paper "Improved Regularization of Convolutional Neural Networks with
+Cutout" by DeVries and Taylor.
+
+In contrast to the paper, this implementation also supports replacing
+image sub-areas with gaussian noise, random intensities or random RGB
+colors. It also supports non-squared areas. While the paper uses
+absolute pixel values for the size and position, this implementation
+uses relative values, which seems more appropriate for mixed-size
+datasets. The position parameter furthermore allows more flexibility, e.g.
+gaussian distributions around the center.
+
+.. note::
+
+    This augmenter affects only image data. Other datatypes (e.g.
+    segmentation map pixels or keypoints within the filled areas)
+    are not affected.
+
+.. note::
+
+    Gaussian fill mode will assume that float input images contain values
+    in the interval ``[0.0, 1.0]`` and hence sample values from a
+    gaussian within that interval, i.e. from ``N(0.5, std=0.5/3)``.
+
+API link: :class:`~imgaug.augmenters.arithmetic.MultiplyElementwise`
+
+**Example.**
+Fill per image two random areas, by default with grayish pixels::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Cutout(nb_iterations=2)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_nb_iterations_2.jpg
+    :alt: Cutout with nb_iterations=2
+
+**Example.**
+Fill per image between one and five areas, each having ``20%``
+of the corresponding size of the height and width (for non-square
+images this results in non-square areas to be filled). ::
+
+    aug = iaa.Cutout(nb_iterations=(1, 5), size=0.2, squared=False)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_non_square.jpg
+    :alt: Cutout non-square
+
+**Example.**
+Fill all areas with white pixels::
+
+    aug = iaa.Cutout(fill_mode="constant", cval=255)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_cval_255.jpg
+    :alt: Cutout with cval=255
+
+**Example.**
+Fill ``50%`` of all areas with a random intensity value between
+``0`` and ``256``. Fill the other ``50%`` of all areas with random colors. ::
+
+    aug = iaa.Cutout(fill_mode="constant", cval=(0, 255),
+                     fill_per_channel=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_rgb.jpg
+    :alt: Cutout with RGB filling
+
+**Example.**
+Fill areas with gaussian channelwise noise (i.e. usually RGB). ::
+
+    aug = iaa.Cutout(fill_mode="gaussian", fill_per_channel=True)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/cutout_gaussian.jpg
+    :alt: Cutout with gaussian filling
+
+
 Dropout
 -------
 
@@ -336,6 +412,80 @@ to 0 while others remain untouched::
 
 .. figure:: ../../images/overview_of_augmenters/arithmetic/coarsedropout_per_channel.jpg
     :alt: CoarseDropout per channel
+
+
+Dropout2D
+---------
+
+Drop random channels from images.
+
+For image data, dropped channels will be filled with zeros.
+
+.. note::
+
+    This augmenter may also set the arrays of heatmaps and segmentation
+    maps to zero and remove all coordinate-based data (e.g. it removes
+    all bounding boxes on images that were filled with zeros).
+    It does so if and only if *all* channels of an image are dropped.
+    If ``nb_keep_channels >= 1`` then that never happens.
+
+API link: :func:`~imgaug.augmenters.arithmetic.Dropout2d`
+
+**Example.**
+Create a dropout augmenter that drops on average half of all image
+channels. Dropped channels will be filled with zeros. At least one
+channel is kept unaltered in each image (default setting). ::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Dropout2d(p=0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/dropout2d.jpg
+    :alt: Dropout2d
+
+**Example.**
+Create a dropout augmenter that drops on average half of all image
+channels *and* may drop *all* channels in an image (i.e. images may
+contain nothing but zeros)::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.Dropout2d(p=0.5, nb_keep_channels=0)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/dropout2d_keep_no_channels.jpg
+    :alt: Dropout2d with nb_keep_channels=0
+
+
+TotalDropout
+------------
+
+Drop all channels of a defined fraction of all images.
+
+For image data, all components of dropped images will be filled with zeros.
+
+.. note::
+
+    This augmenter also sets the arrays of heatmaps and segmentation
+    maps to zero and removes all coordinate-based data (e.g. it removes
+    all bounding boxes on images that were filled with zeros).
+
+API link: :func:`~imgaug.augmenters.arithmetic.TotalDropout`
+
+**Example.**
+Create an augmenter that sets *all* components of all images to zero::
+
+    import imgaug.augmenters as iaa
+    aug = iaa.TotalDropout(1.0)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/totaldropout_100_percent.jpg
+    :alt: TotalDropout at 100%
+
+**Example.**
+Create an augmenter that sets *all* components of ``50%`` of all images to
+zero::
+
+    aug = iaa.TotalDropout(0.5)
+
+.. figure:: ../../images/overview_of_augmenters/arithmetic/totaldropout_50_percent.jpg
+    :alt: TotalDropout at 50%
 
 
 ReplaceElementwise
@@ -610,30 +760,27 @@ For 50% of all images, invert all pixels in these images with 25% probability
     :alt: Invert per channel
 
 
-ContrastNormalization
----------------------
+Solarize
+--------
 
-Augmenter that changes the contrast of images.
+Invert all values above a threshold in images.
 
-API link: :class:`~imgaug.augmenters.arithmetic.ContrastNormalization`
+This is the same as :class:`Invert`, but sets a default threshold around
+``128`` (+/- 64, decided per image) and default `invert_above_threshold`
+to ``True`` (i.e. only values above the threshold will be inverted).
+
+API link: :class:`~imgaug.augmenters.arithmetic.Solarize`
 
 **Example.**
-Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image::
+Invert the colors in ``50`` percent of all images for pixels with a
+value between ``32`` and ``128`` or more. The threshold is sampled once
+per image. The thresholding operation happens per channel. ::
 
     import imgaug.augmenters as iaa
-    aug = iaa.ContrastNormalization((0.5, 1.5))
+    aug = iaa.Solarize(0.5, threshold=(32, 128))
 
-.. figure:: ../../images/overview_of_augmenters/arithmetic/contrastnormalization.jpg
-    :alt: ContrastNormalization
-
-**Example.**
-Normalize contrast by a factor of 0.5 to 1.5, sampled randomly per image
-and for 50% of all images also independently per channel::
-
-    aug = iaa.ContrastNormalization((0.5, 1.5), per_channel=0.5)
-
-.. figure:: ../../images/overview_of_augmenters/arithmetic/contrastnormalization_per_channel.jpg
-    :alt: ContrastNormalization per channel
+.. figure:: ../../images/overview_of_augmenters/arithmetic/solarize.jpg
+    :alt: Solarize
 
 
 JpegCompression
