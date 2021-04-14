@@ -326,7 +326,8 @@ Fill all areas with white pixels::
     :alt: Cutout with cval=255
 
 **Example.**
-Fill ``50%`` of all areas with a random intensity value between
+Fill ``
+%`` of all areas with a random intensity value between
 ``0`` and ``256``. Fill the other ``50%`` of all areas with random colors. ::
 
     aug = iaa.Cutout(fill_mode="constant", cval=(0, 255),
@@ -392,7 +393,7 @@ size, leading to 2x2 squares being dropped::
 
 **Example.**
 Drop 0 to 5% of all pixels by converting them to black pixels, but do
-that on a lower-resolution version of the image that has 5% to 50% of the
+that on a lower-resolution version of the image that has 2% to 25% of the
 original size, leading to large rectangular areas being dropped::
 
     import imgaug.augmenters as iaa
